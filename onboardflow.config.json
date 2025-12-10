@@ -1,0 +1,26 @@
+{
+  "$schema": "https://onboardflow.dev/schema.json",
+  "version": "1.0",
+  "flows": [],
+  "theme": {
+    "primaryColor": "#000000",
+    "borderRadius": "0.5rem",
+    "fontFamily": "system-ui"
+  },
+  "integrations": {
+    "supabase": {
+      "enabled": false,
+      "url": "",
+      "anonKey": ""
+    },
+    "email": {
+      "enabled": false,
+      "provider": "resend"
+    }
+  },
+  "features": {
+    "analytics": false,
+    "multiLanguage": false,
+    "darkMode": true
+  }
+}
