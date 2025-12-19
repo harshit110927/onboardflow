@@ -38,3 +38,4 @@ jobs:
           DATABASE_URL: "postgresql://user:password@localhost:5432/mock_db"
           RESEND_API_KEY: "re_mock_key_123"
           NEXT_PUBLIC_APP_URL: "http://localhost:3000"
+          STRIPE_SECRET_KEY: "sk_test_mock_key_12345"
