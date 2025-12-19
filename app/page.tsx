@@ -1,10 +1,9 @@
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { login } from "./actions";
-// 👇 Import redirection tools
 import { createClient } from "@/utils/supabase/server"; 
 import { redirect } from "next/navigation";
+import { SubmitButton } from "@/components/submit-button"; 
 
 export default async function Home() {
   // 1. CHECK SESSION
@@ -25,7 +24,8 @@ export default async function Home() {
           <CardDescription>Enter your email to sign in to your dashboard</CardDescription>
         </CardHeader>
         <CardContent>
-          <form className="space-y-4">
+          {/* MOVE action={login} HERE */}
+          <form action={login} className="space-y-4">
             <div className="space-y-2">
               <Input
                 id="email"
@@ -35,9 +35,9 @@ export default async function Home() {
                 required
               />
             </div>
-            <Button formAction={login} className="w-full" type="submit">
-              Send Magic Link
-            </Button>
+            
+            {/* Submit Button  */}
+            <SubmitButton />
           </form>
         </CardContent>
       </Card>
