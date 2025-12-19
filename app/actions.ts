@@ -2,28 +2,30 @@
 
 import { createClient } from "@/utils/supabase/server";
 import { redirect } from "next/navigation";
+import { headers } from "next/headers"; 
 
 export async function login(formData: FormData) {
   const supabase = await createClient();
   const email = formData.get("email") as string;
+  
+  // 1. Get the current website URL (works for Localhost AND Vercel)
+  const origin = (await headers()).get("origin");
 
-  // 1. Send the Magic Link via Supabase
+  // 2. Send the Magic Link
   const { error } = await supabase.auth.signInWithOtp({
     email,
     options: {
-      shouldCreateUser: true, // Allows new users to sign up
-      // IMPORTANT: This must match your localhost URL
-      emailRedirectTo: "http://localhost:3000/auth/callback", 
+      shouldCreateUser: true,
+      // Dynamic: Sends them to /auth/callback on the CURRENT site
+      emailRedirectTo: `${origin}/auth/callback`, 
     },
   });
 
   if (error) {
     console.error("Login Error:", error);
-    // In a real app, you would return this error to display it
     return redirect("/?error=true");
   }
 
-  // 2. Redirect to a generic "Check your email" page
-  // (Or just back to home, where you can show a success message)
-  redirect("/dashboard"); // Or wherever you want them to land while they wait
+  // 3. Send them to the waiting room (NOT Dashboard yet)
+  return redirect("/check-email"); 
 }
