@@ -1,0 +1,40 @@
+name: Pro CI Pipeline
+
+on:
+  push:
+    branches: [main]       # Run when code lands in main
+  pull_request:
+    branches: [main]       # Run on every PR targeting main
+
+jobs:
+  quality-check:
+    name: Build, Lint, & Type Check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Check Types (TypeScript)
+        run: npx tsc --noEmit
+
+      - name: Run Linter
+        run: npm run lint
+
+      - name: Attempt Build
+        run: npm run build
+        env:
+          # Dummy values to prevent build crashing due to missing env vars
+          # (Next.js build checks for these variables presence)
+          DATABASE_URL: "postgresql://user:password@localhost:5432/mock_db"
+          RESEND_API_KEY: "re_mock_key_123"
+          NEXT_PUBLIC_APP_URL: "http://localhost:3000"
