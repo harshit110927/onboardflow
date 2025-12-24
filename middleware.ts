@@ -1,8 +1,15 @@
-import { type NextRequest } from 'next/server'
-import { updateSession } from '@/utils/supabase/middleware'
+import { type NextRequest, NextResponse } from "next/server";
+import { updateSession } from "@/utils/supabase/middleware"; // 👈 This imports the file you just showed me
 
 export async function middleware(request: NextRequest) {
-  return await updateSession(request)
+  //  1. IGNORE AUTH for Stripe Webhooks
+  // This lets the "robot" pass through without logging in.
+  if (request.nextUrl.pathname.startsWith("/api/webhook")) {
+    return NextResponse.next();
+  }
+
+  // 2. For everything else, check Supabase Auth
+  return await updateSession(request);
 }
 
 export const config = {
@@ -12,8 +19,8 @@ export const config = {
      * - _next/static (static files)
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
-     * Feel free to modify this pattern to include more paths.
+     * - images - .svg, .png, .jpg, .jpeg, .gif, .webp
      */
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
-}
+};
