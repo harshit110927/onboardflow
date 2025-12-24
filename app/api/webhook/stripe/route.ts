@@ -4,6 +4,7 @@ import Stripe from 'stripe'
 import { db } from '@/db'
 import { tenants } from '@/db/schema'
 import { eq } from 'drizzle-orm'
+import crypto from 'crypto' // 👈 Don't forget this import!
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string)
 
@@ -14,7 +15,6 @@ export async function POST(req: Request) {
   let event: Stripe.Event
 
   try {
-    // 1. Verify the event came from Stripe
     event = stripe.webhooks.constructEvent(
       body,
       signature,
@@ -24,17 +24,20 @@ export async function POST(req: Request) {
     return new NextResponse(`Webhook Error: ${error.message}`, { status: 400 })
   }
 
-  // 2. Handle the "Checkout Completed" event
   if (event.type === 'checkout.session.completed') {
     const session = event.data.object as Stripe.Checkout.Session
     const email = session.customer_details?.email
 
     if (email) {
-      // 3. Update the database to unlock the account
+      // 1. Generate the Key HERE 
+      const newApiKey = "obf_live_" + crypto.randomBytes(24).toString("hex");
+
+      // 2. Save it to the database
       await db.update(tenants)
         .set({ 
           hasAccess: true,
-          stripeCustomerId: session.customer as string 
+          stripeCustomerId: session.customer as string,
+          apiKey: newApiKey // 👈 This is what you were missing!
         })
         .where(eq(tenants.email, email))
     }

@@ -2,16 +2,14 @@ import { createClient } from "@/utils/supabase/server";
 import { redirect } from "next/navigation";
 import { db } from "@/db";
 import { tenants, endUsers } from "@/db/schema";
-import { eq, desc } from "drizzle-orm"; 
+import { eq } from "drizzle-orm"; 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-// Keeping your existing Payment Action
-import { createCheckoutSession } from "./actions";
+import { createCheckoutSession } from "./actions"; // Keeping your existing Payment Action
 import Link from "next/link";
-// Added 'BookOpen' to the imports for the Docs icon
-import { ArrowRight, Users, CheckCircle, Copy, BookOpen, Settings } from "lucide-react";
-import { ApiKeyCard } from "./ApiKeyCard";
+import { ArrowRight, Users, CheckCircle, BookOpen, Settings } from "lucide-react";
+import { ApiKeyCard } from "./ApiKeyCard"; // Ensure this file exists in the same folder
 
 export default async function Dashboard() {
   const supabase = await createClient();
@@ -58,11 +56,6 @@ export default async function Dashboard() {
       ? Math.round((activatedCount / totalUsers) * 100) 
       : 0;
   }
-
-  // 3. PREPARE MASKED KEY
-  const maskedKey = tenant.apiKey 
-    ? `${tenant.apiKey.substring(0, 8)}****************************` 
-    : "No API Key Generated";
 
   return (
     <div className="min-h-screen bg-gray-50 p-8">
@@ -150,8 +143,7 @@ export default async function Dashboard() {
           </Card>
         </div>
 
-        {/* API Key Section (MASKED UI) */}
-        {/* API Key Section (Replaced with the working Client Component) */}
+        {/* API Key Section (Client Component) */}
         {tenant.hasAccess && (
              <ApiKeyCard apiKey={tenant.apiKey} />
         )}
