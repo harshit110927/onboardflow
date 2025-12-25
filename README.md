@@ -32,9 +32,9 @@ OnboardFlow offers a drop-in integration that connects these services instantly.
 Install the package via your preferred package manager:
 
 ```bash
-npm install @onboardflow/sdk
+npm install onboardflow
 # or
-yarn add @onboardflow/sdk
+yarn add onboardflow
 ```
 
 ## Configuration
