@@ -4,7 +4,7 @@ import Stripe from 'stripe'
 import { db } from '@/db'
 import { tenants } from '@/db/schema'
 import { eq } from 'drizzle-orm'
-import crypto from 'crypto' // 👈 Don't forget this import!
+import crypto from 'crypto' 
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string)
 

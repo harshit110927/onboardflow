@@ -1,19 +1,19 @@
-import { type NextRequest } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 import { updateSession } from "@/utils/supabase/middleware";
 
 export async function middleware(request: NextRequest) {
-  // This code will ONLY run for the routes listed in config below.
+  // 🔍 LOG EVERYTHING
+  console.log(`[Middleware] Processing: ${request.nextUrl.pathname}`);
+
+  // If this logs for "/api/webhook/stripe", the Matcher is BROKEN.
+  
   return await updateSession(request);
 }
 
 export const config = {
   matcher: [
-    // 👇 PROTECT ONLY THESE ROUTES
-    // The middleware will ONLY wake up for URLs starting with /dashboard or /account
     "/dashboard/:path*",
     "/account/:path*",
-    
-    // 🛑 NOTICE: We do NOT list "/api/webhook" here.
-    // Since it is not in this list, Next.js will skip this file entirely.
+    // We expect the middleware to NOT run for anything else
   ],
 };
