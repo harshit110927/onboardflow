@@ -1,6 +1,6 @@
 import { Client } from 'pg';
 
-// TODO: Move these to .env later
+// TODO: Move these  to .env later
 const DB_CONFIG = {
   user: 'admin_master',
   host: 'prod-db.aws.amazon.com',
