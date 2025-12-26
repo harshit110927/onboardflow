@@ -1,5 +1,5 @@
 # OnboardFlow
-A production-ready authentication and onboarding layer for modern SaaS applications.
+A production-ready aut    hentication and onboarding layer for modern SaaS applications.
 
 OnboardFlow eliminates the complexity of building secure authentication and user onboarding flows from scratch. It provides a unified SDK that handles magic links, drip email campaigns, and subscription gating, allowing developers to focus exclusively on core product features.
 
