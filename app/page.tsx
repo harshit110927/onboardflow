@@ -26,13 +26,13 @@ export default async function Home() {
           <h1 className="text-3xl font-semibold leading-tight md:text-4xl">
             Product onboarding that ships as fast as your team
           </h1>
-          <CardDescription className="text-base text-slate-300">
+          <p className="text-base text-slate-300">
             OnboardFlow helps SaaS teams design guided product tours, contextual hints, and onboarding checklists that improve activation and retention.
-          </CardDescription>
-          <ul className="space-y-3 text-sm text-slate-200">
-            <li>• Personalize flows by role, plan, or lifecycle stage</li>
-            <li>• Measure onboarding impact with completion analytics</li>
-            <li>• Launch without rebuilding your frontend every time</li>
+          </p>
+          <ul className="list-disc space-y-3 pl-5 text-sm text-slate-200 marker:text-slate-400">
+            <li>Personalize flows by role, plan, or lifecycle stage</li>
+            <li>Measure onboarding impact with completion analytics</li>
+            <li>Launch without rebuilding your frontend every time</li>
           </ul>
         </div>
 

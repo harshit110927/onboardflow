@@ -18,10 +18,10 @@ export default function LoginPage() {
           <p className="text-base text-slate-300">
             OnboardFlow helps you create in-app tours, checklists, and progress nudges that activate users faster without shipping custom UI each sprint.
           </p>
-          <ul className="space-y-3 text-sm text-slate-200">
-            <li>• Build no-code onboarding flows tailored by user segment</li>
-            <li>• Track completion and drop-off from a single dashboard</li>
-            <li>• Embed onboarding widgets directly in your app</li>
+          <ul className="list-disc space-y-3 pl-5 text-sm text-slate-200 marker:text-slate-400">
+            <li>Build no-code onboarding flows tailored by user segment</li>
+            <li>Track completion and drop-off from a single dashboard</li>
+            <li>Embed onboarding widgets directly in your app</li>
           </ul>
         </div>
 
@@ -37,7 +37,7 @@ export default function LoginPage() {
           <CardContent>
             <form action={login} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="email">Work email</Label>
+                <Label htmlFor="email">Email</Label>
                 <Input
                   id="email"
                   name="email"
@@ -47,7 +47,7 @@ export default function LoginPage() {
                   className="border-slate-700 bg-slate-950/70"
                 />
               </div>
-              <Button type="submit" className="w-full bg-emerald-500 text-emerald-950 hover:bg-emerald-400">
+              <Button type="submit" className="w-full">
                 Continue with Magic Link
               </Button>
             </form>
