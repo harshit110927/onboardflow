@@ -8,8 +8,9 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import Link from "next/link";
-import { ArrowLeft, Save, Mail, Zap, GitCommit, CheckCircle, Loader2, Play } from "lucide-react";
+import { ArrowLeft, Save, Mail, Zap, GitCommit, CheckCircle, Loader2, Play, LogOut } from "lucide-react";
 import { toast } from "sonner";
+import { logout } from "./actions";
 
 export default function SettingsPage() {
   const [automationEnabled, setAutomationEnabled] = useState(false);
@@ -288,6 +289,26 @@ export default function SettingsPage() {
                         Users who passed the old steps will not be counted in the new funnel.
                     </p>
             </div>
+
+            <Card className="border-dashed border-amber-200 bg-background">
+                <CardHeader>
+                    <CardTitle>Session</CardTitle>
+                    <CardDescription>
+                        Log out of OnboardFlow on this device when you're done managing your automation settings.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                    <p className="text-sm text-muted-foreground">
+                        This signs you out securely and returns you to the login screen.
+                    </p>
+                    <form action={logout}>
+                        <Button type="submit" variant="destructive" className="w-full sm:w-auto">
+                            <LogOut className="mr-2 h-4 w-4" />
+                            Log out
+                        </Button>
+                    </form>
+                </CardContent>
+            </Card>
         </div>
       </div>
     </div>
