@@ -1,4 +1,4 @@
-// MODIFIED — tier selection
+// NEW FILE — created for tier selection feature
 import { eq } from "drizzle-orm";
 import { redirect } from "next/navigation";
 
@@ -6,7 +6,9 @@ import { db } from "@/db";
 import { tenants } from "@/db/schema";
 import { createClient } from "@/utils/supabase/server";
 
-export default async function DashboardPage() {
+import { TierSelectionClient } from "./_components/TierSelectionClient";
+
+export default async function TierSelectionPage() {
   const supabase = await createClient();
   const {
     data: { user },
@@ -24,9 +26,9 @@ export default async function DashboardPage() {
 
   const tier = rows[0]?.tier ?? null;
 
-  if (!tier) {
-    redirect("/tier-selection");
+  if (tier) {
+    redirect(`/dashboard/${tier}`);
   }
 
-  redirect(`/dashboard/${tier}`);
+  return <TierSelectionClient />;
 }
