@@ -1,7 +1,7 @@
 // NEW FILE — created for tier selection feature
 import { and, asc, eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
-import { z } from "next/dist/compiled/zod";
+import { z } from "zod";
 
 import { db } from "@/db";
 import { individualContacts, individualLists, tenants } from "@/db/schema";
