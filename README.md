@@ -1,119 +1,137 @@
 # OnboardFlow
-A production-ready authentication and onboarding layer for modern SaaS applications.
 
-OnboardFlow eliminates the complexity of building secure authentication and user onboarding flows from scratch. It provides a unified SDK that handles magic links, drip email campaigns, and subscription gating, allowing developers to focus exclusively on core product features.
+A unified authentication and onboarding platform for developers and small businesses.
 
-## Table of Contents
-- [Overview](#overview)
-- [Key Features](#key-features)
-- [Installation](#installation)
-- [Configuration](#configuration)
-- [Usage](#usage)
-  - [Protecting Routes (Middleware)](#1-protecting-routes-middleware)
-  - [Accessing User Sessions](#2-accessing-user-sessions)
-  - [Triggering Events](#3-triggering-events)
-- [License](#license)
+OnboardFlow comes in two tiers — **Enterprise** for developers building SaaS products, and **Individual** for freelancers and small businesses who want email list management without writing code.
 
-## Overview
-### The Problem
-Early-stage startups frequently lose significant development time implementing redundant infrastructure. Integrating secure authentication (Auth0/Supabase), payment processing (Stripe), and email automation (Resend/SendGrid) often takes weeks of engineering effort before the core product can be tested.
+Live: <a href="https://onboardflow-three.vercel.app">onboardflow-three.vercel.app</a>
 
-### The Solution
-OnboardFlow offers a drop-in integration that connects these services instantly. By installing the SDK, developers gain a pre-built authentication flow, automated welcome emails, and subscription management without managing the underlying infrastructure.
+---
 
-## Key Features
-- **Magic Link Authentication**: Secure, passwordless login flows that reduce friction and increase conversion rates.
-- **Subscription Gating**: Built-in middleware to protect routes based on Stripe subscription status (Active, Past Due, Canceled).
-- **Automated Onboarding**: Trigger email sequences automatically when users sign up or upgrade their plans.
-- **Developer Dashboard**: A centralized view to manage API keys, view user sessions, and track revenue metrics.
-- **Type-Safe SDK**: Full TypeScript support with comprehensive type definitions for user sessions and subscription data.
+## What it does
 
-## Installation
+### Enterprise Tier — For Developers
+Drop-in authentication and onboarding automation for your SaaS product. Install the SDK, get magic link auth, automated drip emails, and a developer dashboard — without building any of it from scratch.
+
+### Individual Tier — For Small Businesses
+No code required. Create email lists, manage contacts, build campaigns, and send emails directly from the dashboard. Free to start.
+
+---
+
+## Enterprise — Key Features
+
+- **Magic Link Authentication** — Passwordless, secure login flows
+- **Automated Onboarding Emails** — Drip sequences triggered by user behaviour (step completion, inactivity nudges)
+- **Smart Nudges** — Re-engage users who haven't activated after 1 hour or 24 hours
+- **Developer Dashboard** — Manage API keys, view user analytics, configure automation steps
+- **Type-Safe SDK** — Full TypeScript support
+
+## Individual — Key Features
+
+- **Email Lists** — Create and manage up to 3 lists
+- **Contact Management** — Add and remove contacts (up to 10 per list)
+- **Email Campaigns** — Write, schedule, and send campaigns via Resend
+- **Basic Analytics** — Track campaign status (draft, scheduled, sent)
+
+---
+
+## Tech Stack
+
+- **Framework**: Next.js 15 (App Router, TypeScript)
+- **Database**: PostgreSQL via Supabase + Drizzle ORM
+- **Auth**: Supabase Auth (Magic Link + Google OAuth)
+- **Email**: Resend
+- **Payments**: Stripe (coming soon)
+- **Hosting**: Vercel
+
+---
+
+## Enterprise SDK — Quick Start
+
+### Installation
+
 Install the package via your preferred package manager:
 
-```bash
-npm install onboardflow
-# or
-yarn add onboardflow
-```
+    npm install onboardflow
 
-## Configuration
-To start using the SDK, you must initialize the client with your project credentials.
+### Configuration
 
-1. Navigate to the Developer Settings in your OnboardFlow dashboard.
-2. Generate a new Public API Key.
-3. Add the key to your environment variables file (`.env.local`):
+1. Sign up at onboardflow-three.vercel.app
+2. Choose the Enterprise tier
+3. Copy your API key from the dashboard
+4. Add to your .env.local file:
 
-```bash
-NEXT_PUBLIC_ONBOARDFLOW_KEY=obf_live_xxxxxxxxxxxxx
-```
+    NEXT_PUBLIC_ONBOARDFLOW_KEY=obf_live_xxxxxxxxxxxxx
 
-### Client Initialization
-Initialize the OnboardFlow instance in a shared utility file (e.g., `lib/onboardflow.ts`):
+### Initialize the client
 
-```typescript
-import { OnboardFlow } from '@onboardflow/sdk';
+Create a shared utility file at lib/onboardflow.ts:
 
-export const onboard = new OnboardFlow({
-  apiKey: process.env.NEXT_PUBLIC_ONBOARDFLOW_KEY,
-});
-```
+    import { OnboardFlow } from '@onboardflow/sdk';
+    
+    export const onboard = new OnboardFlow({
+      apiKey: process.env.NEXT_PUBLIC_ONBOARDFLOW_KEY,
+    });
 
-## Usage
-### 1. Protecting Routes (Middleware)
-Use the provided middleware to automatically restrict access to unauthenticated users. This ensures that private routes are only accessible to users with valid sessions.
+### Protect routes
 
-```typescript
-// middleware.ts
-import { onboardMiddleware } from '@onboardflow/sdk/next';
+In your middleware.ts file:
 
-export default onboardMiddleware({
-  // Routes that do not require authentication
-  publicRoutes: ['/', '/login', '/pricing', '/api/webhook'],
-  
-  // redirect unauthenticated users here
-  redirectTo: '/login',
-});
+    import { onboardMiddleware } from '@onboardflow/sdk/next';
+    
+    export default onboardMiddleware({
+      publicRoutes: ['/', '/login', '/pricing', '/api/webhook'],
+      redirectTo: '/login',
+    });
+    
+    export const config = {
+      matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
+    };
 
-export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
-};
-```
+### Access user sessions
 
-### 2. Accessing User Sessions
-Retrieve current user data server-side to customize the UI or validate permissions.
+    import { onboard } from '@/lib/onboardflow';
+    
+    export default async function Dashboard() {
+      const session = await onboard.getSession();
+      if (!session) return ;
+    
+      return (
+        
+      );
+    }
 
-```typescript
-// app/dashboard/page.tsx
-import { onboard } from '@/lib/onboardflow';
+### Track onboarding events
 
-export default async function Dashboard() {
-  const session = await onboard.getSession();
+    await onboard.events.track('feature_used', {
+      featureName: 'AI Generator',
+      userId: session.user.id
+    });
 
-  if (!session) {
-    return <div>Access Denied</div>;
-  }
+---
 
-  return (
-    <section>
-      <h1>Welcome, {session.user.email}</h1>
-      <p>Current Status: <strong>{session.subscription.status}</strong></p>
-    </section>
-  );
-}
-```
+## Rate Limits (Free Tier)
 
-### 3. Triggering Events
-Manually trigger onboarding events from your application logic.
+Enterprise: 20 emails per day, 300 emails per month, 50 end users tracked
+Individual: 3 email lists, 10 contacts per list, 1 campaign per list
 
-```typescript
-await onboard.events.track('feature_used', {
-  featureName: 'AI Generator',
-  userId: session.user.id
-});
-```
+Limits will increase when we launch a paid plan. You will be notified first.
+
+---
+
+## Roadmap
+
+- Stripe payment gating for Enterprise
+- Campaign scheduling execution via cron
+- Advanced analytics including open rates and click rates
+- Bulk CSV contact import
+- Premium Individual tier
+- Custom domain support
+
+---
 
 ## License
-This project is licensed under the MIT License - see the LICENSE file for details.
 
-Copyright © 2025 OnboardFlow.
+MIT License — Copyright 2026 OnboardFlow
+
+---
