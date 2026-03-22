@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,300&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -8,86 +8,86 @@
   :root {
     /* Backgrounds */
     --background: 0 0% 100%;
-    --foreground: 222 47% 11%;
+    --foreground: 243 47% 18%;
 
     /* Cards */
     --card: 0 0% 100%;
-    --card-foreground: 222 47% 11%;
+    --card-foreground: 243 47% 18%;
 
     /* Popovers */
     --popover: 0 0% 100%;
-    --popover-foreground: 222 47% 11%;
+    --popover-foreground: 243 47% 18%;
 
-    /* Primary — Deep Indigo (trust, authority) */
-    --primary: 243 75% 59%;
+    /* Primary — Indigo (matches login #6366f1) */
+    --primary: 239 84% 67%;
     --primary-foreground: 0 0% 100%;
 
-    /* Secondary — Soft slate */
-    --secondary: 220 14% 96%;
-    --secondary-foreground: 222 47% 11%;
+    /* Secondary — soft indigo tint */
+    --secondary: 240 20% 96%;
+    --secondary-foreground: 243 47% 18%;
 
-    /* Muted — subtle gray */
-    --muted: 220 14% 96%;
+    /* Muted */
+    --muted: 240 20% 96%;
     --muted-foreground: 215 16% 47%;
 
-    /* Accent — Electric violet glow */
-    --accent: 243 75% 96%;
-    --accent-foreground: 243 75% 40%;
+    /* Accent — light indigo wash */
+    --accent: 239 84% 95%;
+    --accent-foreground: 239 84% 40%;
 
     /* Destructive */
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
 
     /* Border, Input, Ring */
-    --border: 220 13% 91%;
-    --input: 220 13% 91%;
-    --ring: 243 75% 59%;
+    --border: 240 15% 91%;
+    --input: 240 15% 91%;
+    --ring: 239 84% 67%;
 
-    /* Border radius — slightly rounded, professional */
+    /* Border radius */
     --radius: 0.5rem;
 
     /* Charts */
-    --chart-1: 243 75% 59%;
+    --chart-1: 239 84% 67%;
     --chart-2: 262 83% 58%;
     --chart-3: 291 64% 42%;
     --chart-4: 316 72% 50%;
-    --chart-5: 340 82% 52%;
+    --chart-5: 158 64% 52%;
   }
 
   .dark {
-    --background: 222 47% 6%;
-    --foreground: 213 31% 91%;
+    --background: 243 47% 6%;
+    --foreground: 220 30% 92%;
 
-    --card: 222 47% 8%;
-    --card-foreground: 213 31% 91%;
+    --card: 243 47% 8%;
+    --card-foreground: 220 30% 92%;
 
-    --popover: 222 47% 8%;
-    --popover-foreground: 213 31% 91%;
+    --popover: 243 47% 8%;
+    --popover-foreground: 220 30% 92%;
 
-    --primary: 243 75% 65%;
+    --primary: 239 84% 70%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 222 47% 12%;
-    --secondary-foreground: 213 31% 91%;
+    --secondary: 243 47% 13%;
+    --secondary-foreground: 220 30% 92%;
 
-    --muted: 222 47% 12%;
+    --muted: 243 47% 13%;
     --muted-foreground: 215 16% 57%;
 
-    --accent: 243 75% 18%;
-    --accent-foreground: 243 75% 80%;
+    --accent: 239 84% 20%;
+    --accent-foreground: 239 84% 80%;
 
     --destructive: 0 63% 40%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 222 47% 14%;
-    --input: 222 47% 14%;
-    --ring: 243 75% 65%;
+    --border: 243 47% 16%;
+    --input: 243 47% 16%;
+    --ring: 239 84% 70%;
 
-    --chart-1: 243 75% 65%;
+    --chart-1: 239 84% 70%;
     --chart-2: 262 83% 65%;
     --chart-3: 291 64% 55%;
     --chart-4: 316 72% 62%;
-    --chart-5: 340 82% 60%;
+    --chart-5: 158 64% 60%;
   }
 
   * {
@@ -96,7 +96,7 @@
 
   body {
     @apply bg-background text-foreground;
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;

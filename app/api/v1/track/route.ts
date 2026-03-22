@@ -1,44 +1,67 @@
 import { db } from "@/db";
 import { tenants, endUsers } from "@/db/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, and, count } from "drizzle-orm";
 import { NextResponse } from "next/server";
+import { checkEndUserLimit } from "@/lib/rate-limit/enterprise";
 
 export async function POST(req: Request) {
-  // 1. Auth Check
   const apiKey = req.headers.get("x-api-key");
-  if (!apiKey) return NextResponse.json({ error: "Missing API Key" }, { status: 401 });
+  if (!apiKey)
+    return NextResponse.json({ error: "Missing API Key" }, { status: 401 });
 
   const tenant = await db.query.tenants.findFirst({
-    where: eq(tenants.apiKey, apiKey)
+    where: eq(tenants.apiKey, apiKey),
   });
-  if (!tenant) return NextResponse.json({ error: "Invalid API Key" }, { status: 403 });
+  if (!tenant)
+    return NextResponse.json({ error: "Invalid API Key" }, { status: 403 });
 
-  // 2. Parse Data
   const body = await req.json();
-  const { userId, event, stepId } = body; 
+  const { userId, event, stepId } = body;
 
-  if (!userId || !stepId) return NextResponse.json({ error: "Missing data" }, { status: 400 });
+  if (!userId || !stepId)
+    return NextResponse.json({ error: "Missing data" }, { status: 400 });
 
-  // 3. Find the User
   const user = await db.query.endUsers.findFirst({
     where: and(
       eq(endUsers.tenantId, tenant.id),
       eq(endUsers.externalId, userId)
-    )
+    ),
   });
 
-  if (!user) return NextResponse.json({ error: "User not found. Call /identify first" }, { status: 404 });
+  if (!user) {
+    // Check end user limit before allowing new user tracking
+    const currentCountResult = await db
+      .select({ total: count() })
+      .from(endUsers)
+      .where(eq(endUsers.tenantId, tenant.id));
 
-  // 4. Update Progress (Add step if unique)
+    const currentCount = currentCountResult[0]?.total ?? 0;
+    const limit = await checkEndUserLimit(tenant.id, currentCount);
+
+    if (!limit.allowed) {
+      return NextResponse.json(
+        {
+          error: limit.reason,
+        },
+        { status: 403 }
+      );
+    }
+
+    return NextResponse.json(
+      { error: "User not found. Call /identify first." },
+      { status: 404 }
+    );
+  }
+
   const currentSteps = (user.completedSteps as string[]) || [];
-  
+
   if (!currentSteps.includes(stepId)) {
     const newSteps = [...currentSteps, stepId];
-    
-    await db.update(endUsers)
-      .set({ 
+    await db
+      .update(endUsers)
+      .set({
         completedSteps: newSteps,
-        lastSeenAt: new Date()
+        lastSeenAt: new Date(),
       })
       .where(eq(endUsers.id, user.id));
   }

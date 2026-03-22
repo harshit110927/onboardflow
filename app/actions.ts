@@ -29,3 +29,16 @@ export async function login(formData: FormData) {
   // 3. Send them to the waiting room (NOT Dashboard yet)
   return redirect("/check-email"); 
 }
+
+export async function signInWithGoogle() {
+  "use server";
+  const supabase = await createClient();
+  const { data, error } = await supabase.auth.signInWithOAuth({
+    provider: "google",
+    options: {
+      redirectTo: `${process.env.NEXT_PUBLIC_BASE_URL}/auth/callback`,
+    },
+  });
+  if (error) throw error;
+  if (data.url) redirect(data.url);
+}
