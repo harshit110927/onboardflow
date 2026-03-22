@@ -1,4 +1,15 @@
-import { pgTable, text, timestamp, uuid, boolean, jsonb } from 'drizzle-orm/pg-core';
+import {
+  boolean,
+  integer,
+  jsonb,
+  pgTable,
+  serial,
+  text,
+  timestamp,
+  uniqueIndex,
+  uuid,
+  varchar,
+} from 'drizzle-orm/pg-core';
 
 export const tenants = pgTable('tenants', {
     id: uuid('id').defaultRandom().primaryKey(),
@@ -27,6 +38,8 @@ export const tenants = pgTable('tenants', {
     // NEW
     emailSubject3: text("email_subject_3"),
     emailBody3: text("email_body_3"),
+    // MODIFIED — tier selection
+    tier: varchar("tier", { length: 20 }).$type<"enterprise" | "individual" | null>().default(null),
     
     createdAt: timestamp('created_at').defaultNow().notNull(),
   });
@@ -45,5 +58,49 @@ export const endUsers = pgTable("end_users", {
     automationsReceived: text("automations_received").array().default([]),
     
     lastSeenAt: timestamp("last_seen_at").defaultNow(),
+    createdAt: timestamp("created_at").defaultNow(),
+  });
+
+// MODIFIED — tier selection
+export const individualLists = pgTable("individual_lists", {
+    id: serial("id").primaryKey(),
+    userId: uuid("user_id").notNull().references(() => tenants.id),
+    name: varchar("name", { length: 100 }).notNull(),
+    description: text("description"),
+    createdAt: timestamp("created_at").defaultNow(),
+    updatedAt: timestamp("updated_at").defaultNow(),
+  });
+
+// MODIFIED — tier selection
+export const individualContacts = pgTable(
+  "individual_contacts",
+  {
+    id: serial("id").primaryKey(),
+    listId: integer("list_id")
+      .notNull()
+      .references(() => individualLists.id, { onDelete: "cascade" }),
+    name: varchar("name", { length: 100 }).notNull(),
+    email: varchar("email", { length: 255 }).notNull(),
+    createdAt: timestamp("created_at").defaultNow(),
+  },
+  (table) => ({
+    listEmailUnique: uniqueIndex("individual_contacts_list_id_email_idx").on(
+      table.listId,
+      table.email,
+    ),
+  }),
+);
+
+// MODIFIED — tier selection
+export const individualCampaigns = pgTable("individual_campaigns", {
+    id: serial("id").primaryKey(),
+    listId: integer("list_id")
+      .notNull()
+      .references(() => individualLists.id, { onDelete: "cascade" }),
+    subject: varchar("subject", { length: 255 }).notNull(),
+    body: text("body").notNull(),
+    status: varchar("status", { length: 20 }).notNull().default("draft"),
+    scheduledAt: timestamp("scheduled_at"),
+    sentAt: timestamp("sent_at"),
     createdAt: timestamp("created_at").defaultNow(),
   });
