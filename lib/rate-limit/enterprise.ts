@@ -1,10 +1,8 @@
-// NEW FILE — enterprise email rate limiting
+// MODIFIED — phase 1 premium foundation
 import { db } from "@/db";
 import { sql } from "drizzle-orm";
-
-const DAILY_LIMIT = 20;
-const MONTHLY_LIMIT = 300;
-const END_USER_LIMIT = 50;
+import { ENTERPRISE_LIMITS } from "@/lib/plans/limits";
+import { getTenantPlan } from "@/lib/plans/get-tenant-plan";
 
 export type RateLimitResult =
   | { allowed: true }
@@ -14,17 +12,18 @@ export async function checkEmailRateLimit(
   tenantId: string
 ): Promise<RateLimitResult> {
   try {
+    const { plan } = await getTenantPlan(tenantId);
+    const limits = ENTERPRISE_LIMITS[plan];
+
     const today = new Date().toISOString().slice(0, 10);
     const month = today.slice(0, 7);
 
-    // Upsert the row for today
     await db.execute(sql`
       INSERT INTO email_usage (tenant_id, date, month, daily_count, monthly_count)
       VALUES (${tenantId}, ${today}, ${month}, 0, 0)
       ON CONFLICT (tenant_id, date) DO NOTHING
     `);
 
-    // Read current counts separately
     const rows = await db.execute(sql`
       SELECT
         daily_count,
@@ -46,23 +45,31 @@ export async function checkEmailRateLimit(
 
     if (!row) return { allowed: true };
 
-    if (Number(row.daily_count) >= DAILY_LIMIT) {
+    if (Number(row.daily_count) >= limits.maxEmailsPerDay) {
       return {
         allowed: false,
-        reason: `Daily email limit reached (${DAILY_LIMIT}/day). OnboardFlow currently offers up to ${DAILY_LIMIT} automated emails per day and ${MONTHLY_LIMIT} per month per account. Once we hit 500 users we'll roll out a paid plan with higher limits — you'll be the first to know.`,
+        reason: `Daily email limit reached (${limits.maxEmailsPerDay}/day on ${plan} plan). ${
+          plan === "free"
+            ? "Upgrade to Enterprise Premium for 500 emails/day."
+            : "Purchase credits to send more emails today."
+        }`,
       };
     }
 
-    if (Number(row.monthly_count) >= MONTHLY_LIMIT) {
+    if (Number(row.monthly_count) >= limits.maxEmailsPerMonth) {
       return {
         allowed: false,
-        reason: `Monthly email limit reached (${MONTHLY_LIMIT}/month). OnboardFlow currently offers up to ${MONTHLY_LIMIT} automated emails per month per account. Once we hit 500 users we'll roll out a paid plan with higher limits — you'll be the first to know.`,
+        reason: `Monthly email limit reached (${limits.maxEmailsPerMonth}/month on ${plan} plan). ${
+          plan === "free"
+            ? "Upgrade to Enterprise Premium for 10,000 emails/month."
+            : "Purchase credits to send more emails this month."
+        }`,
       };
     }
 
     return { allowed: true };
   } catch {
-    return { allowed: false, reason: "Server error checking rate limit." };
+    return { allowed: false, reason: "Server error. Please try again." };
   }
 }
 
@@ -94,11 +101,22 @@ export async function checkEndUserLimit(
   tenantId: string,
   currentCount: number
 ): Promise<RateLimitResult> {
-  if (currentCount >= END_USER_LIMIT) {
-    return {
-      allowed: false,
-      reason: `End user tracking limit reached (${END_USER_LIMIT} users). OnboardFlow currently tracks up to ${END_USER_LIMIT} users per account for free. Once we hit 500 users we'll roll out a paid plan with higher limits — you'll be the first to know.`,
-    };
+  try {
+    const { plan } = await getTenantPlan(tenantId);
+    const limits = ENTERPRISE_LIMITS[plan];
+
+    if (currentCount >= limits.maxTrackedUsers) {
+      return {
+        allowed: false,
+        reason: `End user tracking limit reached (${limits.maxTrackedUsers} users on ${plan} plan). ${
+          plan === "free"
+            ? "Upgrade to Enterprise Premium to track up to 2,000 users."
+            : "Purchase credits to track additional users."
+        }`,
+      };
+    }
+    return { allowed: true };
+  } catch {
+    return { allowed: false, reason: "Server error. Please try again." };
   }
-  return { allowed: true };
 }
