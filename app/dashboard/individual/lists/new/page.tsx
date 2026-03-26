@@ -4,8 +4,9 @@ import { eq, count } from "drizzle-orm";
 import { db } from "@/db";
 import { individualLists, tenants } from "@/db/schema";
 import { createClient } from "@/utils/supabase/server";
+import { getTenantPlan } from "@/lib/plans/get-tenant-plan";
+import { INDIVIDUAL_LIMITS } from "@/lib/plans/limits";
 
-const MAX_LISTS = 3;
 
 // ── Server action: create list ───────────────────────────────────────────────
 async function createList(formData: FormData) {
@@ -29,12 +30,15 @@ async function createList(formData: FormData) {
   if (!tenant || tenant.tier !== "individual") redirect("/dashboard");
 
   // Check limit
+  const { plan } = await getTenantPlan(tenant.id);
+  const maxLists = INDIVIDUAL_LIMITS[plan].maxLists;
+
   const countResult = await db
     .select({ total: count() })
     .from(individualLists)
     .where(eq(individualLists.userId, tenant.id));
 
-  if ((countResult[0]?.total ?? 0) >= MAX_LISTS) {
+  if ((countResult[0]?.total ?? 0) >= maxLists) {
     redirect("/dashboard/individual/lists?error=limit");
   }
 

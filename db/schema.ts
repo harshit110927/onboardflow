@@ -47,6 +47,12 @@ export const tenants = pgTable('tenants', {
   creditsUpdatedAt: timestamp("credits_updated_at").defaultNow(),
 
   createdAt: timestamp('created_at').defaultNow().notNull(),
+
+  //smtp related fields
+  smtpEmail: varchar("smtp_email", { length: 255 }),
+  smtpPassword: text("smtp_password"),
+  smtpVerified: boolean("smtp_verified").default(false).notNull(),
+  smtpProvider: varchar("smtp_provider", { length: 50 }),
 });
 
 export const endUsers = pgTable("end_users", {
@@ -103,6 +109,9 @@ export const individualCampaigns = pgTable("individual_campaigns", {
   scheduledAt: timestamp("scheduled_at"),
   sentAt: timestamp("sent_at"),
   createdAt: timestamp("created_at").defaultNow(),
+  sequenceId: uuid("sequence_id"),
+  sequencePosition: integer("sequence_position").notNull().default(1),
+  sendDelayDays: integer("send_delay_days").notNull().default(0),
 });
 
 // MODIFIED — phase 1 premium foundation
@@ -130,4 +139,20 @@ export const processedWebhookEvents = pgTable("processed_webhook_events", {
   id: serial("id").primaryKey(),
   stripeEventId: text("stripe_event_id").notNull().unique(),
   processedAt: timestamp("processed_at").defaultNow(),
+});
+
+export const aiUsage = pgTable("ai_usage", {
+  id: serial("id").primaryKey(),
+  tenantId: uuid("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+  generatedAt: timestamp("generated_at").defaultNow(),
+  tokensUsed: integer("tokens_used").notNull().default(0),
+});
+
+export const campaignEvents = pgTable("campaign_events", {
+  id: serial("id").primaryKey(),
+  campaignId: integer("campaign_id").notNull().references(() => individualCampaigns.id, { onDelete: "cascade" }),
+  contactEmail: varchar("contact_email", { length: 255 }).notNull(),
+  eventType: varchar("event_type", { length: 20 }).notNull(),
+  eventData: text("event_data"),
+  occurredAt: timestamp("occurred_at").defaultNow(),
 });

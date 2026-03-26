@@ -6,8 +6,9 @@ import { db } from "@/db";
 import { individualContacts, individualLists, individualCampaigns, tenants } from "@/db/schema";
 import { createClient } from "@/utils/supabase/server";
 import { DeleteContactButton } from "./_components/DeleteContactButton";
+import { getTenantPlan } from "@/lib/plans/get-tenant-plan";
+import { INDIVIDUAL_LIMITS } from "@/lib/plans/limits";
 
-const MAX_CONTACTS = 10;
 
 async function addContact(formData: FormData) {
   "use server";
@@ -23,8 +24,12 @@ async function addContact(formData: FormData) {
   const tenantRows = await db.select({ id: tenants.id }).from(tenants).where(eq(tenants.email, user.email)).limit(1);
   if (!tenantRows[0]) return;
 
+  const tenantId = tenantRows[0].id;
+  const { plan } = await getTenantPlan(tenantId);
+  const maxContacts = INDIVIDUAL_LIMITS[plan].maxContactsPerList;
+
   const countResult = await db.select({ total: count() }).from(individualContacts).where(eq(individualContacts.listId, listId));
-  if ((countResult[0]?.total ?? 0) >= MAX_CONTACTS) return;
+  if ((countResult[0]?.total ?? 0) >= maxContacts) return;
 
   try {
     await db.insert(individualContacts).values({ listId, name, email });
@@ -66,6 +71,9 @@ export default async function ListDetailPage({
   const listId = Number(listIdParam);
   if (isNaN(listId)) redirect("/dashboard/individual/lists");
 
+  const { plan } = await getTenantPlan(tenant.id);
+  const MAX_CONTACTS = INDIVIDUAL_LIMITS[plan].maxContactsPerList;
+
   const [listRows, contacts, campaignCount] = await Promise.all([
     db.select().from(individualLists).where(eq(individualLists.id, listId)).limit(1),
     db.select().from(individualContacts).where(eq(individualContacts.listId, listId)).orderBy(individualContacts.createdAt),
@@ -105,12 +113,20 @@ export default async function ListDetailPage({
               <span>{campaigns} {campaigns === 1 ? "campaign" : "campaigns"}</span>
             </div>
           </div>
-          <Link
-            href={`/dashboard/individual/campaigns/create?listId=${list.id}`}
-            className="text-sm rounded-md bg-primary text-primary-foreground px-4 py-2 hover:opacity-90 transition-opacity"
-          >
-            Send Campaign
-          </Link>
+          <div className="flex gap-2">
+            <Link
+              href={`/dashboard/individual/lists/${list.id}/sequences/new`}
+              className="text-sm rounded-md border border-border px-4 py-2 hover:bg-secondary transition-colors"
+            >
+              Sequences
+            </Link>
+            <Link
+              href={`/dashboard/individual/campaigns/create?listId=${list.id}`}
+              className="text-sm rounded-md bg-primary text-primary-foreground px-4 py-2 hover:opacity-90 transition-opacity"
+            >
+              Send Campaign
+            </Link>
+          </div>
         </div>
 
         {/* Progress bar */}

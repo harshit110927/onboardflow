@@ -4,6 +4,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { tenants } from "@/db/schema";
 import { createClient } from "@/utils/supabase/server";
+import { getTenantPlan } from "@/lib/plans/get-tenant-plan";
 
 export default async function IndividualLayout({
   children,
@@ -15,7 +16,7 @@ export default async function IndividualLayout({
   if (!user?.email) redirect("/login");
 
   const tenantRows = await db
-    .select({ email: tenants.email, tier: tenants.tier })
+    .select({ id: tenants.id, email: tenants.email, tier: tenants.tier })
     .from(tenants)
     .where(eq(tenants.email, user.email))
     .limit(1);
@@ -23,6 +24,7 @@ export default async function IndividualLayout({
   const tenant = tenantRows[0];
   if (!tenant || tenant.tier !== "individual") redirect("/dashboard");
 
+  const planInfo = await getTenantPlan(tenant.id);
   const initials = user.email.slice(0, 2).toUpperCase();
 
   return (
@@ -46,6 +48,8 @@ export default async function IndividualLayout({
               { href: "/dashboard/individual", label: "Dashboard" },
               { href: "/dashboard/individual/lists", label: "Lists" },
               { href: "/dashboard/individual/campaigns", label: "Campaigns" },
+              { href: "/dashboard/individual/billing", label: "Billing" },
+              { href: "/dashboard/individual/settings", label: "Settings" },
             ].map((item) => (
               <Link
                 key={item.href}
@@ -59,8 +63,8 @@ export default async function IndividualLayout({
 
           {/* Right side */}
           <div className="flex items-center gap-3 shrink-0">
-            <span className="text-xs px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-700 font-medium hidden sm:block">
-              Free Plan
+            <span className={`text-xs px-2.5 py-1 rounded-full font-medium hidden sm:block ${planInfo.plan === "premium" ? "bg-emerald-100 text-emerald-700" : "bg-secondary text-muted-foreground"}`}>
+              {planInfo.plan === "premium" ? "Premium" : "Free Plan"}
             </span>
             <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-xs font-semibold">
               {initials}

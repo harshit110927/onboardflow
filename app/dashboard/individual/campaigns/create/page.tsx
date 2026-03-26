@@ -4,8 +4,9 @@ import Link from "next/link";
 import { db } from "@/db";
 import { individualCampaigns, individualLists, tenants } from "@/db/schema";
 import { createClient } from "@/utils/supabase/server";
-
-const MAX_CAMPAIGNS_PER_LIST = 1;
+import { getTenantPlan } from "@/lib/plans/get-tenant-plan";
+import { INDIVIDUAL_LIMITS } from "@/lib/plans/limits";
+import { CreateCampaignForm } from "../_components/CreateCampaignForm";
 
 async function createCampaign(formData: FormData) {
   "use server";
@@ -30,7 +31,6 @@ async function createCampaign(formData: FormData) {
   const tenant = tenantRows[0];
   if (!tenant || tenant.tier !== "individual") redirect("/dashboard");
 
-  // Verify list ownership
   const listRows = await db
     .select({ id: individualLists.id })
     .from(individualLists)
@@ -38,13 +38,15 @@ async function createCampaign(formData: FormData) {
     .limit(1);
   if (!listRows[0]) return;
 
-  // Enforce 1 campaign per list
+  const { plan } = await getTenantPlan(tenant.id);
+  const maxCampaigns = INDIVIDUAL_LIMITS[plan].maxCampaignsPerList;
+
   const existing = await db
     .select({ total: count() })
     .from(individualCampaigns)
     .where(eq(individualCampaigns.listId, listId));
 
-  if ((existing[0]?.total ?? 0) >= MAX_CAMPAIGNS_PER_LIST) {
+  if ((existing[0]?.total ?? 0) >= maxCampaigns) {
     redirect(`/dashboard/individual/campaigns/create?error=limit&listId=${listId}`);
   }
 
@@ -77,16 +79,17 @@ export default async function CreateCampaignPage({
   const tenant = tenantRows[0];
   if (!tenant || tenant.tier !== "individual") redirect("/dashboard");
 
+  const { plan } = await getTenantPlan(tenant.id);
+  const MAX_CAMPAIGNS_PER_LIST = INDIVIDUAL_LIMITS[plan].maxCampaignsPerList;
+
   const params = await searchParams;
 
-  // Get all lists with their campaign counts
   const lists = await db
-    .select({
-      id: individualLists.id,
-      name: individualLists.name,
-    })
+    .select({ id: individualLists.id, name: individualLists.name })
     .from(individualLists)
     .where(eq(individualLists.userId, tenant.id));
+
+  if (lists.length === 0) redirect("/dashboard/individual/lists/new");
 
   const campaignCounts = await db
     .select({ listId: individualCampaigns.listId, total: count() })
@@ -97,22 +100,16 @@ export default async function CreateCampaignPage({
     campaignCounts.map((r) => [r.listId, r.total])
   );
 
-  // Lists that still have room for a campaign
   const availableLists = lists.filter(
     (l) => (campaignMap[l.id] ?? 0) < MAX_CAMPAIGNS_PER_LIST
   );
 
   const limitError = params.error === "limit";
 
-  if (lists.length === 0) {
-    redirect("/dashboard/individual/lists/new");
-  }
-
   return (
     <div className="min-h-screen bg-background">
       <div className="max-w-2xl mx-auto px-4 py-10">
 
-        {/* Breadcrumb */}
         <div className="flex items-center gap-2 text-sm text-muted-foreground mb-6">
           <Link href="/dashboard/individual" className="hover:text-foreground transition-colors">Dashboard</Link>
           <span>/</span>
@@ -131,15 +128,15 @@ export default async function CreateCampaignPage({
 
           {limitError && (
             <div className="rounded-md bg-destructive/10 border border-destructive/20 px-4 py-3 text-sm text-destructive">
-              That list already has a campaign. Each list supports 1 campaign on the free plan.
+              This list has reached its campaign limit on your current plan.
             </div>
           )}
 
           {availableLists.length === 0 ? (
             <div className="text-center py-6">
-              <p className="font-medium text-foreground">All lists have a campaign</p>
+              <p className="font-medium text-foreground">All lists have reached their campaign limit</p>
               <p className="text-sm text-muted-foreground mt-1">
-                Each list supports 1 campaign on the free plan.
+                Upgrade to Premium for up to 10 campaigns per list.
               </p>
               <Link
                 href="/dashboard/individual/campaigns"
@@ -149,111 +146,20 @@ export default async function CreateCampaignPage({
               </Link>
             </div>
           ) : (
-            <form action={createCampaign} className="flex flex-col gap-5">
-
-              {/* List selector */}
-              <div className="flex flex-col gap-1.5">
-                <label htmlFor="listId" className="text-sm font-medium text-foreground">
-                  Send to List <span className="text-destructive">*</span>
-                </label>
-                <select
-                  id="listId"
-                  name="listId"
-                  required
-                  defaultValue={params.listId ?? ""}
-                  className="rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-                >
-                  <option value="" disabled>Select a list...</option>
-                  {availableLists.map((l) => (
-                    <option key={l.id} value={l.id}>{l.name}</option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Subject */}
-              <div className="flex flex-col gap-1.5">
-                <label htmlFor="subject" className="text-sm font-medium text-foreground">
-                  Subject Line <span className="text-destructive">*</span>
-                </label>
-                <input
-                  id="subject"
-                  name="subject"
-                  type="text"
-                  required
-                  maxLength={255}
-                  placeholder="e.g. Welcome to our community!"
-                  className="rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-                />
-              </div>
-
-              {/* Body */}
-              <div className="flex flex-col gap-1.5">
-                <label htmlFor="body" className="text-sm font-medium text-foreground">
-                  Email Body <span className="text-destructive">*</span>
-                </label>
-                <textarea
-                  id="body"
-                  name="body"
-                  required
-                  rows={10}
-                  placeholder="Write your email here..."
-                  className="rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring resize-y"
-                />
-                <p className="text-xs text-muted-foreground">
-                  Plain text only for now. HTML support coming soon.
-                </p>
-              </div>
-
-              {/* Schedule */}
-              <div className="flex flex-col gap-3">
-                <label className="text-sm font-medium text-foreground">When to Send</label>
-                <div className="flex flex-col gap-2">
-                  <label className="flex items-center gap-2 text-sm cursor-pointer">
-                    <input
-                      type="radio"
-                      name="scheduleType"
-                      value="draft"
-                      defaultChecked
-                      className="accent-primary"
-                    />
-                    <span className="text-foreground">Save as draft</span>
-                  </label>
-                  <label className="flex items-center gap-2 text-sm cursor-pointer">
-                    <input
-                      type="radio"
-                      name="scheduleType"
-                      value="later"
-                      className="accent-primary"
-                    />
-                    <span className="text-foreground">Schedule for later</span>
-                  </label>
-                </div>
-                <input
-                  type="datetime-local"
-                  name="scheduledAt"
-                  className="rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-                />
-                <p className="text-xs text-muted-foreground -mt-1">
-                  Only used if you selected "Schedule for later" above.
-                </p>
-              </div>
-
-              {/* Actions */}
-              <div className="flex items-center gap-3 pt-2">
-                <button
-                  type="submit"
-                  className="flex-1 rounded-md bg-primary text-primary-foreground px-4 py-2 text-sm font-medium hover:opacity-90 transition-opacity"
-                >
-                  Save Campaign
-                </button>
-                <Link
-                  href="/dashboard/individual/campaigns"
-                  className="flex-1 text-center rounded-md border border-border px-4 py-2 text-sm hover:bg-secondary transition-colors"
-                >
-                  Cancel
-                </Link>
-              </div>
-            </form>
+            <>
+              <CreateCampaignForm
+                availableLists={availableLists}
+                defaultListId={params.listId}
+                isPremium={plan === "premium"}
+                createAction={createCampaign}
+              />
+              <Link
+                href="/dashboard/individual/campaigns"
+                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+              >
+                ← Cancel
+              </Link>
+            </>
           )}
         </div>
       </div>

@@ -1,12 +1,15 @@
-import { eq } from "drizzle-orm";
+import { eq, and, count } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import Link from "next/link";
 import { Resend } from "resend";
 import { db } from "@/db";
-import { individualCampaigns, individualContacts, individualLists, tenants } from "@/db/schema";
+import { individualCampaigns, individualContacts, individualLists, tenants, campaignEvents } from "@/db/schema";
 import { createClient } from "@/utils/supabase/server";
 import { SendCampaignButton } from "./_components/SendCampaignButton";
+import { decryptPassword, createGmailTransporter } from "@/lib/email/smtp";
+import { injectTracking } from "@/lib/tracking/inject";
+import { getTenantPlan } from "@/lib/plans/get-tenant-plan";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -27,7 +30,6 @@ async function sendCampaign(formData: FormData) {
   const tenant = tenantRows[0];
   if (!tenant) return;
 
-  // Get campaign + verify it belongs to this tenant
   const campaignRows = await db
     .select({
       id: individualCampaigns.id,
@@ -46,7 +48,6 @@ async function sendCampaign(formData: FormData) {
   if (!campaign) return;
   if (campaign.status === "sent") return;
 
-  // Get all contacts for this list
   const contacts = await db
     .select({ name: individualContacts.name, email: individualContacts.email })
     .from(individualContacts)
@@ -54,19 +55,48 @@ async function sendCampaign(formData: FormData) {
 
   if (contacts.length === 0) return;
 
-  // Send one email per contact
-  for (const contact of contacts) {
-    const personalizedBody = campaign.body.replace(/\{contact_name\}/g, contact.name);
+  const tenantSmtp = await db
+    .select({ smtpEmail: tenants.smtpEmail, smtpPassword: tenants.smtpPassword, smtpVerified: tenants.smtpVerified })
+    .from(tenants)
+    .where(eq(tenants.id, tenant.id))
+    .limit(1);
 
-    await resend.emails.send({
-      from: "OnboardFlow <onboarding@resend.dev>",
-      to: contact.email,
-      subject: campaign.subject,
-      text: personalizedBody,
-    });
+  const smtp = tenantSmtp[0];
+  const useGmail = smtp?.smtpVerified && smtp.smtpEmail && smtp.smtpPassword;
+
+  const { plan } = await getTenantPlan(tenant.id);
+  const trackingEnabled = plan === "premium";
+
+  if (useGmail) {
+    const decrypted = decryptPassword(smtp.smtpPassword!);
+    const transporter = createGmailTransporter(smtp.smtpEmail!, decrypted);
+    for (const contact of contacts) {
+      const rawBody = campaign.body.replace(/\{contact_name\}/g, contact.name);
+      const personalizedBody = trackingEnabled
+        ? injectTracking(rawBody, campaign.id, contact.email)
+        : rawBody;
+      await transporter.sendMail({
+        from: smtp.smtpEmail!,
+        to: contact.email,
+        subject: campaign.subject,
+        text: personalizedBody,
+      });
+    }
+  } else {
+    for (const contact of contacts) {
+      const rawBody = campaign.body.replace(/\{contact_name\}/g, contact.name);
+      const personalizedBody = trackingEnabled
+        ? injectTracking(rawBody, campaign.id, contact.email)
+        : rawBody;
+      await resend.emails.send({
+        from: "OnboardFlow <onboarding@resend.dev>",
+        to: contact.email,
+        subject: campaign.subject,
+        text: personalizedBody,
+      });
+    }
   }
 
-  // Mark campaign as sent
   await db
     .update(individualCampaigns)
     .set({ status: "sent", sentAt: new Date() })
@@ -106,6 +136,16 @@ export default async function CampaignDetailPage({
   const tenant = tenantRows[0];
   if (!tenant || tenant.tier !== "individual") redirect("/dashboard");
 
+  const smtpRow = await db
+    .select({ smtpEmail: tenants.smtpEmail, smtpVerified: tenants.smtpVerified })
+    .from(tenants)
+    .where(eq(tenants.id, tenant.id))
+    .limit(1);
+
+  const sendingFrom = smtpRow[0]?.smtpVerified && smtpRow[0]?.smtpEmail
+    ? smtpRow[0].smtpEmail
+    : "onboarding@resend.dev";
+
   const { campaignId } = await params;
   const id = Number(campaignId);
   if (isNaN(id)) redirect("/dashboard/individual/campaigns");
@@ -130,11 +170,26 @@ export default async function CampaignDetailPage({
   const campaign = rows[0];
   if (!campaign) redirect("/dashboard/individual/campaigns");
 
-  // Get contact count for this list
   const contacts = await db
     .select({ name: individualContacts.name, email: individualContacts.email })
     .from(individualContacts)
     .where(eq(individualContacts.listId, campaign.listId));
+
+  const { plan } = await getTenantPlan(tenant.id);
+
+  let openCount = 0;
+  let clickCount = 0;
+
+  if (plan === "premium" && campaign.status === "sent") {
+    const [opens, clicks] = await Promise.all([
+      db.select({ total: count() }).from(campaignEvents)
+        .where(and(eq(campaignEvents.campaignId, campaign.id), eq(campaignEvents.eventType, "open"))),
+      db.select({ total: count() }).from(campaignEvents)
+        .where(and(eq(campaignEvents.campaignId, campaign.id), eq(campaignEvents.eventType, "click"))),
+    ]);
+    openCount = opens[0]?.total ?? 0;
+    clickCount = clicks[0]?.total ?? 0;
+  }
 
   const created = campaign.createdAt?.toLocaleDateString("en-US", {
     month: "long", day: "numeric", year: "numeric",
@@ -152,7 +207,6 @@ export default async function CampaignDetailPage({
     <div className="min-h-screen bg-background">
       <div className="max-w-3xl mx-auto px-4 py-10 flex flex-col gap-6">
 
-        {/* Breadcrumb */}
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <Link href="/dashboard/individual" className="hover:text-foreground transition-colors">Dashboard</Link>
           <span>/</span>
@@ -161,7 +215,6 @@ export default async function CampaignDetailPage({
           <span className="text-foreground truncate">{campaign.subject}</span>
         </div>
 
-        {/* Header */}
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div>
             <h1 className="text-2xl font-bold text-foreground">{campaign.subject}</h1>
@@ -179,13 +232,15 @@ export default async function CampaignDetailPage({
           </div>
         </div>
 
-        {/* Send box — only show for draft/scheduled */}
         {campaign.status !== "sent" && (
           <div className="rounded-lg border border-border bg-card p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div>
               <p className="font-medium text-foreground">Ready to send?</p>
               <p className="text-sm text-muted-foreground mt-0.5">
                 This will email {contacts.length} contact{contacts.length !== 1 ? "s" : ""} in {campaign.listName}.
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Sending from: <span className="font-mono">{sendingFrom}</span>
               </p>
               {contacts.length === 0 && (
                 <p className="text-sm text-destructive mt-1">
@@ -206,7 +261,6 @@ export default async function CampaignDetailPage({
           </div>
         )}
 
-        {/* Sent success box */}
         {campaign.status === "sent" && (
           <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-5 py-4">
             <p className="text-sm font-medium text-emerald-700">
@@ -215,7 +269,37 @@ export default async function CampaignDetailPage({
           </div>
         )}
 
-        {/* Email preview */}
+        {campaign.status === "sent" && (
+          <div className="rounded-lg border border-border bg-card p-6">
+            <h2 className="text-base font-semibold text-foreground mb-4">Campaign Analytics</h2>
+            {plan === "premium" ? (
+              <div className="grid grid-cols-2 gap-4">
+                <div className="rounded-lg bg-secondary/40 p-4 text-center">
+                  <p className="text-2xl font-bold text-foreground">
+                    {contacts.length > 0 ? Math.round((openCount / contacts.length) * 100) : 0}%
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">Open Rate</p>
+                  <p className="text-xs text-muted-foreground">{openCount} of {contacts.length}</p>
+                </div>
+                <div className="rounded-lg bg-secondary/40 p-4 text-center">
+                  <p className="text-2xl font-bold text-foreground">
+                    {contacts.length > 0 ? Math.round((clickCount / contacts.length) * 100) : 0}%
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">Click Rate</p>
+                  <p className="text-xs text-muted-foreground">{clickCount} of {contacts.length}</p>
+                </div>
+              </div>
+            ) : (
+              <div className="text-center py-4">
+                <p className="text-sm text-muted-foreground">Upgrade to Premium to see open and click rates.</p>
+                <Link href="/dashboard/individual/billing" className="mt-2 inline-block text-sm text-primary underline">
+                  Upgrade now
+                </Link>
+              </div>
+            )}
+          </div>
+        )}
+
         <div className="rounded-lg border border-border bg-card overflow-hidden">
           <div className="px-6 py-4 border-b border-border bg-secondary/30">
             <p className="text-xs text-muted-foreground uppercase tracking-wide font-medium">Email Preview</p>
@@ -228,7 +312,6 @@ export default async function CampaignDetailPage({
           </div>
         </div>
 
-        {/* Recipients */}
         {contacts.length > 0 && (
           <div>
             <h2 className="text-base font-semibold text-foreground mb-3">
@@ -255,7 +338,6 @@ export default async function CampaignDetailPage({
           </div>
         )}
 
-        {/* Actions */}
         <div className="flex items-center gap-3">
           <Link
             href="/dashboard/individual/campaigns"

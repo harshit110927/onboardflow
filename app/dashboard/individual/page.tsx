@@ -10,8 +10,8 @@ import {
 } from "@/db/schema";
 import { createClient } from "@/utils/supabase/server";
 
-const MAX_LISTS = 3;
-const MAX_CONTACTS = 10;
+import { getTenantPlan } from "@/lib/plans/get-tenant-plan";
+import { INDIVIDUAL_LIMITS } from "@/lib/plans/limits";
 
 // ── Local components ────────────────────────────────────────────────────────
 
@@ -48,12 +48,14 @@ function ListCard({
   list,
   contactCount,
   campaignCount,
+  maxContacts,
 }: {
   list: { id: number; name: string; description: string | null; createdAt: Date | null };
   contactCount: number;
   campaignCount: number;
+  maxContacts: number;
 }) {
-  const full = contactCount >= MAX_CONTACTS;
+  const full = contactCount >= maxContacts;
   const created = list.createdAt
     ? list.createdAt.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
     : "";
@@ -81,12 +83,12 @@ function ListCard({
       <div className="flex flex-col gap-1.5">
         <div className="flex items-center justify-between text-xs text-muted-foreground">
           <span>Contacts</span>
-          <span>{contactCount} / {MAX_CONTACTS}</span>
+          <span>{contactCount} / {maxContacts}</span>
         </div>
         <div className="h-1.5 w-full rounded-full bg-secondary overflow-hidden">
           <div
             className={`h-1.5 rounded-full ${full ? "bg-destructive" : "bg-primary"}`}
-            style={{ width: `${Math.min((contactCount / MAX_CONTACTS) * 100, 100)}%` }}
+            style={{ width: `${Math.min((contactCount / maxContacts) * 100, 100)}%` }}
           />
         </div>
       </div>
@@ -168,6 +170,11 @@ export default async function IndividualDashboardPage() {
 
   const tenant = tenantRows[0];
   if (!tenant || tenant.tier !== "individual") redirect("/dashboard");
+
+  const planInfo = await getTenantPlan(tenant.id);
+  const limits = INDIVIDUAL_LIMITS[planInfo.plan];
+  const MAX_LISTS = limits.maxLists;
+  const MAX_CONTACTS = limits.maxContactsPerList;
 
   // All queries in parallel
   const [lists, contactCounts, campaignCounts, recentCampaignsRaw] =
@@ -292,6 +299,7 @@ export default async function IndividualDashboardPage() {
                   list={list}
                   contactCount={contactMap[list.id] ?? 0}
                   campaignCount={campaignMap[list.id] ?? 0}
+                  maxContacts={MAX_CONTACTS}
                 />
               ))
             )}
