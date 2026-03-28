@@ -3,6 +3,7 @@ import { tenants, endUsers } from "@/db/schema";
 import { eq, and, count } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { checkEndUserLimit } from "@/lib/rate-limit/enterprise";
+import { deliverWebhookEvent } from "@/lib/webhooks/deliver";
 
 export async function POST(req: Request) {
   const apiKey = req.headers.get("x-api-key");
@@ -29,7 +30,6 @@ export async function POST(req: Request) {
   });
 
   if (!user) {
-    // Check end user limit before allowing new user tracking
     const currentCountResult = await db
       .select({ total: count() })
       .from(endUsers)
@@ -39,12 +39,7 @@ export async function POST(req: Request) {
     const limit = await checkEndUserLimit(tenant.id, currentCount);
 
     if (!limit.allowed) {
-      return NextResponse.json(
-        {
-          error: limit.reason,
-        },
-        { status: 403 }
-      );
+      return NextResponse.json({ error: limit.reason }, { status: 403 });
     }
 
     return NextResponse.json(
@@ -57,13 +52,18 @@ export async function POST(req: Request) {
 
   if (!currentSteps.includes(stepId)) {
     const newSteps = [...currentSteps, stepId];
+
     await db
       .update(endUsers)
-      .set({
-        completedSteps: newSteps,
-        lastSeenAt: new Date(),
-      })
+      .set({ completedSteps: newSteps, lastSeenAt: new Date() })
       .where(eq(endUsers.id, user.id));
+
+    // Fire webhook — non-blocking, never fail the request
+    deliverWebhookEvent(tenant.id, "user.activated", {
+      userId,
+      stepId,
+      completedSteps: newSteps,
+    }).catch((err) => console.error("Webhook delivery error:", err));
   }
 
   return NextResponse.json({ success: true, step: stepId });

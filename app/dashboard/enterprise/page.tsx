@@ -3,12 +3,8 @@ import { redirect } from "next/navigation";
 import { db } from "@/db";
 import { tenants, endUsers } from "@/db/schema";
 import { eq } from "drizzle-orm";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { createCheckoutSession } from "@/app/dashboard/actions";
 import Link from "next/link";
-import { ArrowRight, Users, CheckCircle, BookOpen, Settings } from "lucide-react";
+import { getTenantPlan } from "@/lib/plans/get-tenant-plan";
 import { ApiKeyCard } from "@/app/dashboard/ApiKeyCard";
 
 export default async function EnterpriseDashboardPage() {
@@ -16,7 +12,6 @@ export default async function EnterpriseDashboardPage() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  // Tier guard
   const tierCheck = await db
     .select({ tier: tenants.tier })
     .from(tenants)
@@ -27,124 +22,152 @@ export default async function EnterpriseDashboardPage() {
   if (!tier) redirect("/tier-selection");
   if (tier !== "enterprise") redirect("/dashboard/individual");
 
-  // Get Tenant Identity
-  let tenant = await db.query.tenants.findFirst({
-    where: eq(tenants.email, user.email!)
-  });
+  const tenantRows = await db
+    .select()
+    .from(tenants)
+    .where(eq(tenants.email, user.email!))
+    .limit(1);
 
-  if (!tenant) {
-    try {
-      [tenant] = await db.insert(tenants).values({
-        email: user.email!,
-        name: "Founder",
-      }).returning();
-    } catch (err) { console.error(err); }
-  }
-
+  const tenant = tenantRows[0];
   if (!tenant) return <div>Error loading account. Please refresh.</div>;
 
-  // Fetch analytics
-  let totalUsers = 0;
-  let completionRate = 0;
+  const planInfo = await getTenantPlan(tenant.id);
 
-  if (tenant.hasAccess) {
-    const allUsers = await db.query.endUsers.findMany({
-      where: eq(endUsers.tenantId, tenant.id)
-    });
+  const allUsers = await db.query.endUsers.findMany({
+    where: eq(endUsers.tenantId, tenant.id),
+  });
 
-    totalUsers = allUsers.length;
-
-    const activationStep = tenant.activationStep || "connect_repo";
-    const activatedCount = allUsers.filter(u => {
-      const steps = u.completedSteps as string[] || [];
-      return steps.includes(activationStep);
-    }).length;
-
-    completionRate = totalUsers > 0
-      ? Math.round((activatedCount / totalUsers) * 100)
-      : 0;
-  }
+  const totalUsers = allUsers.length;
+  const activationStep = tenant.activationStep || "connect_repo";
+  const activatedCount = allUsers.filter((u) => {
+    const steps = (u.completedSteps as string[]) || [];
+    return steps.includes(activationStep);
+  }).length;
+  const completionRate = totalUsers > 0
+    ? Math.round((activatedCount / totalUsers) * 100)
+    : 0;
 
   return (
-    <div className="min-h-screen bg-gray-50 p-8">
+    <div className="min-h-screen bg-background p-8">
       <div className="max-w-4xl mx-auto space-y-8">
 
         {/* Header */}
-        <div className="flex justify-between items-center">
+        <div className="flex justify-between items-center flex-wrap gap-4">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Welcome back, {tenant.name}</h1>
+            <h1 className="text-3xl font-bold tracking-tight text-foreground">
+              Welcome back, {tenant.name}
+            </h1>
             <p className="text-muted-foreground">Executive Overview</p>
           </div>
           <div className="flex items-center gap-3">
-            <Link href="/dashboard/settings">
-              <Button variant="outline" size="icon" title="Settings">
-                <Settings className="h-4 w-4" />
-              </Button>
+            <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${
+              planInfo.plan === "premium"
+                ? "bg-emerald-100 text-emerald-700"
+                : "bg-secondary text-muted-foreground"
+            }`}>
+              {planInfo.plan === "premium" ? "Premium" : "Free Plan"}
+            </span>
+            <Link
+              href="/dashboard/settings"
+              className="text-sm rounded-md border border-border px-3 py-1.5 hover:bg-secondary transition-colors"
+            >
+              Settings
             </Link>
-            <Link href="/docs">
-              <Button variant="outline" className="gap-2">
-                <BookOpen className="h-4 w-4" /> Docs
-              </Button>
-            </Link>
-            {tenant.hasAccess && (
-              <Badge className="bg-green-600 px-3 py-1 text-sm">System Active</Badge>
+            {planInfo.plan === "premium" && (
+              <>
+                <Link
+                  href="/dashboard/enterprise/drip-steps"
+                  className="text-sm rounded-md border border-border px-3 py-1.5 hover:bg-secondary transition-colors"
+                >
+                  Drip Steps
+                </Link>
+                <Link
+                  href="/dashboard/enterprise/webhooks"
+                  className="text-sm rounded-md border border-border px-3 py-1.5 hover:bg-secondary transition-colors"
+                >
+                  Webhooks
+                </Link>
+              </>
             )}
+            <Link
+              href="/docs"
+              className="text-sm rounded-md border border-border px-3 py-1.5 hover:bg-secondary transition-colors"
+            >
+              Docs
+            </Link>
+            <Link
+              href="/dashboard/enterprise/billing"
+              className="text-sm rounded-md bg-primary text-primary-foreground px-3 py-1.5 hover:opacity-90 transition-opacity"
+            >
+              {planInfo.plan === "premium" ? "Manage Billing" : "Upgrade"}
+            </Link>
           </div>
         </div>
 
         {/* Stats */}
         <div className="grid gap-6 md:grid-cols-2">
-          <Card className={!tenant.hasAccess ? "opacity-60 grayscale" : ""}>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Onboarding Health</CardTitle>
-              <Users className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="flex justify-between items-end">
-                <div>
-                  <div className="text-3xl font-bold">{tenant.hasAccess ? totalUsers : "--"}</div>
-                  <p className="text-xs text-muted-foreground">Total Users</p>
-                </div>
-                <div className="text-right">
-                  <div className="text-3xl font-bold text-blue-600">{tenant.hasAccess ? `${completionRate}%` : "--"}</div>
-                  <p className="text-xs text-muted-foreground">Completion Rate</p>
-                </div>
+          <div className="rounded-lg border border-border bg-card p-6">
+            <p className="text-sm font-medium text-muted-foreground mb-4">Onboarding Health</p>
+            <div className="flex justify-between items-end">
+              <div>
+                <div className="text-3xl font-bold text-foreground">{totalUsers}</div>
+                <p className="text-xs text-muted-foreground">Total Users</p>
               </div>
-              <div className="mt-6 pt-4 border-t">
-                <Link href="/dashboard/analytics">
-                  <Button variant="outline" className="w-full gap-2" disabled={!tenant.hasAccess}>
-                    View Detailed Dashboard <ArrowRight className="h-4 w-4" />
-                  </Button>
+              <div className="text-right">
+                <div className="text-3xl font-bold text-primary">{completionRate}%</div>
+                <p className="text-xs text-muted-foreground">Completion Rate</p>
+              </div>
+            </div>
+            <div className="mt-6 pt-4 border-t border-border">
+              <Link
+                href="/dashboard/analytics"
+                className="block text-center text-sm rounded-md border border-border px-4 py-2 hover:bg-secondary transition-colors"
+              >
+                View Detailed Dashboard →
+              </Link>
+            </div>
+          </div>
+
+          <div className="rounded-lg border border-border bg-card p-6">
+            <p className="text-sm font-medium text-muted-foreground mb-4">Subscription</p>
+            {planInfo.plan === "premium" ? (
+              <div className="flex flex-col gap-2">
+                <div className="text-2xl font-bold text-emerald-700">Enterprise Premium</div>
+                {planInfo.expiresAt && (
+                  <p className="text-xs text-muted-foreground">
+                    Renews {planInfo.expiresAt.toLocaleDateString("en-US", {
+                      month: "long", day: "numeric", year: "numeric",
+                    })}
+                  </p>
+                )}
+                <Link
+                  href="/dashboard/enterprise/billing"
+                  className="mt-4 text-center text-sm rounded-md border border-border px-4 py-2 hover:bg-secondary transition-colors"
+                >
+                  Manage Subscription
                 </Link>
               </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Subscription</CardTitle>
-              <CheckCircle className={`h-4 w-4 ${tenant.hasAccess ? "text-green-500" : "text-gray-300"}`} />
-            </CardHeader>
-            <CardContent>
-              {tenant.hasAccess ? (
-                <div className="flex flex-col h-full justify-between">
-                  <div className="text-2xl font-bold text-green-700">Active License</div>
-                  <p className="text-xs text-muted-foreground mb-4">Your plan is valid forever.</p>
+            ) : (
+              <div className="flex flex-col gap-3">
+                <div className="text-2xl font-bold text-foreground">
+                  $49.99 <span className="text-sm font-normal text-muted-foreground">/ month</span>
                 </div>
-              ) : (
-                <div className="space-y-4">
-                  <div className="text-2xl font-bold">$49 <span className="text-sm font-normal text-muted-foreground">/ lifetime</span></div>
-                  <form action={createCheckoutSession}>
-                    <Button className="w-full" type="submit">Buy License</Button>
-                  </form>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                <p className="text-xs text-muted-foreground">
+                  2,000 users · 500 emails/day · Unlimited drip steps · Webhooks
+                </p>
+                <Link
+                  href="/dashboard/enterprise/billing"
+                  className="text-center text-sm rounded-md bg-primary text-primary-foreground px-4 py-2 hover:opacity-90 transition-opacity"
+                >
+                  Upgrade to Premium
+                </Link>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* API Key */}
-        {tenant.hasAccess && (
+        {tenant.apiKey && (
           <ApiKeyCard apiKey={tenant.apiKey} />
         )}
 

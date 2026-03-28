@@ -156,3 +156,34 @@ export const campaignEvents = pgTable("campaign_events", {
   eventData: text("event_data"),
   occurredAt: timestamp("occurred_at").defaultNow(),
 });
+
+export const dripSteps = pgTable("drip_steps", {
+  id: serial("id").primaryKey(),
+  tenantId: uuid("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+  position: integer("position").notNull(),
+  eventTrigger: varchar("event_trigger", { length: 100 }).notNull(),
+  emailSubject: varchar("email_subject", { length: 255 }).notNull(),
+  emailBody: text("email_body").notNull(),
+  delayHours: integer("delay_hours").notNull().default(1),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const webhooks = pgTable("webhooks", {
+  id: serial("id").primaryKey(),
+  tenantId: uuid("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+  url: text("url").notNull(),
+  events: text("events").array().notNull().default([]),
+  secret: text("secret").notNull(),
+  active: boolean("active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const webhookDeliveries = pgTable("webhook_deliveries", {
+  id: serial("id").primaryKey(),
+  webhookId: integer("webhook_id").notNull().references(() => webhooks.id, { onDelete: "cascade" }),
+  eventType: varchar("event_type", { length: 100 }).notNull(),
+  payload: text("payload").notNull(),
+  responseStatus: integer("response_status"),
+  deliveredAt: timestamp("delivered_at").defaultNow(),
+  success: boolean("success").notNull().default(false),
+});
