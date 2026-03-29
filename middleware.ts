@@ -41,7 +41,7 @@ export async function middleware(request: NextRequest) {
 
     const tier = tenantRow?.tier ?? null;
 
-    if (pathname.startsWith("/dashboard") && pathname !== "/dashboard/settings") {
+    if (pathname.startsWith("/dashboard")) {
       if (!tier && pathname !== "/tier-selection") {
         return NextResponse.redirect(new URL("/tier-selection", request.url));
       }

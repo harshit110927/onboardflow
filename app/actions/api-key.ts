@@ -2,27 +2,32 @@
 
 import { createClient } from "@/utils/supabase/server";
 import { revalidatePath } from "next/cache";
+import { db } from "@/db";
+import { tenants } from "@/db/schema";
+import { eq } from "drizzle-orm";
 import crypto from "crypto";
 
 export async function generateApiKey() {
   const supabase = await createClient();
-  
-  // 1. Get current user
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error("Unauthorized");
+  if (!user?.email) throw new Error("Unauthorized");
 
-  // 2. Generate a random key (sk_live_...)
-  const key = "sk_live_" + crypto.randomBytes(16).toString("hex");
+  const tenantRows = await db
+    .select({ id: tenants.id, tier: tenants.tier })
+    .from(tenants)
+    .where(eq(tenants.email, user.email))
+    .limit(1);
 
-  // 3. Save to Database
-  const { error } = await supabase.from("api_keys").insert({
-    user_id: user.id,
-    key: key,
-    label: "Default Key"
-  });
+  const tenant = tenantRows[0];
+  if (!tenant || tenant.tier !== "enterprise") throw new Error("Unauthorized");
 
-  if (error) throw new Error(error.message);
+  const key = "obf_live_" + crypto.randomBytes(24).toString("hex");
 
-  revalidatePath("/dashboard");
+  await db
+    .update(tenants)
+    .set({ apiKey: key })
+    .where(eq(tenants.id, tenant.id));
+
+  revalidatePath("/dashboard/enterprise");
   return key;
 }

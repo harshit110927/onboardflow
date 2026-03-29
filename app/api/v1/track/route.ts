@@ -4,8 +4,14 @@ import { eq, and, count } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { checkEndUserLimit } from "@/lib/rate-limit/enterprise";
 import { deliverWebhookEvent } from "@/lib/webhooks/deliver";
+import { checkApiRateLimit } from "@/lib/rate-limit/api";
 
 export async function POST(req: Request) {
+  const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+  const rateLimit = checkApiRateLimit(ip);
+  if (!rateLimit.allowed) {
+    return NextResponse.json({ error: "Too many requests" }, { status: 429 });
+  }
   const apiKey = req.headers.get("x-api-key");
   if (!apiKey)
     return NextResponse.json({ error: "Missing API Key" }, { status: 401 });
