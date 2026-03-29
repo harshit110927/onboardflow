@@ -26,6 +26,7 @@ export default async function IndividualLayout({
 
   const planInfo = await getTenantPlan(tenant.id);
   const initials = user.email.slice(0, 2).toUpperCase();
+  const creditBalance = planInfo.credits;
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -66,6 +67,14 @@ export default async function IndividualLayout({
             <span className={`text-xs px-2.5 py-1 rounded-full font-medium hidden sm:block ${planInfo.plan === "premium" ? "bg-emerald-100 text-emerald-700" : "bg-secondary text-muted-foreground"}`}>
               {planInfo.plan === "premium" ? "Premium" : "Free Plan"}
             </span>
+            {creditBalance > 0 && (
+              <Link
+                href="/dashboard/individual/billing"
+                className="text-xs px-2.5 py-1 rounded-full bg-primary/10 text-primary font-medium hidden sm:block hover:bg-primary/20 transition-colors"
+              >
+                {creditBalance.toLocaleString()} credits
+              </Link>
+            )}
             <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-xs font-semibold">
               {initials}
             </div>

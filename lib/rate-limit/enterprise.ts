@@ -6,7 +6,7 @@ import { getTenantPlan } from "@/lib/plans/get-tenant-plan";
 
 export type RateLimitResult =
   | { allowed: true }
-  | { allowed: false; reason: string };
+  | { allowed: false; reason: string; isOverage?: boolean };
 
 export async function checkEmailRateLimit(
   tenantId: string
@@ -53,6 +53,7 @@ export async function checkEmailRateLimit(
             ? "Upgrade to Enterprise Premium for 500 emails/day."
             : "Purchase credits to send more emails today."
         }`,
+        isOverage: plan === "premium",
       };
     }
 
@@ -64,6 +65,7 @@ export async function checkEmailRateLimit(
             ? "Upgrade to Enterprise Premium for 10,000 emails/month."
             : "Purchase credits to send more emails this month."
         }`,
+        isOverage: plan === "premium",
       };
     }
 

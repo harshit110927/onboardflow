@@ -8,6 +8,7 @@ import { checkEmailRateLimit, incrementEmailCount } from "@/lib/rate-limit/enter
 import { decryptPassword, createGmailTransporter } from "@/lib/email/smtp";
 import { getTenantPlan } from "@/lib/plans/get-tenant-plan";
 import { deliverWebhookEvent } from "@/lib/webhooks/deliver";
+import { deductCredits } from "@/lib/credits/deduct";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -105,9 +106,20 @@ export async function GET(req: Request) {
           const limit = await checkEmailRateLimit(tenant.id);
 
           if (!limit.allowed) {
-            console.warn(`🚫 Rate limit hit for tenant ${tenant.email}: ${limit.reason}`);
-            emailsBlocked++;
-            break;
+            if (limit.isOverage) {
+              // Premium tenant over limit — try credits
+              const deduction = await deductCredits(tenant.id, 3, "usage_email", "Enterprise automated email (credit overage)");
+              if (!deduction.success) {
+                console.warn(`🚫 No credits for tenant ${tenant.email}: ${deduction.error}`);
+                emailsBlocked++;
+                break;
+              }
+              // Credits deducted — allow send to continue
+            } else {
+              console.warn(`🚫 Rate limit hit for tenant ${tenant.email}: ${limit.reason}`);
+              emailsBlocked++;
+              break;
+            }
           }
 
           try {
@@ -130,7 +142,8 @@ export async function GET(req: Request) {
               .where(eq(endUsers.id, user.id));
 
             emailsSent++;
-
+            
+            // If rate limit would normally block, check credits to extend
             // Fire webhook — non-blocking
             deliverWebhookEvent(tenant.id, "user.stuck", {
               userEmail: user.email,

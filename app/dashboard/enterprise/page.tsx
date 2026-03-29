@@ -32,6 +32,7 @@ export default async function EnterpriseDashboardPage() {
   if (!tenant) return <div>Error loading account. Please refresh.</div>;
 
   const planInfo = await getTenantPlan(tenant.id);
+  const creditBalance = planInfo.credits;
 
   const allUsers = await db.query.endUsers.findMany({
     where: eq(endUsers.tenantId, tenant.id),
@@ -59,7 +60,7 @@ export default async function EnterpriseDashboardPage() {
             </h1>
             <p className="text-muted-foreground">Executive Overview</p>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-wrap">
             <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${
               planInfo.plan === "premium"
                 ? "bg-emerald-100 text-emerald-700"
@@ -67,6 +68,14 @@ export default async function EnterpriseDashboardPage() {
             }`}>
               {planInfo.plan === "premium" ? "Premium" : "Free Plan"}
             </span>
+            {creditBalance > 0 && (
+              <Link
+                href="/dashboard/enterprise/billing"
+                className="text-xs px-2.5 py-1 rounded-full bg-primary/10 text-primary font-medium hover:bg-primary/20 transition-colors"
+              >
+                {creditBalance.toLocaleString()} credits
+              </Link>
+            )}
             <Link
               href="/dashboard/settings"
               className="text-sm rounded-md border border-border px-3 py-1.5 hover:bg-secondary transition-colors"

@@ -7,6 +7,7 @@ import { getTenantPlan } from "@/lib/plans/get-tenant-plan";
 import { INDIVIDUAL_LIMITS } from "@/lib/plans/limits";
 import { generateCampaign } from "@/lib/ai/generate-campaign";
 import type { CampaignTone, CampaignType } from "@/lib/ai/generate-campaign";
+import { deductCredits } from "@/lib/credits/deduct";
 
 export async function POST(req: Request) {
   try {
@@ -53,23 +54,26 @@ export async function POST(req: Request) {
     const monthlyLimit = INDIVIDUAL_LIMITS.premium.maxAiGenerationsPerMonth;
 
     if (monthlyUsed >= monthlyLimit) {
-      // Check credits for overage
       const creditCost = 50;
-      if ((tenant.credits ?? 0) < creditCost) {
+      const deduction = await deductCredits(
+        tenant.id,
+        creditCost,
+        "usage_ai",
+        "AI email generation (overage)"
+      );
+      if (!deduction.success) {
         return NextResponse.json(
           {
-            error: `You've used all ${monthlyLimit} monthly AI generations. Purchase credits to continue (50 credits each).`,
+            error: `You've used all ${monthlyLimit} monthly AI generations. You need ${creditCost} credits but have ${deduction.creditsHave}. Purchase credits to continue.`,
             needsCredits: true,
+            creditsNeeded: creditCost,
+            creditsHave: deduction.creditsHave,
           },
           { status: 402 }
         );
       }
-      // Deduct credits
-      await db
-        .update(tenants)
-        .set({ credits: (tenant.credits ?? 0) - creditCost, creditsUpdatedAt: new Date() })
-        .where(eq(tenants.id, tenant.id));
     }
+
 
     const { businessDescription, tone, campaignType } = await req.json() as {
       businessDescription: string;

@@ -1,4 +1,4 @@
-import { eq, and, count } from "drizzle-orm";
+import { eq, and, count, sql } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import Link from "next/link";
@@ -10,6 +10,8 @@ import { SendCampaignButton } from "./_components/SendCampaignButton";
 import { decryptPassword, createGmailTransporter } from "@/lib/email/smtp";
 import { injectTracking } from "@/lib/tracking/inject";
 import { getTenantPlan } from "@/lib/plans/get-tenant-plan";
+import { deductCredits } from "@/lib/credits/deduct";
+import { INDIVIDUAL_LIMITS } from "@/lib/plans/limits";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -55,6 +57,46 @@ async function sendCampaign(formData: FormData) {
 
   if (contacts.length === 0) return;
 
+  // ── Monthly email limit + credit check ────────────────────────────
+  const { plan: currentPlan } = await getTenantPlan(tenant.id);
+  const monthlyLimit = INDIVIDUAL_LIMITS[currentPlan].maxEmailsPerMonth;
+  const today = new Date().toISOString().slice(0, 10);
+  const month = today.slice(0, 7);
+
+  await db.execute(sql`
+    INSERT INTO email_usage (tenant_id, date, month, daily_count, monthly_count)
+    VALUES (${tenant.id}, ${today}, ${month}, 0, 0)
+    ON CONFLICT (tenant_id, date) DO NOTHING
+  `);
+
+  const usageRows = await db.execute(sql`
+    SELECT COALESCE(SUM(daily_count), 0) AS monthly_count
+    FROM email_usage
+    WHERE tenant_id = ${tenant.id} AND month = ${month}
+  `);
+
+  const monthlyUsed = Number((usageRows as any)[0]?.monthly_count ?? 0);
+  const emailsToSend = contacts.length;
+
+  if (currentPlan === "free" && monthlyUsed >= monthlyLimit) {
+    return;
+  }
+
+  if (currentPlan === "premium" && monthlyUsed + emailsToSend > monthlyLimit) {
+    const overage = (monthlyUsed + emailsToSend) - monthlyLimit;
+    const creditCost = overage * 2;
+    const deduction = await deductCredits(
+      tenant.id,
+      creditCost,
+      "usage_email",
+      `Email campaign overage — ${overage} extra email${overage !== 1 ? "s" : ""}`
+    );
+    if (!deduction.success) {
+      redirect(`/dashboard/individual/campaigns/${campaignId}?error=credits&need=${deduction.creditsNeeded}&have=${deduction.creditsHave}`);
+    }
+  }
+
+  // ── Send emails ───────────────────────────────────────────────────
   const tenantSmtp = await db
     .select({ smtpEmail: tenants.smtpEmail, smtpPassword: tenants.smtpPassword, smtpVerified: tenants.smtpVerified })
     .from(tenants)
@@ -63,9 +105,7 @@ async function sendCampaign(formData: FormData) {
 
   const smtp = tenantSmtp[0];
   const useGmail = smtp?.smtpVerified && smtp.smtpEmail && smtp.smtpPassword;
-
-  const { plan } = await getTenantPlan(tenant.id);
-  const trackingEnabled = plan === "premium";
+  const trackingEnabled = currentPlan === "premium";
 
   if (useGmail) {
     const decrypted = decryptPassword(smtp.smtpPassword!);
@@ -120,8 +160,10 @@ function StatusBadge({ status }: { status: string }) {
 
 export default async function CampaignDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ campaignId: string }>;
+  searchParams: Promise<{ error?: string; need?: string; have?: string }>;
 }) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -149,6 +191,8 @@ export default async function CampaignDetailPage({
   const { campaignId } = await params;
   const id = Number(campaignId);
   if (isNaN(id)) redirect("/dashboard/individual/campaigns");
+
+  const sp = await searchParams;
 
   const rows = await db
     .select({
@@ -214,6 +258,15 @@ export default async function CampaignDetailPage({
           <span>/</span>
           <span className="text-foreground truncate">{campaign.subject}</span>
         </div>
+
+        {sp.error === "credits" && (
+          <div className="rounded-lg border border-destructive/20 bg-destructive/5 px-5 py-4 text-sm text-destructive">
+            Not enough credits to send. You need {sp.need} credits but have {sp.have}.{" "}
+            <Link href="/dashboard/individual/billing" className="underline font-medium">
+              Purchase credits →
+            </Link>
+          </div>
+        )}
 
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div>
