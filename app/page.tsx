@@ -213,13 +213,12 @@ export default async function Home() {
             </button>
           </form>
 
-          {/* <p style={{ marginTop: 26, fontSize: 12, color: "#b0aac8", textAlign: "center", lineHeight: 1.7 }}>
-            No account? <a href="#" style={{ color: "#6366f1", textDecoration: "none" }}>Sign up free</a><br />
+          <p style={{ marginTop: 26, fontSize: 12, color: "#b0aac8", textAlign: "center", lineHeight: 1.7 }}>
             By continuing you agree to our{" "}
-            <a href="#" style={{ color: "#6366f1", textDecoration: "none" }}>Terms</a>
+            <a href="/terms" style={{ color: "#6366f1", textDecoration: "none" }}>Terms</a>
             {" "}&amp;{" "}
-            <a href="#" style={{ color: "#6366f1", textDecoration: "none" }}>Privacy Policy</a>
-          </p> */}
+            <a href="/privacy" style={{ color: "#6366f1", textDecoration: "none" }}>Privacy Policy</a>
+          </p>
 
         </div>
       </div>

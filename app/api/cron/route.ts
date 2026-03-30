@@ -1,5 +1,5 @@
 import { db } from "@/db";
-import { tenants, endUsers, individualCampaigns, individualLists, individualContacts, dripSteps } from "@/db/schema";
+import { tenants, endUsers, individualCampaigns, individualLists, individualContacts, dripSteps, unsubscribedContacts } from "@/db/schema";
 import { NextResponse } from "next/server";
 import { Resend } from "resend";
 import { subHours } from "date-fns";
@@ -9,6 +9,7 @@ import { decryptPassword, createGmailTransporter } from "@/lib/email/smtp";
 import { getTenantPlan } from "@/lib/plans/get-tenant-plan";
 import { deliverWebhookEvent } from "@/lib/webhooks/deliver";
 import { deductCredits } from "@/lib/credits/deduct";
+import { buildEmailHtml } from "@/lib/email/templates";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -81,6 +82,14 @@ export async function GET(req: Request) {
       for (const user of users) {
         if (!user.email) continue;
 
+        // Check unsubscribe
+        const unsubCheck = await db
+          .select({ email: unsubscribedContacts.email })
+          .from(unsubscribedContacts)
+          .where(eq(unsubscribedContacts.email, user.email.toLowerCase()))
+          .limit(1);
+        if (unsubCheck.length > 0) continue;
+
         const stepsCompleted = (user.completedSteps as string[]) || [];
         let emailToSend: { subject: string; body: string; tag: string } | null = null;
 
@@ -113,14 +122,12 @@ export async function GET(req: Request) {
 
           if (!limit.allowed) {
             if (limit.isOverage) {
-              // Premium tenant over limit — try credits
               const deduction = await deductCredits(tenant.id, 3, "usage_email", "Enterprise automated email (credit overage)");
               if (!deduction.success) {
                 console.warn(`🚫 No credits for tenant ${tenant.email}: ${deduction.error}`);
                 emailsBlocked++;
                 break;
               }
-              // Credits deducted — allow send to continue
             } else {
               console.warn(`🚫 Rate limit hit for tenant ${tenant.email}: ${limit.reason}`);
               emailsBlocked++;
@@ -131,11 +138,12 @@ export async function GET(req: Request) {
           try {
             console.log(`🚀 Sending [${emailToSend.tag}] to ${user.email}`);
 
+            const emailBody = emailToSend.body.replace("{{name}}", user.email.split("@")[0]);
             await resend.emails.send({
               from: "OnboardFlow <onboarding@resend.dev>",
               to: [user.email],
               subject: emailToSend.subject,
-              text: emailToSend.body.replace("{{name}}", user.email.split("@")[0]),
+              html: buildEmailHtml({ body: emailBody }),
             });
 
             await incrementEmailCount(tenant.id);
@@ -148,9 +156,7 @@ export async function GET(req: Request) {
               .where(eq(endUsers.id, user.id));
 
             emailsSent++;
-            
-            // If rate limit would normally block, check credits to extend
-            // Fire webhook — non-blocking
+
             deliverWebhookEvent(tenant.id, "user.stuck", {
               userEmail: user.email,
               tag: emailToSend.tag,
@@ -230,20 +236,22 @@ export async function GET(req: Request) {
             const decrypted = decryptPassword(seqTenant.smtpPassword!);
             const transporter = createGmailTransporter(seqTenant.smtpEmail!, decrypted);
             for (const contact of contacts) {
+              const body = step.body.replace(/\{contact_name\}/g, contact.name);
               await transporter.sendMail({
                 from: seqTenant.smtpEmail!,
                 to: contact.email,
                 subject: step.subject,
-                text: step.body.replace(/\{contact_name\}/g, contact.name),
+                html: buildEmailHtml({ body }),
               });
             }
           } else {
             for (const contact of contacts) {
+              const body = step.body.replace(/\{contact_name\}/g, contact.name);
               await resend.emails.send({
                 from: "OnboardFlow <onboarding@resend.dev>",
                 to: contact.email,
                 subject: step.subject,
-                text: step.body.replace(/\{contact_name\}/g, contact.name),
+                html: buildEmailHtml({ body }),
               });
             }
           }

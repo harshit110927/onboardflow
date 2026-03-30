@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
 import { db } from "@/db";
-import { tenants, individualLists, individualCampaigns, individualContacts } from "@/db/schema";
+import { tenants, individualLists, individualCampaigns, individualContacts, unsubscribedContacts } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { getTenantPlan } from "@/lib/plans/get-tenant-plan";
 import { decryptPassword, createGmailTransporter } from "@/lib/email/smtp";
+import { buildEmailHtml, createUnsubscribeToken } from "@/lib/email/templates";
 import { Resend } from "resend";
 import crypto from "crypto";
 
@@ -44,7 +45,6 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Invalid sequence data." }, { status: 400 });
     }
 
-    // Verify list ownership
     const listRows = await db
       .select({ id: individualLists.id })
       .from(individualLists)
@@ -55,7 +55,6 @@ export async function POST(req: Request) {
 
     const sequenceId = crypto.randomUUID();
 
-    // Insert all steps
     const insertedIds: number[] = [];
     for (const [i, step] of steps.entries()) {
       const rows = await db
@@ -74,35 +73,45 @@ export async function POST(req: Request) {
       insertedIds.push(rows[0].id);
     }
 
-    // Send step 1 immediately
     const firstId = insertedIds[0];
     const contacts = await db
       .select({ name: individualContacts.name, email: individualContacts.email })
       .from(individualContacts)
       .where(eq(individualContacts.listId, listId));
 
-    if (contacts.length > 0) {
+    // Filter unsubscribed
+    const unsubscribed = await db
+      .select({ email: unsubscribedContacts.email })
+      .from(unsubscribedContacts);
+    const unsubscribedEmails = new Set(unsubscribed.map((u) => u.email.toLowerCase()));
+    const activeContacts = contacts.filter(
+      (c) => !unsubscribedEmails.has(c.email.toLowerCase())
+    );
+
+    if (activeContacts.length > 0) {
       const firstStep = steps[0];
       const useGmail = tenant.smtpVerified && tenant.smtpEmail && tenant.smtpPassword;
 
       if (useGmail) {
         const decrypted = decryptPassword(tenant.smtpPassword!);
         const transporter = createGmailTransporter(tenant.smtpEmail!, decrypted);
-        for (const contact of contacts) {
+        for (const contact of activeContacts) {
+          const body = firstStep.body.replace(/\{contact_name\}/g, contact.name);
           await transporter.sendMail({
             from: tenant.smtpEmail!,
             to: contact.email,
             subject: firstStep.subject,
-            text: firstStep.body.replace(/\{contact_name\}/g, contact.name),
+            html: buildEmailHtml({ body, contactEmail: contact.email, unsubscribeToken: createUnsubscribeToken(contact.email) }),
           });
         }
       } else {
-        for (const contact of contacts) {
+        for (const contact of activeContacts) {
+          const body = firstStep.body.replace(/\{contact_name\}/g, contact.name);
           await resend.emails.send({
             from: "OnboardFlow <onboarding@resend.dev>",
             to: contact.email,
             subject: firstStep.subject,
-            text: firstStep.body.replace(/\{contact_name\}/g, contact.name),
+            html: buildEmailHtml({ body, contactEmail: contact.email, unsubscribeToken: createUnsubscribeToken(contact.email) }),
           });
         }
       }

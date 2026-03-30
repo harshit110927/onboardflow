@@ -250,8 +250,12 @@ export default async function IndividualDashboardPage() {
             </p>
           </div>
           <div className="flex items-center gap-3">
-            <span className="text-xs px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-700 font-medium">
-              Free Plan
+            <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${
+              planInfo.plan === "premium"
+                ? "bg-emerald-100 text-emerald-700"
+                : "bg-secondary text-muted-foreground"
+            }`}>
+              {planInfo.plan === "premium" ? "Premium" : "Free Plan"}
             </span>
             <Link
               href="/dashboard/individual/lists/new"
@@ -380,6 +384,54 @@ export default async function IndividualDashboardPage() {
             ))}
           </div>
         </div>
+        {/* ── Onboarding Checklist ── */}
+        {lists.length === 0 && (
+          <div className="rounded-lg border border-border bg-card p-6">
+            <h2 className="text-lg font-semibold text-foreground mb-1">Get started</h2>
+            <p className="text-sm text-muted-foreground mb-4">Complete these steps to send your first campaign.</p>
+            <div className="flex flex-col gap-3">
+              {[
+                {
+                  done: lists.length > 0,
+                  label: "Create your first list",
+                  href: "/dashboard/individual/lists/new",
+                  cta: "Create list",
+                },
+                {
+                  done: Object.values(contactMap).some((c) => c > 0),
+                  label: "Add contacts to a list",
+                  href: "/dashboard/individual/lists",
+                  cta: "Add contacts",
+                },
+                {
+                  done: totalCampaigns > 0,
+                  label: "Send your first campaign",
+                  href: "/dashboard/individual/campaigns/create",
+                  cta: "Create campaign",
+                },
+              ].map((step, i) => (
+                <div key={i} className="flex items-center gap-4">
+                  <div className={`h-6 w-6 rounded-full flex items-center justify-center shrink-0 text-xs font-bold ${
+                    step.done ? "bg-emerald-100 text-emerald-700" : "bg-secondary text-muted-foreground"
+                  }`}>
+                    {step.done ? "✓" : i + 1}
+                  </div>
+                  <span className={`flex-1 text-sm ${step.done ? "line-through text-muted-foreground" : "text-foreground"}`}>
+                    {step.label}
+                  </span>
+                  {!step.done && (
+                    <Link
+                      href={step.href}
+                      className="text-xs rounded-md bg-primary text-primary-foreground px-3 py-1.5 hover:opacity-90 transition-opacity shrink-0"
+                    >
+                      {step.cta}
+                    </Link>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
       </div>
     </div>

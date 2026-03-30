@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import Link from "next/link";
 import { Resend } from "resend";
 import { db } from "@/db";
-import { individualCampaigns, individualContacts, individualLists, tenants, campaignEvents } from "@/db/schema";
+import { individualCampaigns, individualContacts, individualLists, tenants, campaignEvents, unsubscribedContacts } from "@/db/schema";
 import { createClient } from "@/utils/supabase/server";
 import { SendCampaignButton } from "./_components/SendCampaignButton";
 import { decryptPassword, createGmailTransporter } from "@/lib/email/smtp";
@@ -12,6 +12,7 @@ import { injectTracking } from "@/lib/tracking/inject";
 import { getTenantPlan } from "@/lib/plans/get-tenant-plan";
 import { deductCredits } from "@/lib/credits/deduct";
 import { INDIVIDUAL_LIMITS } from "@/lib/plans/limits";
+import { buildEmailHtml, createUnsubscribeToken } from "@/lib/email/templates";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -57,6 +58,18 @@ async function sendCampaign(formData: FormData) {
 
   if (contacts.length === 0) return;
 
+  // Filter out unsubscribed contacts
+  const unsubscribed = await db
+    .select({ email: unsubscribedContacts.email })
+    .from(unsubscribedContacts);
+
+  const unsubscribedEmails = new Set(unsubscribed.map((u) => u.email.toLowerCase()));
+  const activeContacts = contacts.filter(
+    (c) => !unsubscribedEmails.has(c.email.toLowerCase())
+  );
+
+  if (activeContacts.length === 0) return;
+
   // ── Monthly email limit + credit check ────────────────────────────
   const { plan: currentPlan } = await getTenantPlan(tenant.id);
   const monthlyLimit = INDIVIDUAL_LIMITS[currentPlan].maxEmailsPerMonth;
@@ -76,7 +89,7 @@ async function sendCampaign(formData: FormData) {
   `);
 
   const monthlyUsed = Number((usageRows as any)[0]?.monthly_count ?? 0);
-  const emailsToSend = contacts.length;
+  const emailsToSend = activeContacts.length;
 
   if (currentPlan === "free" && monthlyUsed >= monthlyLimit) {
     return;
@@ -110,29 +123,43 @@ async function sendCampaign(formData: FormData) {
   if (useGmail) {
     const decrypted = decryptPassword(smtp.smtpPassword!);
     const transporter = createGmailTransporter(smtp.smtpEmail!, decrypted);
-    for (const contact of contacts) {
+    for (const contact of activeContacts) {
       const rawBody = campaign.body.replace(/\{contact_name\}/g, contact.name);
-      const personalizedBody = trackingEnabled
+      const trackedBody = trackingEnabled
         ? injectTracking(rawBody, campaign.id, contact.email)
         : rawBody;
+      const unsubToken = createUnsubscribeToken(contact.email);
+      const htmlBody = buildEmailHtml({
+        body: trackedBody,
+        campaignId: campaign.id,
+        contactEmail: contact.email,
+        unsubscribeToken: unsubToken,
+      });
       await transporter.sendMail({
         from: smtp.smtpEmail!,
         to: contact.email,
         subject: campaign.subject,
-        text: personalizedBody,
+        html: htmlBody,
       });
     }
   } else {
-    for (const contact of contacts) {
+    for (const contact of activeContacts) {
       const rawBody = campaign.body.replace(/\{contact_name\}/g, contact.name);
-      const personalizedBody = trackingEnabled
+      const trackedBody = trackingEnabled
         ? injectTracking(rawBody, campaign.id, contact.email)
         : rawBody;
+      const unsubToken = createUnsubscribeToken(contact.email);
+      const htmlBody = buildEmailHtml({
+        body: trackedBody,
+        campaignId: campaign.id,
+        contactEmail: contact.email,
+        unsubscribeToken: unsubToken,
+      });
       await resend.emails.send({
         from: "OnboardFlow <onboarding@resend.dev>",
         to: contact.email,
         subject: campaign.subject,
-        text: personalizedBody,
+        html: htmlBody,
       });
     }
   }

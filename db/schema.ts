@@ -187,3 +187,9 @@ export const webhookDeliveries = pgTable("webhook_deliveries", {
   deliveredAt: timestamp("delivered_at").defaultNow(),
   success: boolean("success").notNull().default(false),
 });
+
+export const unsubscribedContacts = pgTable("unsubscribed_contacts", {
+  id: serial("id").primaryKey(),
+  email: varchar("email", { length: 255 }).notNull().unique(),
+  unsubscribedAt: timestamp("unsubscribed_at").defaultNow(),
+});
