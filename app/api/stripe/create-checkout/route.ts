@@ -1,3 +1,4 @@
+// MODIFIED — razorpay credits migration — Stripe checkout/portal suppressed behind STRIPE_ENABLED gate
 // NEW FILE — phase 2 stripe integration
 import { NextResponse } from "next/server";
 import Stripe from "stripe";
@@ -9,6 +10,15 @@ import { eq } from "drizzle-orm";
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string);
 
 export async function POST(req: Request) {
+  // STRIPE SUPPRESSED — Stripe India approval pending
+  // TO RE-ENABLE: Remove the 4 lines below
+  if (process.env.STRIPE_ENABLED !== "true") {
+    return NextResponse.json(
+      { error: "Stripe payments temporarily unavailable. Please use the credit purchase system." },
+      { status: 503 }
+    );
+  }
+
   try {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();

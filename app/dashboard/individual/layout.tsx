@@ -1,3 +1,4 @@
+// MODIFIED — razorpay credits migration — added shared CreditMeter to individual top navigation
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { eq } from "drizzle-orm";
@@ -5,6 +6,7 @@ import { db } from "@/db";
 import { tenants } from "@/db/schema";
 import { createClient } from "@/utils/supabase/server";
 import { getTenantPlan } from "@/lib/plans/get-tenant-plan";
+import CreditMeter from "@/app/_components/CreditMeter";
 
 export default async function IndividualLayout({
   children,
@@ -67,14 +69,13 @@ export default async function IndividualLayout({
             <span className={`text-xs px-2.5 py-1 rounded-full font-medium hidden sm:block ${planInfo.plan === "premium" ? "bg-emerald-100 text-emerald-700" : "bg-secondary text-muted-foreground"}`}>
               {planInfo.plan === "premium" ? "Premium" : "Free Plan"}
             </span>
-            {creditBalance > 0 && (
-              <Link
-                href="/dashboard/individual/billing"
-                className="text-xs px-2.5 py-1 rounded-full bg-primary/10 text-primary font-medium hidden sm:block hover:bg-primary/20 transition-colors"
-              >
-                {creditBalance.toLocaleString()} credits
-              </Link>
-            )}
+            <div className="hidden sm:block">
+              <CreditMeter
+                credits={creditBalance}
+                tier="individual"
+                billingPath="/dashboard/individual/billing"
+              />
+            </div>
             <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-xs font-semibold">
               {initials}
             </div>

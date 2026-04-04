@@ -1,4 +1,4 @@
-// NEW FILE — phase 1 premium foundation
+// MODIFIED — razorpay credits migration — replaced shared credit packs with tier-specific Razorpay packs and updated credit cost constants
 
 export type PlanTier = "free" | "premium";
 export type AccountTier = "individual" | "enterprise";
@@ -21,6 +21,17 @@ export type EnterpriseLimits = {
   maxApiCallsPerMonth: number;
   webhooksEnabled: boolean;
   advancedAnalyticsEnabled: boolean;
+};
+
+export type CreditPack = {
+  id: string;
+  priceInr: number;
+  priceUsd: number;
+  amountInPaise: number;
+  credits: number;
+  bonus: number;
+  label: string;
+  highlights: string[];
 };
 
 export const INDIVIDUAL_LIMITS: Record<PlanTier, IndividualLimits> = {
@@ -65,25 +76,41 @@ export const ENTERPRISE_LIMITS: Record<PlanTier, EnterpriseLimits> = {
   },
 };
 
-// Credit costs per resource unit
 export const CREDIT_COSTS = {
   individual: {
-    emailSend: 2,        // per email over monthly limit
-    aiGeneration: 50,    // per AI write over monthly limit
-    extraContacts: 200,  // per 100 contacts over limit
-    extraCampaign: 100,  // per extra campaign slot
+    emailSend: 10,
+    aiCampaignSend: 25,
   },
   enterprise: {
-    emailSend: 3,        // per automated email over monthly limit
-    extraTrackedUsers: 500, // per 100 users over limit
-    extraApiCalls: 100,  // per 1000 API calls over limit
+    emailSend: 10,
   },
 } as const;
 
-// Credit pack definitions
-export const CREDIT_PACKS = [
-  { id: "credits_10", price: 10, credits: 10000, bonus: 0 },
-  { id: "credits_25", price: 25, credits: 27500, bonus: 10 },
-  { id: "credits_50", price: 50, credits: 60000, bonus: 20 },
-  { id: "credits_100", price: 100, credits: 130000, bonus: 30 },
-] as const;
+const createIndividualPack = (pack: Omit<CreditPack, "highlights">): CreditPack => ({
+  ...pack,
+  highlights: [
+    `${Math.floor(pack.credits / CREDIT_COSTS.individual.emailSend).toLocaleString()} emails`,
+    `${Math.floor(pack.credits / CREDIT_COSTS.individual.aiCampaignSend).toLocaleString()} AI campaigns`,
+  ],
+});
+
+const createEnterprisePack = (pack: Omit<CreditPack, "highlights">): CreditPack => ({
+  ...pack,
+  highlights: [
+    `${Math.floor(pack.credits / CREDIT_COSTS.enterprise.emailSend).toLocaleString()} drip emails`,
+  ],
+});
+
+export const INDIVIDUAL_CREDIT_PACKS: CreditPack[] = [
+  createIndividualPack({ id: "credits_starter", label: "Starter", priceInr: 420, priceUsd: 5, amountInPaise: 42000, credits: 5000, bonus: 0 }),
+  createIndividualPack({ id: "credits_basic", label: "Basic", priceInr: 840, priceUsd: 10, amountInPaise: 84000, credits: 11000, bonus: 10 }),
+  createIndividualPack({ id: "credits_pro", label: "Pro", priceInr: 2100, priceUsd: 25, amountInPaise: 210000, credits: 30000, bonus: 20 }),
+  createIndividualPack({ id: "credits_growth", label: "Growth", priceInr: 4200, priceUsd: 50, amountInPaise: 420000, credits: 65000, bonus: 30 }),
+  createIndividualPack({ id: "credits_scale", label: "Scale", priceInr: 8400, priceUsd: 100, amountInPaise: 840000, credits: 140000, bonus: 40 }),
+];
+
+export const ENTERPRISE_CREDIT_PACKS: CreditPack[] = [
+  createEnterprisePack({ id: "credits_pro", label: "Pro", priceInr: 2100, priceUsd: 25, amountInPaise: 210000, credits: 30000, bonus: 0 }),
+  createEnterprisePack({ id: "credits_growth", label: "Growth", priceInr: 4200, priceUsd: 50, amountInPaise: 420000, credits: 65000, bonus: 0 }),
+  createEnterprisePack({ id: "credits_scale", label: "Scale", priceInr: 8400, priceUsd: 100, amountInPaise: 840000, credits: 140000, bonus: 0 }),
+];

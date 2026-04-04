@@ -1,3 +1,4 @@
+// MODIFIED — razorpay credits migration — added shared CreditMeter to enterprise dashboard header
 import { createClient } from "@/utils/supabase/server";
 import { redirect } from "next/navigation";
 import { db } from "@/db";
@@ -6,6 +7,7 @@ import { eq } from "drizzle-orm";
 import Link from "next/link";
 import { getTenantPlan } from "@/lib/plans/get-tenant-plan";
 import { ApiKeyCard } from "@/app/dashboard/ApiKeyCard";
+import CreditMeter from "@/app/_components/CreditMeter";
 
 export default async function EnterpriseDashboardPage() {
   const supabase = await createClient();
@@ -68,14 +70,11 @@ export default async function EnterpriseDashboardPage() {
             }`}>
               {planInfo.plan === "premium" ? "Premium" : "Free Plan"}
             </span>
-            {creditBalance > 0 && (
-              <Link
-                href="/dashboard/enterprise/billing"
-                className="text-xs px-2.5 py-1 rounded-full bg-primary/10 text-primary font-medium hover:bg-primary/20 transition-colors"
-              >
-                {creditBalance.toLocaleString()} credits
-              </Link>
-            )}
+            <CreditMeter
+              credits={creditBalance}
+              tier="enterprise"
+              billingPath="/dashboard/enterprise/billing"
+            />
             <Link
               href="/dashboard/settings"
               className="text-sm rounded-md border border-border px-3 py-1.5 hover:bg-secondary transition-colors"
