@@ -1,10 +1,11 @@
+// MODIFIED — razorpay credits migration — switched AI overage deduction to shared credit cost constant
 import { NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
 import { db } from "@/db";
 import { tenants, aiUsage } from "@/db/schema";
 import { eq, count, and, gte } from "drizzle-orm";
 import { getTenantPlan } from "@/lib/plans/get-tenant-plan";
-import { INDIVIDUAL_LIMITS } from "@/lib/plans/limits";
+import { CREDIT_COSTS, INDIVIDUAL_LIMITS } from "@/lib/plans/limits";
 import { generateCampaign } from "@/lib/ai/generate-campaign";
 import type { CampaignTone, CampaignType } from "@/lib/ai/generate-campaign";
 import { deductCredits } from "@/lib/credits/deduct";
@@ -54,7 +55,7 @@ export async function POST(req: Request) {
     const monthlyLimit = INDIVIDUAL_LIMITS.premium.maxAiGenerationsPerMonth;
 
     if (monthlyUsed >= monthlyLimit) {
-      const creditCost = 50;
+      const creditCost = CREDIT_COSTS.individual.aiCampaignSend;
       const deduction = await deductCredits(
         tenant.id,
         creditCost,

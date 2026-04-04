@@ -1,3 +1,4 @@
+// MODIFIED — razorpay credits migration — switched enterprise drip overage deduction to shared credit cost constant
 import { db } from "@/db";
 import { tenants, endUsers, individualCampaigns, individualLists, individualContacts, dripSteps, unsubscribedContacts } from "@/db/schema";
 import { NextResponse } from "next/server";
@@ -10,6 +11,7 @@ import { getTenantPlan } from "@/lib/plans/get-tenant-plan";
 import { deliverWebhookEvent } from "@/lib/webhooks/deliver";
 import { deductCredits } from "@/lib/credits/deduct";
 import { buildEmailHtml } from "@/lib/email/templates";
+import { CREDIT_COSTS } from "@/lib/plans/limits";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -122,7 +124,7 @@ export async function GET(req: Request) {
 
           if (!limit.allowed) {
             if (limit.isOverage) {
-              const deduction = await deductCredits(tenant.id, 3, "usage_email", "Enterprise automated email (credit overage)");
+              const deduction = await deductCredits(tenant.id, CREDIT_COSTS.enterprise.emailSend, "usage_email", "Enterprise automated email (credit overage)");
               if (!deduction.success) {
                 console.warn(`🚫 No credits for tenant ${tenant.email}: ${deduction.error}`);
                 emailsBlocked++;

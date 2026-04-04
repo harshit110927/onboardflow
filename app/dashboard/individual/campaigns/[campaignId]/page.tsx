@@ -1,3 +1,4 @@
+// MODIFIED — razorpay credits migration — updated individual campaign overage deductions to credits-only cost constants
 import { eq, and, count, sql } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
@@ -11,7 +12,7 @@ import { decryptPassword, createGmailTransporter } from "@/lib/email/smtp";
 import { injectTracking } from "@/lib/tracking/inject";
 import { getTenantPlan } from "@/lib/plans/get-tenant-plan";
 import { deductCredits } from "@/lib/credits/deduct";
-import { INDIVIDUAL_LIMITS } from "@/lib/plans/limits";
+import { CREDIT_COSTS, INDIVIDUAL_LIMITS } from "@/lib/plans/limits";
 import { buildEmailHtml, createUnsubscribeToken } from "@/lib/email/templates";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
@@ -72,7 +73,7 @@ async function sendCampaign(formData: FormData) {
 
   // ── Monthly email limit + credit check ────────────────────────────
   const { plan: currentPlan } = await getTenantPlan(tenant.id);
-  const monthlyLimit = INDIVIDUAL_LIMITS[currentPlan].maxEmailsPerMonth;
+  const monthlyLimit = INDIVIDUAL_LIMITS.free.maxEmailsPerMonth;
   const today = new Date().toISOString().slice(0, 10);
   const month = today.slice(0, 7);
 
@@ -91,13 +92,9 @@ async function sendCampaign(formData: FormData) {
   const monthlyUsed = Number((usageRows as any)[0]?.monthly_count ?? 0);
   const emailsToSend = activeContacts.length;
 
-  if (currentPlan === "free" && monthlyUsed >= monthlyLimit) {
-    return;
-  }
-
-  if (currentPlan === "premium" && monthlyUsed + emailsToSend > monthlyLimit) {
-    const overage = (monthlyUsed + emailsToSend) - monthlyLimit;
-    const creditCost = overage * 2;
+  if (monthlyUsed + emailsToSend > monthlyLimit) {
+    const overage = monthlyUsed + emailsToSend - monthlyLimit;
+    const creditCost = overage * CREDIT_COSTS.individual.emailSend;
     const deduction = await deductCredits(
       tenant.id,
       creditCost,
