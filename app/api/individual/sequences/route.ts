@@ -2,8 +2,9 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
 import { db } from "@/db";
 import { tenants, individualLists, individualCampaigns, individualContacts, unsubscribedContacts } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { getTenantPlan } from "@/lib/plans/get-tenant-plan";
+import { INDIVIDUAL_LIMITS } from "@/lib/plans/limits";
 import { decryptPassword, createGmailTransporter } from "@/lib/email/smtp";
 import { buildEmailHtml, createUnsubscribeToken } from "@/lib/email/templates";
 import { Resend } from "resend";
@@ -89,6 +90,25 @@ export async function POST(req: Request) {
     );
 
     if (activeContacts.length > 0) {
+      // FIX — enforce monthly email cap before first sequence send
+      const today = new Date().toISOString().slice(0, 10);
+      const month = today.slice(0, 7);
+      const monthlyLimit = INDIVIDUAL_LIMITS[plan].maxEmailsPerMonth;
+      await db.execute(sql`
+        INSERT INTO email_usage (tenant_id, date, month, daily_count, monthly_count)
+        VALUES (${tenant.id}, ${today}, ${month}, 0, 0)
+        ON CONFLICT (tenant_id, date) DO NOTHING
+      `);
+      const usageRows = await db.execute(sql`
+        SELECT COALESCE(SUM(daily_count), 0) AS monthly_count
+        FROM email_usage
+        WHERE tenant_id = ${tenant.id} AND month = ${month}
+      `);
+      const monthlyUsed = Number((usageRows as any)[0]?.monthly_count ?? 0);
+      if (monthlyUsed + activeContacts.length > monthlyLimit) {
+        return NextResponse.json({ error: "Monthly email limit reached." }, { status: 400 });
+      }
+
       const firstStep = steps[0];
       const useGmail = tenant.smtpVerified && tenant.smtpEmail && tenant.smtpPassword;
 
