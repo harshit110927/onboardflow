@@ -27,7 +27,8 @@ async function sendCampaign(formData: FormData) {
   if (!user?.email) return;
 
   const tenantRows = await db
-    .select()
+    // FIX — select only tenant fields required for send action ownership + billing checks
+    .select({ id: tenants.id, tier: tenants.tier })
     .from(tenants)
     .where(eq(tenants.email, user.email))
     .limit(1);
@@ -45,7 +46,8 @@ async function sendCampaign(formData: FormData) {
     })
     .from(individualCampaigns)
     .innerJoin(individualLists, eq(individualCampaigns.listId, individualLists.id))
-    .where(eq(individualCampaigns.id, campaignId))
+    // FIX — enforce tenant ownership while loading campaign for send
+    .where(and(eq(individualCampaigns.id, campaignId), eq(individualLists.userId, tenant.id)))
     .limit(1);
 
   const campaign = campaignRows[0];
@@ -57,7 +59,10 @@ async function sendCampaign(formData: FormData) {
     .from(individualContacts)
     .where(eq(individualContacts.listId, campaign.listId));
 
-  if (contacts.length === 0) return;
+  if (contacts.length === 0) {
+    // FIX — return explicit UI feedback instead of silent no-op when a campaign has no contacts
+    redirect(`/dashboard/individual/campaigns/${campaignId}?error=no_contacts`);
+  }
 
   // Filter out unsubscribed contacts
   const unsubscribed = await db
@@ -69,11 +74,15 @@ async function sendCampaign(formData: FormData) {
     (c) => !unsubscribedEmails.has(c.email.toLowerCase())
   );
 
-  if (activeContacts.length === 0) return;
+  if (activeContacts.length === 0) {
+    // FIX — return explicit UI feedback when every contact is unsubscribed
+    redirect(`/dashboard/individual/campaigns/${campaignId}?error=no_active_contacts`);
+  }
 
   // ── Monthly email limit + credit check ────────────────────────────
   const { plan: currentPlan } = await getTenantPlan(tenant.id);
-  const monthlyLimit = INDIVIDUAL_LIMITS.free.maxEmailsPerMonth;
+  // FIX — use plan-specific monthly cap (free: 50, premium: 5000)
+  const monthlyLimit = INDIVIDUAL_LIMITS[currentPlan].maxEmailsPerMonth;
   const today = new Date().toISOString().slice(0, 10);
   const month = today.slice(0, 7);
 
@@ -91,6 +100,11 @@ async function sendCampaign(formData: FormData) {
 
   const monthlyUsed = Number((usageRows as any)[0]?.monthly_count ?? 0);
   const emailsToSend = activeContacts.length;
+
+  // FIX — hard-block free tier at 50 monthly emails before any overage credit logic
+  if (currentPlan === "free" && (monthlyUsed >= 50 || monthlyUsed + emailsToSend > monthlyLimit)) {
+    redirect(`/dashboard/individual/campaigns/${campaignId}?error=monthly_limit`);
+  }
 
   if (monthlyUsed + emailsToSend > monthlyLimit) {
     const overage = monthlyUsed + emailsToSend - monthlyLimit;
@@ -131,6 +145,7 @@ async function sendCampaign(formData: FormData) {
         campaignId: campaign.id,
         contactEmail: contact.email,
         unsubscribeToken: unsubToken,
+        senderEmail: smtp.smtpEmail!,
       });
       await transporter.sendMail({
         from: smtp.smtpEmail!,
@@ -151,6 +166,7 @@ async function sendCampaign(formData: FormData) {
         campaignId: campaign.id,
         contactEmail: contact.email,
         unsubscribeToken: unsubToken,
+        senderEmail: "onboarding@resend.dev",
       });
       await resend.emails.send({
         from: "OnboardFlow <onboarding@resend.dev>",
@@ -167,6 +183,8 @@ async function sendCampaign(formData: FormData) {
     .where(eq(individualCampaigns.id, campaignId));
 
   revalidatePath(`/dashboard/individual/campaigns/${campaignId}`);
+  // FIX — redirect after send so user sees a definitive success state and refreshed data
+  redirect(`/dashboard/individual/campaigns/${campaignId}?success=sent`);
 }
 
 function StatusBadge({ status }: { status: string }) {
@@ -187,14 +205,21 @@ export default async function CampaignDetailPage({
   searchParams,
 }: {
   params: Promise<{ campaignId: string }>;
-  searchParams: Promise<{ error?: string; need?: string; have?: string }>;
+  searchParams: Promise<{ error?: string; need?: string; have?: string; success?: string }>;
 }) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user?.email) redirect("/login");
 
   const tenantRows = await db
-    .select()
+    // FIX — select only tenant fields required by campaign detail page
+    .select({
+      id: tenants.id,
+      tier: tenants.tier,
+      smtpEmail: tenants.smtpEmail,
+      smtpVerified: tenants.smtpVerified,
+      smtpPassword: tenants.smtpPassword,
+    })
     .from(tenants)
     .where(eq(tenants.email, user.email))
     .limit(1);
@@ -289,6 +314,29 @@ export default async function CampaignDetailPage({
             <Link href="/dashboard/individual/billing" className="underline font-medium">
               Purchase credits →
             </Link>
+          </div>
+        )}
+        {sp.error === "no_contacts" && (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-800">
+            This campaign&apos;s list has no contacts yet. Add contacts before sending.
+          </div>
+        )}
+        {sp.error === "no_active_contacts" && (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-800">
+            All contacts in this list are unsubscribed. Add new active contacts before sending.
+          </div>
+        )}
+        {sp.error === "monthly_limit" && (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-800">
+            You&apos;ve used all 50 free emails this month.
+            <Link href="/dashboard/individual/billing" className="underline font-medium ml-1">
+              Purchase credits to send more →
+            </Link>
+          </div>
+        )}
+        {sp.success === "sent" && (
+          <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm text-emerald-700">
+            Campaign sent successfully.
           </div>
         )}
 

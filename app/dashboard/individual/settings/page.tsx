@@ -5,6 +5,7 @@ import { db } from "@/db";
 import { tenants } from "@/db/schema";
 import { createClient } from "@/utils/supabase/server";
 import { GmailSettingsForm } from "./_components/GmailSettingsForm";
+import { LogoutButton } from "./_components/LogoutButton";
 
 export default async function IndividualSettingsPage() {
   const supabase = await createClient();
@@ -12,11 +13,16 @@ export default async function IndividualSettingsPage() {
   if (!user?.email) redirect("/login");
 
   const rows = await db
+    // FIX — include account metadata needed for settings account summary and inline plan derivation
     .select({
       id: tenants.id,
       tier: tenants.tier,
       smtpEmail: tenants.smtpEmail,
       smtpVerified: tenants.smtpVerified,
+      credits: tenants.credits,
+      createdAt: tenants.createdAt,
+      plan: tenants.plan,
+      planExpiresAt: tenants.planExpiresAt,
     })
     .from(tenants)
     .where(eq(tenants.email, user.email))
@@ -24,6 +30,13 @@ export default async function IndividualSettingsPage() {
 
   const tenant = rows[0];
   if (!tenant || tenant.tier !== "individual") redirect("/dashboard");
+  // FIX — derive effective plan inline in settings instead of extra plan query
+  const now = new Date();
+  const planInfo = {
+    plan: (tenant.plan === "premium" && (tenant.planExpiresAt === null || tenant.planExpiresAt > now))
+      ? "premium"
+      : "free",
+  } as const;
 
   return (
     <div className="min-h-screen bg-background">
@@ -40,6 +53,49 @@ export default async function IndividualSettingsPage() {
           <p className="text-sm text-muted-foreground mt-1">Manage your email sending preferences.</p>
         </div>
 
+        {/* FIX — add account section for identity/plan/credits snapshot */}
+        <div className="rounded-lg border border-border bg-card p-6">
+          <h2 className="text-base font-semibold text-foreground mb-4">Account</h2>
+          <div className="flex flex-col gap-3">
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-muted-foreground">Email</span>
+              <span className="text-sm font-medium text-foreground">{user.email}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-muted-foreground">Plan</span>
+              <span className="text-sm font-medium text-foreground capitalize">{planInfo.plan}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-muted-foreground">Credits</span>
+              <span className="text-sm font-medium text-foreground">{tenant.credits?.toLocaleString() ?? 0}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-muted-foreground">Member since</span>
+              <span className="text-sm font-medium text-foreground">
+                {tenant.createdAt?.toLocaleDateString("en-US", { month: "long", year: "numeric" })}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* FIX — add billing shortcut card in settings */}
+        <div className="rounded-lg border border-border bg-card p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-base font-semibold text-foreground">Credits & Billing</h2>
+              <p className="text-sm text-muted-foreground mt-0.5">
+                Purchase credits or view transaction history.
+              </p>
+            </div>
+            <Link
+              href="/dashboard/individual/billing"
+              className="text-sm rounded-md bg-primary text-primary-foreground px-4 py-2 hover:opacity-90 transition-opacity"
+            >
+              Go to Billing
+            </Link>
+          </div>
+        </div>
+
         <div className="rounded-lg border border-border bg-card p-6">
           <h2 className="text-base font-semibold text-foreground mb-1">Email Sending</h2>
           <p className="text-sm text-muted-foreground mb-6">
@@ -51,6 +107,15 @@ export default async function IndividualSettingsPage() {
             currentEmail={tenant.smtpEmail ?? null}
             isVerified={tenant.smtpVerified}
           />
+        </div>
+
+        {/* FIX — add explicit session sign-out control for current device */}
+        <div className="rounded-lg border border-destructive/20 bg-card p-6">
+          <h2 className="text-base font-semibold text-foreground mb-1">Session</h2>
+          <p className="text-sm text-muted-foreground mb-4">
+            Sign out of your OnboardFlow account on this device.
+          </p>
+          <LogoutButton />
         </div>
 
       </div>

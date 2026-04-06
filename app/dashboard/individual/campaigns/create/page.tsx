@@ -23,7 +23,8 @@ async function createCampaign(formData: FormData) {
   if (!user?.email) redirect("/login");
 
   const tenantRows = await db
-    .select()
+    // FIX — select only tenant fields required for create campaign action
+    .select({ id: tenants.id, tier: tenants.tier })
     .from(tenants)
     .where(eq(tenants.email, user.email))
     .limit(1);
@@ -71,7 +72,8 @@ export default async function CreateCampaignPage({
   if (!user?.email) redirect("/login");
 
   const tenantRows = await db
-    .select()
+    // FIX — select only tenant fields required by create campaign page
+    .select({ id: tenants.id, tier: tenants.tier })
     .from(tenants)
     .where(eq(tenants.email, user.email))
     .limit(1);

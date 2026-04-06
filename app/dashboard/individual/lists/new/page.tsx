@@ -21,7 +21,8 @@ async function createList(formData: FormData) {
   if (!user?.email) redirect("/login");
 
   const tenantRows = await db
-    .select()
+    // FIX — select only tenant fields required for create list action
+    .select({ id: tenants.id, tier: tenants.tier })
     .from(tenants)
     .where(eq(tenants.email, user.email))
     .limit(1);
@@ -58,7 +59,8 @@ export default async function NewListPage() {
   if (!user?.email) redirect("/login");
 
   const tenantRows = await db
-    .select({ tier: tenants.tier })
+    // FIX — select only tenant fields required by new list page
+    .select({ id: tenants.id, tier: tenants.tier })
     .from(tenants)
     .where(eq(tenants.email, user.email))
     .limit(1);
