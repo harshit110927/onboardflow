@@ -27,7 +27,8 @@ async function sendCampaign(formData: FormData) {
   if (!user?.email) return;
 
   const tenantRows = await db
-    .select()
+    // FIX — select only tenant fields required for send action ownership + billing checks
+    .select({ id: tenants.id, tier: tenants.tier })
     .from(tenants)
     .where(eq(tenants.email, user.email))
     .limit(1);
@@ -194,7 +195,14 @@ export default async function CampaignDetailPage({
   if (!user?.email) redirect("/login");
 
   const tenantRows = await db
-    .select()
+    // FIX — select only tenant fields required by campaign detail page
+    .select({
+      id: tenants.id,
+      tier: tenants.tier,
+      smtpEmail: tenants.smtpEmail,
+      smtpVerified: tenants.smtpVerified,
+      smtpPassword: tenants.smtpPassword,
+    })
     .from(tenants)
     .where(eq(tenants.email, user.email))
     .limit(1);

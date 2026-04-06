@@ -20,7 +20,14 @@ export default async function IndividualBillingPage({
   if (!user?.email) redirect("/login");
 
   const tenantRows = await db
-    .select()
+    // FIX — select only tenant fields required by billing page
+    .select({
+      id: tenants.id,
+      tier: tenants.tier,
+      credits: tenants.credits,
+      stripeCustomerId: tenants.stripeCustomerId,
+      email: tenants.email,
+    })
     .from(tenants)
     .where(eq(tenants.email, user.email))
     .limit(1);

@@ -63,7 +63,12 @@ export default async function ListDetailPage({
   const { data: { user } } = await supabase.auth.getUser();
   if (!user?.email) redirect("/login");
 
-  const tenantRows = await db.select().from(tenants).where(eq(tenants.email, user.email)).limit(1);
+  // FIX — select only tenant fields required by list detail page
+  const tenantRows = await db
+    .select({ id: tenants.id, tier: tenants.tier })
+    .from(tenants)
+    .where(eq(tenants.email, user.email))
+    .limit(1);
   const tenant = tenantRows[0];
   if (!tenant || tenant.tier !== "individual") redirect("/dashboard");
 

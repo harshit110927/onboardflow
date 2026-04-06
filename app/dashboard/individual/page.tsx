@@ -1,6 +1,7 @@
 import { count, eq } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import Link from "next/link";
+import { unstable_noStore as noStore } from "next/cache";
 import { db } from "@/db";
 import {
   individualCampaigns,
@@ -158,12 +159,15 @@ function StatusBadge({ status }: { status: string }) {
 // ── Page ────────────────────────────────────────────────────────────────────
 
 export default async function IndividualDashboardPage() {
+  // FIX — disable cache for per-user dashboard data to avoid stale cross-user rendering
+  noStore();
+
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user?.email) redirect("/login");
 
   const tenantRows = await db
-    .select()
+    .select({ id: tenants.id, tier: tenants.tier, email: tenants.email })
     .from(tenants)
     .where(eq(tenants.email, user.email))
     .limit(1);
@@ -171,13 +175,9 @@ export default async function IndividualDashboardPage() {
   const tenant = tenantRows[0];
   if (!tenant || tenant.tier !== "individual") redirect("/dashboard");
 
-  const planInfo = await getTenantPlan(tenant.id);
-  const limits = INDIVIDUAL_LIMITS[planInfo.plan];
-  const MAX_LISTS = limits.maxLists;
-  const MAX_CONTACTS = limits.maxContactsPerList;
-
   // All queries in parallel
-  const [lists, contactCounts, campaignCounts, recentCampaignsRaw] =
+  // FIX — moved tenant plan lookup into Promise.all to remove a sequential DB round trip
+  const [lists, contactCounts, campaignCounts, recentCampaignsRaw, planInfo] =
     await Promise.all([
       // 1. All lists
       db
@@ -193,6 +193,9 @@ export default async function IndividualDashboardPage() {
           total: count(),
         })
         .from(individualContacts)
+        .innerJoin(individualLists, eq(individualContacts.listId, individualLists.id))
+        // FIX — scope contact counts to the current tenant's lists only
+        .where(eq(individualLists.userId, tenant.id))
         .groupBy(individualContacts.listId),
 
       // 3. Campaign count per list
@@ -202,6 +205,9 @@ export default async function IndividualDashboardPage() {
           total: count(),
         })
         .from(individualCampaigns)
+        .innerJoin(individualLists, eq(individualCampaigns.listId, individualLists.id))
+        // FIX — scope campaign counts to the current tenant's lists only
+        .where(eq(individualLists.userId, tenant.id))
         .groupBy(individualCampaigns.listId),
 
       // 4. 3 most recent campaigns with list name
@@ -218,7 +224,12 @@ export default async function IndividualDashboardPage() {
         .where(eq(individualLists.userId, tenant.id))
         .orderBy(individualCampaigns.createdAt)
         .limit(3),
+      getTenantPlan(tenant.id),
     ]);
+
+  const limits = INDIVIDUAL_LIMITS[planInfo.plan];
+  const MAX_LISTS = limits.maxLists;
+  const MAX_CONTACTS = limits.maxContactsPerList;
 
   // Build lookup maps
   const contactMap = Object.fromEntries(
@@ -274,18 +285,12 @@ export default async function IndividualDashboardPage() {
             max={MAX_CONTACTS}
             label="Contacts (largest list)"
           />
-          <div className="flex flex-col gap-1">
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-muted-foreground">Campaigns</span>
-              <span className="text-foreground">{totalCampaigns}</span>
-            </div>
-            <div className="h-2 w-full rounded-full bg-secondary overflow-hidden">
-              <div
-                className="h-2 rounded-full bg-primary"
-                style={{ width: totalCampaigns > 0 ? "100%" : "0%" }}
-              />
-            </div>
-          </div>
+          {/* FIX — use proportional campaign quota fill across total possible campaigns */}
+          <QuotaBar
+            used={totalCampaigns}
+            max={MAX_LISTS * limits.maxCampaignsPerList}
+            label="Campaigns"
+          />
         </div>
 
         {/* ── Lists ── */}
@@ -385,7 +390,8 @@ export default async function IndividualDashboardPage() {
           </div>
         </div>
         {/* ── Onboarding Checklist ── */}
-        {lists.length === 0 && (
+        {/* FIX — show checklist until all onboarding steps are complete */}
+        {!(lists.length > 0 && Object.values(contactMap).some((c) => c > 0) && totalCampaigns > 0) && (
           <div className="rounded-lg border border-border bg-card p-6">
             <h2 className="text-lg font-semibold text-foreground mb-1">Get started</h2>
             <p className="text-sm text-muted-foreground mb-4">Complete these steps to send your first campaign.</p>
@@ -398,13 +404,15 @@ export default async function IndividualDashboardPage() {
                   cta: "Create list",
                 },
                 {
-                  done: Object.values(contactMap).some((c) => c > 0),
+                  // FIX — require list existence for contact-step completion
+                  done: lists.length > 0 && Object.values(contactMap).some((c) => c > 0),
                   label: "Add contacts to a list",
                   href: "/dashboard/individual/lists",
                   cta: "Add contacts",
                 },
                 {
-                  done: totalCampaigns > 0,
+                  // FIX — require list existence for campaign-step completion
+                  done: totalCampaigns > 0 && lists.length > 0,
                   label: "Send your first campaign",
                   href: "/dashboard/individual/campaigns/create",
                   cta: "Create campaign",
