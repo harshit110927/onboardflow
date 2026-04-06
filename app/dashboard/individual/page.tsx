@@ -1,4 +1,4 @@
-import { count, eq } from "drizzle-orm";
+import { count, desc, eq, sql } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { unstable_noStore as noStore } from "next/cache";
@@ -167,7 +167,14 @@ export default async function IndividualDashboardPage() {
   if (!user?.email) redirect("/login");
 
   const tenantRows = await db
-    .select({ id: tenants.id, tier: tenants.tier, email: tenants.email })
+    // FIX — include tenant profile fields needed for personalized dashboard header
+    .select({
+      id: tenants.id,
+      tier: tenants.tier,
+      email: tenants.email,
+      name: tenants.name,
+      createdAt: tenants.createdAt,
+    })
     .from(tenants)
     .where(eq(tenants.email, user.email))
     .limit(1);
@@ -177,7 +184,7 @@ export default async function IndividualDashboardPage() {
 
   // All queries in parallel
   // FIX — moved tenant plan lookup into Promise.all to remove a sequential DB round trip
-  const [lists, contactCounts, campaignCounts, recentCampaignsRaw, planInfo] =
+  const [lists, contactCounts, campaignCounts, recentCampaignsRaw, emailUsageResult, planInfo] =
     await Promise.all([
       // 1. All lists
       db
@@ -222,8 +229,16 @@ export default async function IndividualDashboardPage() {
         .from(individualCampaigns)
         .innerJoin(individualLists, eq(individualCampaigns.listId, individualLists.id))
         .where(eq(individualLists.userId, tenant.id))
-        .orderBy(individualCampaigns.createdAt)
+        // FIX — show newest campaigns first in recent campaigns table
+        .orderBy(desc(individualCampaigns.createdAt))
         .limit(3),
+      // FIX — fetch monthly email usage so dashboard and checklist reflect real send usage
+      db.execute(sql`
+        SELECT COALESCE(SUM(daily_count), 0) AS monthly_count
+        FROM email_usage
+        WHERE tenant_id = ${tenant.id}
+        AND month = ${new Date().toISOString().slice(0, 7)}
+      `) as Promise<any>,
       getTenantPlan(tenant.id),
     ]);
 
@@ -244,7 +259,30 @@ export default async function IndividualDashboardPage() {
       ? Math.max(...lists.map((l) => contactMap[l.id] ?? 0))
       : 0;
 
-  const totalCampaigns = campaignCounts.reduce((sum, r) => sum + r.total, 0);
+  const monthlyEmailsUsed = Number(emailUsageResult[0]?.monthly_count ?? 0);
+  const allListsFull =
+    lists.length > 0 && lists.every((list) => (contactMap[list.id] ?? 0) >= MAX_CONTACTS);
+  // FIX — enforce ordered checklist completion using actual monthly email usage for send completion
+  const steps = [
+    {
+      done: lists.length > 0,
+      label: "Create your first list",
+      href: "/dashboard/individual/lists/new",
+      cta: "Create list",
+    },
+    {
+      done: lists.length > 0 && Object.values(contactMap).some((c) => c > 0),
+      label: "Add contacts to a list",
+      href: "/dashboard/individual/lists",
+      cta: "Add contacts",
+    },
+    {
+      done: lists.length > 0 && monthlyEmailsUsed > 0,
+      label: "Send your first campaign",
+      href: "/dashboard/individual/campaigns/create",
+      cta: "Create campaign",
+    },
+  ];
 
   return (
     <div className="min-h-screen bg-background">
@@ -254,7 +292,8 @@ export default async function IndividualDashboardPage() {
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div>
             <h1 className="text-2xl font-bold text-foreground">
-              Welcome back, {user.email}
+              {/* FIX — prefer tenant name in greeting, fallback to email username */}
+              Welcome back, {tenant.name || user.email.split("@")[0]}
             </h1>
             <p className="text-sm text-muted-foreground mt-1">
               Here&apos;s what&apos;s happening with your lists.
@@ -285,13 +324,30 @@ export default async function IndividualDashboardPage() {
             max={MAX_CONTACTS}
             label="Contacts (largest list)"
           />
-          {/* FIX — use proportional campaign quota fill across total possible campaigns */}
+          {/* FIX — replace campaigns quota with monthly email usage quota */}
           <QuotaBar
-            used={totalCampaigns}
-            max={MAX_LISTS * limits.maxCampaignsPerList}
-            label="Campaigns"
+            used={monthlyEmailsUsed}
+            max={50}
+            label="Emails This Month"
           />
         </div>
+        {monthlyEmailsUsed >= 40 && monthlyEmailsUsed < 50 && (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+            ⚠️ You&apos;ve used {monthlyEmailsUsed}/50 free emails this month.{" "}
+            <Link href="/dashboard/individual/billing" className="underline">
+              Purchase credits
+            </Link>{" "}
+            to send more when you hit the limit.
+          </div>
+        )}
+        {monthlyEmailsUsed >= 50 && (
+          <div className="rounded-lg border border-destructive/20 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+            ✕ Monthly email limit reached. Purchase credits to continue sending.{" "}
+            <Link href="/dashboard/individual/billing" className="underline font-medium">
+              Buy credits →
+            </Link>
+          </div>
+        )}
 
         {/* ── Lists ── */}
         <div>
@@ -359,65 +415,46 @@ export default async function IndividualDashboardPage() {
             Quick Actions
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {[
-              {
-                label: "Add Contacts",
-                desc: "Add people to an existing list",
-                href: "/dashboard/individual/lists",
-              },
-              {
-                label: "New Campaign",
-                desc: "Write and schedule an email",
-                href: "/dashboard/individual/campaigns/create",
-              },
-              {
-                label: "View All Campaigns",
-                desc: "See drafts, scheduled, and sent",
-                href: "/dashboard/individual/campaigns",
-              },
-            ].map((action) => (
-              <Link
-                key={action.href}
-                href={action.href}
-                className="rounded-lg border border-border bg-card p-5 hover:bg-secondary/40 transition-colors group"
-              >
-                <p className="font-medium text-foreground group-hover:text-primary transition-colors">
-                  {action.label}
-                </p>
-                <p className="text-sm text-muted-foreground mt-1">{action.desc}</p>
-              </Link>
-            ))}
+            {/* FIX — make quick actions adapt to account state */}
+            <Link
+              href="/dashboard/individual/lists/new"
+              className="rounded-lg border border-border bg-card p-5 hover:bg-secondary/40 transition-colors group"
+            >
+              <p className="font-medium text-foreground group-hover:text-primary transition-colors">
+                {lists.length === 0 ? "Create Your First List" : "New Email List"}
+              </p>
+              <p className="text-sm text-muted-foreground mt-1">
+                {lists.length === 0 ? "Start by creating an email list" : "Add another list to your account"}
+              </p>
+            </Link>
+            <Link
+              href={lists.length > 0 ? "/dashboard/individual/campaigns/create" : "/dashboard/individual/lists/new"}
+              className={`rounded-lg border border-border bg-card p-5 hover:bg-secondary/40 transition-colors group ${lists.length === 0 ? "opacity-50 pointer-events-none" : ""}`}
+            >
+              <p className="font-medium text-foreground group-hover:text-primary transition-colors">New Campaign</p>
+              <p className="text-sm text-muted-foreground mt-1">Write and schedule an email</p>
+            </Link>
+            <Link
+              href={allListsFull ? "/dashboard/individual/billing" : "/dashboard/individual/campaigns"}
+              className="rounded-lg border border-border bg-card p-5 hover:bg-secondary/40 transition-colors group"
+            >
+              <p className="font-medium text-foreground group-hover:text-primary transition-colors">
+                {allListsFull ? "Upgrade Contact Capacity" : "View All Campaigns"}
+              </p>
+              <p className="text-sm text-muted-foreground mt-1">
+                {allListsFull ? "All lists are full — buy credits to unlock more sends" : "See drafts, scheduled, and sent"}
+              </p>
+            </Link>
           </div>
         </div>
         {/* ── Onboarding Checklist ── */}
-        {/* FIX — show checklist until all onboarding steps are complete */}
-        {!(lists.length > 0 && Object.values(contactMap).some((c) => c > 0) && totalCampaigns > 0) && (
+        {/* FIX — keep checklist visible until all onboarding steps are complete */}
+        {!steps.every((s) => s.done) && (
           <div className="rounded-lg border border-border bg-card p-6">
             <h2 className="text-lg font-semibold text-foreground mb-1">Get started</h2>
             <p className="text-sm text-muted-foreground mb-4">Complete these steps to send your first campaign.</p>
             <div className="flex flex-col gap-3">
-              {[
-                {
-                  done: lists.length > 0,
-                  label: "Create your first list",
-                  href: "/dashboard/individual/lists/new",
-                  cta: "Create list",
-                },
-                {
-                  // FIX — require list existence for contact-step completion
-                  done: lists.length > 0 && Object.values(contactMap).some((c) => c > 0),
-                  label: "Add contacts to a list",
-                  href: "/dashboard/individual/lists",
-                  cta: "Add contacts",
-                },
-                {
-                  // FIX — require list existence for campaign-step completion
-                  done: totalCampaigns > 0 && lists.length > 0,
-                  label: "Send your first campaign",
-                  href: "/dashboard/individual/campaigns/create",
-                  cta: "Create campaign",
-                },
-              ].map((step, i) => (
+              {steps.map((step, i) => (
                 <div key={i} className="flex items-center gap-4">
                   <div className={`h-6 w-6 rounded-full flex items-center justify-center shrink-0 text-xs font-bold ${
                     step.done ? "bg-emerald-100 text-emerald-700" : "bg-secondary text-muted-foreground"

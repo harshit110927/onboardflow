@@ -7,6 +7,7 @@ import { db } from "@/db";
 import { tenants } from "@/db/schema";
 import { createClient } from "@/utils/supabase/server";
 import CreditMeter from "@/app/_components/CreditMeter";
+import { NavLinks } from "./_components/NavLinks";
 
 export default async function IndividualLayout({
   children,
@@ -58,24 +59,8 @@ export default async function IndividualLayout({
             OnboardFlow
           </Link>
 
-          {/* Nav links */}
-          <nav className="hidden sm:flex items-center gap-1">
-            {[
-              { href: "/dashboard/individual", label: "Dashboard" },
-              { href: "/dashboard/individual/lists", label: "Lists" },
-              { href: "/dashboard/individual/campaigns", label: "Campaigns" },
-              { href: "/dashboard/individual/billing", label: "Billing" },
-              { href: "/dashboard/individual/settings", label: "Settings" },
-            ].map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className="text-sm px-3 py-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
-              >
-                {item.label}
-              </Link>
-            ))}
-          </nav>
+          {/* FIX — use client nav links for active route styling */}
+          <NavLinks />
 
           {/* Right side */}
           <div className="flex items-center gap-3 shrink-0">

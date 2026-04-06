@@ -29,7 +29,10 @@ async function addContact(formData: FormData) {
   const maxContacts = INDIVIDUAL_LIMITS[plan].maxContactsPerList;
 
   const countResult = await db.select({ total: count() }).from(individualContacts).where(eq(individualContacts.listId, listId));
-  if ((countResult[0]?.total ?? 0) >= maxContacts) return;
+  // FIX — redirect with explicit error when contact limit is reached so UI can show feedback
+  if ((countResult[0]?.total ?? 0) >= maxContacts) {
+    redirect(`/dashboard/individual/lists/${listId}?error=contact_limit`);
+  }
 
   try {
     await db.insert(individualContacts).values({ listId, name, email });
@@ -56,8 +59,10 @@ async function deleteContact(formData: FormData) {
 
 export default async function ListDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ listId: string }>;
+  searchParams: Promise<{ error?: string }>;
 }) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -73,6 +78,7 @@ export default async function ListDetailPage({
   if (!tenant || tenant.tier !== "individual") redirect("/dashboard");
 
   const { listId: listIdParam } = await params;
+  const sp = await searchParams;
   const listId = Number(listIdParam);
   if (isNaN(listId)) redirect("/dashboard/individual/lists");
 
@@ -133,6 +139,12 @@ export default async function ListDetailPage({
             </Link>
           </div>
         </div>
+
+        {sp.error === "contact_limit" && (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-800">
+            You&apos;ve reached this list&apos;s contact limit on your current plan. Remove contacts or upgrade limits to add more.
+          </div>
+        )}
 
         {/* Progress bar */}
         <div className="flex flex-col gap-1.5">
