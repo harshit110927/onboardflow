@@ -55,7 +55,8 @@ export default async function CampaignsPage() {
   if (!user?.email) redirect("/login");
 
   const tenantRows = await db
-    .select()
+    // FIX — select only tenant fields required by campaigns page
+    .select({ id: tenants.id, tier: tenants.tier })
     .from(tenants)
     .where(eq(tenants.email, user.email))
     .limit(1);

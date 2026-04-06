@@ -27,7 +27,8 @@ async function sendCampaign(formData: FormData) {
   if (!user?.email) return;
 
   const tenantRows = await db
-    .select()
+    // FIX — select only tenant fields required for send action ownership + billing checks
+    .select({ id: tenants.id, tier: tenants.tier })
     .from(tenants)
     .where(eq(tenants.email, user.email))
     .limit(1);
@@ -73,7 +74,8 @@ async function sendCampaign(formData: FormData) {
 
   // ── Monthly email limit + credit check ────────────────────────────
   const { plan: currentPlan } = await getTenantPlan(tenant.id);
-  const monthlyLimit = INDIVIDUAL_LIMITS.free.maxEmailsPerMonth;
+  // FIX — use plan-specific monthly cap (free: 50, premium: 5000)
+  const monthlyLimit = INDIVIDUAL_LIMITS[currentPlan].maxEmailsPerMonth;
   const today = new Date().toISOString().slice(0, 10);
   const month = today.slice(0, 7);
 
@@ -91,6 +93,11 @@ async function sendCampaign(formData: FormData) {
 
   const monthlyUsed = Number((usageRows as any)[0]?.monthly_count ?? 0);
   const emailsToSend = activeContacts.length;
+
+  // FIX — hard-block free tier at 50 monthly emails before any overage credit logic
+  if (currentPlan === "free" && (monthlyUsed >= 50 || monthlyUsed + emailsToSend > monthlyLimit)) {
+    redirect(`/dashboard/individual/campaigns/${campaignId}?error=monthly_limit`);
+  }
 
   if (monthlyUsed + emailsToSend > monthlyLimit) {
     const overage = monthlyUsed + emailsToSend - monthlyLimit;
@@ -194,7 +201,14 @@ export default async function CampaignDetailPage({
   if (!user?.email) redirect("/login");
 
   const tenantRows = await db
-    .select()
+    // FIX — select only tenant fields required by campaign detail page
+    .select({
+      id: tenants.id,
+      tier: tenants.tier,
+      smtpEmail: tenants.smtpEmail,
+      smtpVerified: tenants.smtpVerified,
+      smtpPassword: tenants.smtpPassword,
+    })
     .from(tenants)
     .where(eq(tenants.email, user.email))
     .limit(1);
@@ -288,6 +302,14 @@ export default async function CampaignDetailPage({
             Not enough credits to send. You need {sp.need} credits but have {sp.have}.{" "}
             <Link href="/dashboard/individual/billing" className="underline font-medium">
               Purchase credits →
+            </Link>
+          </div>
+        )}
+        {sp.error === "monthly_limit" && (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-800">
+            You&apos;ve used all 50 free emails this month.
+            <Link href="/dashboard/individual/billing" className="underline font-medium ml-1">
+              Purchase credits to send more →
             </Link>
           </div>
         )}
