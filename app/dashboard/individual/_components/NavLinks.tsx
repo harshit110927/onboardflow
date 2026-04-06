@@ -23,6 +23,8 @@ export function NavLinks() {
           <Link
             key={item.href}
             href={item.href}
+            // FIX — disable automatic prefetch to avoid opening many parallel DB-backed route requests
+            prefetch={false}
             className={`text-sm px-3 py-1.5 rounded-md transition-colors ${
               isActive
                 ? "bg-secondary text-foreground font-medium"

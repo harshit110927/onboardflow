@@ -54,6 +54,8 @@ export default async function IndividualLayout({
           {/* Logo */}
           <Link
             href="/dashboard/individual"
+            // FIX — avoid eager prefetch storm from persistent dashboard header links
+            prefetch={false}
             className="font-bold text-foreground tracking-tight text-base shrink-0"
           >
             OnboardFlow
@@ -92,6 +94,8 @@ export default async function IndividualLayout({
               <Link
                 key={item.href}
                 href={item.href}
+                // FIX — disable mobile nav prefetch for the same DB-connection protection as desktop links
+                prefetch={false}
                 className="flex-1 text-center text-xs py-2.5 text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
               >
                 {item.label}

@@ -233,12 +233,13 @@ export default async function IndividualDashboardPage() {
         .orderBy(desc(individualCampaigns.createdAt))
         .limit(3),
       // FIX — fetch monthly email usage so dashboard and checklist reflect real send usage
+      // FIX — gracefully fallback to zero on transient DB pool saturation to keep dashboard responsive
       db.execute(sql`
         SELECT COALESCE(SUM(daily_count), 0) AS monthly_count
         FROM email_usage
         WHERE tenant_id = ${tenant.id}
         AND month = ${new Date().toISOString().slice(0, 7)}
-      `) as Promise<any>,
+      `).catch(() => [{ monthly_count: 0 }]) as Promise<any>,
       getTenantPlan(tenant.id),
     ]);
 
