@@ -2,8 +2,9 @@ import { count, eq } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { db } from "@/db";
-import { individualCampaigns, individualLists, tenants } from "@/db/schema";
-import { createClient } from "@/utils/supabase/server";
+import { individualCampaigns, individualLists } from "@/db/schema";
+import { getSession } from "@/lib/auth/get-session";
+import { getTenant } from "@/lib/auth/get-tenant";
 import { getTenantPlan } from "@/lib/plans/get-tenant-plan";
 import { INDIVIDUAL_LIMITS } from "@/lib/plans/limits";
 import { CreateCampaignForm } from "../_components/CreateCampaignForm";
@@ -18,18 +19,10 @@ async function createCampaign(formData: FormData) {
 
   if (!listId || !subject || !body) return;
 
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const { user } = await getSession();
   if (!user?.email) redirect("/login");
 
-  const tenantRows = await db
-    // FIX — select only tenant fields required for create campaign action
-    .select({ id: tenants.id, tier: tenants.tier })
-    .from(tenants)
-    .where(eq(tenants.email, user.email))
-    .limit(1);
-
-  const tenant = tenantRows[0];
+  const tenant = await getTenant(user.email);
   if (!tenant || tenant.tier !== "individual") redirect("/dashboard");
 
   const listRows = await db
@@ -67,18 +60,10 @@ export default async function CreateCampaignPage({
 }: {
   searchParams: Promise<{ error?: string; listId?: string }>;
 }) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const { user } = await getSession();
   if (!user?.email) redirect("/login");
 
-  const tenantRows = await db
-    // FIX — select only tenant fields required by create campaign page
-    .select({ id: tenants.id, tier: tenants.tier })
-    .from(tenants)
-    .where(eq(tenants.email, user.email))
-    .limit(1);
-
-  const tenant = tenantRows[0];
+  const tenant = await getTenant(user.email);
   if (!tenant || tenant.tier !== "individual") redirect("/dashboard");
 
   const { plan } = await getTenantPlan(tenant.id);

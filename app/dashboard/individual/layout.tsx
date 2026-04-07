@@ -2,11 +2,9 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
-import { eq } from "drizzle-orm";
-import { db } from "@/db";
-import { tenants } from "@/db/schema";
-import { createClient } from "@/utils/supabase/server";
 import CreditMeter from "@/app/_components/CreditMeter";
+import { getSession } from "@/lib/auth/get-session";
+import { getTenant } from "@/lib/auth/get-tenant";
 import { NavLinks } from "./_components/NavLinks";
 
 export default async function IndividualLayout({
@@ -14,24 +12,10 @@ export default async function IndividualLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const { user } = await getSession();
   if (!user?.email) redirect("/login");
 
-  const tenantRows = await db
-    .select({
-      id: tenants.id,
-      email: tenants.email,
-      tier: tenants.tier,
-      plan: tenants.plan,
-      planExpiresAt: tenants.planExpiresAt,
-      credits: tenants.credits,
-    })
-    .from(tenants)
-    .where(eq(tenants.email, user.email))
-    .limit(1);
-
-  const tenant = tenantRows[0];
+  const tenant = await getTenant(user.email);
   if (!tenant || tenant.tier !== "individual") redirect("/dashboard");
 
   // FIX — derive effective plan inline to avoid extra getTenantPlan DB call in layout

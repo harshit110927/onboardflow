@@ -1,34 +1,15 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { eq } from "drizzle-orm";
-import { db } from "@/db";
-import { tenants } from "@/db/schema";
-import { createClient } from "@/utils/supabase/server";
 import { GmailSettingsForm } from "./_components/GmailSettingsForm";
 import { LogoutButton } from "./_components/LogoutButton";
+import { getSession } from "@/lib/auth/get-session";
+import { getTenant } from "@/lib/auth/get-tenant";
 
 export default async function IndividualSettingsPage() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const { user } = await getSession();
   if (!user?.email) redirect("/login");
 
-  const rows = await db
-    // FIX — include account metadata needed for settings account summary and inline plan derivation
-    .select({
-      id: tenants.id,
-      tier: tenants.tier,
-      smtpEmail: tenants.smtpEmail,
-      smtpVerified: tenants.smtpVerified,
-      credits: tenants.credits,
-      createdAt: tenants.createdAt,
-      plan: tenants.plan,
-      planExpiresAt: tenants.planExpiresAt,
-    })
-    .from(tenants)
-    .where(eq(tenants.email, user.email))
-    .limit(1);
-
-  const tenant = rows[0];
+  const tenant = await getTenant(user.email);
   if (!tenant || tenant.tier !== "individual") redirect("/dashboard");
   // FIX — derive effective plan inline in settings instead of extra plan query
   const now = new Date();

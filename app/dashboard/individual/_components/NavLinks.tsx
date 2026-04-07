@@ -1,7 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { usePathname } from "next/navigation";
+import { useEffect } from "react";
 
 const links = [
   { href: "/dashboard/individual", label: "Dashboard" },
@@ -13,6 +15,14 @@ const links = [
 
 export function NavLinks() {
   const pathname = usePathname();
+  const router = useRouter();
+
+  useEffect(() => {
+    for (const item of links) {
+      router.prefetch(item.href);
+    }
+  }, [router]);
+
   return (
     <nav className="hidden sm:flex items-center gap-1">
       {links.map((item) => {
@@ -23,8 +33,7 @@ export function NavLinks() {
           <Link
             key={item.href}
             href={item.href}
-            // FIX — disable automatic prefetch to avoid opening many parallel DB-backed route requests
-            prefetch={false}
+            prefetch
             className={`text-sm px-3 py-1.5 rounded-md transition-colors ${
               isActive
                 ? "bg-secondary text-foreground font-medium"

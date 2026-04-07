@@ -1,10 +1,11 @@
-import { count, eq } from "drizzle-orm";
+import { and, count, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { db } from "@/db";
-import { individualContacts, individualLists, individualCampaigns, tenants } from "@/db/schema";
-import { createClient } from "@/utils/supabase/server";
+import { individualContacts, individualLists, individualCampaigns } from "@/db/schema";
+import { getSession } from "@/lib/auth/get-session";
+import { getTenant } from "@/lib/auth/get-tenant";
 import { DeleteListButton } from "./_components/DeleteListButton";
 
 const MAX_LISTS = 3;
@@ -15,14 +16,17 @@ async function deleteList(formData: FormData) {
   const listId = Number(formData.get("listId"));
   if (!listId) return;
 
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const { user } = await getSession();
   if (!user?.email) return;
 
-  const tenantRows = await db.select({ id: tenants.id }).from(tenants).where(eq(tenants.email, user.email)).limit(1);
-  if (!tenantRows[0]) return;
+  const tenant = await getTenant(user.email);
+  if (!tenant) return;
 
-  const owned = await db.select({ id: individualLists.id }).from(individualLists).where(eq(individualLists.id, listId)).limit(1);
+  const owned = await db
+    .select({ id: individualLists.id })
+    .from(individualLists)
+    .where(and(eq(individualLists.id, listId), eq(individualLists.userId, tenant.id)))
+    .limit(1);
   if (!owned[0]) return;
 
   await db.delete(individualLists).where(eq(individualLists.id, listId));
@@ -30,23 +34,28 @@ async function deleteList(formData: FormData) {
 }
 
 export default async function ListsPage() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const { user } = await getSession();
   if (!user?.email) redirect("/login");
 
-  // FIX — select only tenant fields required by lists page
-  const tenantRows = await db
-    .select({ id: tenants.id, tier: tenants.tier })
-    .from(tenants)
-    .where(eq(tenants.email, user.email))
-    .limit(1);
-  const tenant = tenantRows[0];
+  const tenant = await getTenant(user.email);
   if (!tenant || tenant.tier !== "individual") redirect("/dashboard");
 
   const [lists, contactCounts, campaignCounts] = await Promise.all([
     db.select().from(individualLists).where(eq(individualLists.userId, tenant.id)).orderBy(individualLists.createdAt),
-    db.select({ listId: individualContacts.listId, total: count() }).from(individualContacts).groupBy(individualContacts.listId),
-    db.select({ listId: individualCampaigns.listId, total: count() }).from(individualCampaigns).groupBy(individualCampaigns.listId),
+    // FIX — scope contact aggregates to this tenant's lists to avoid full-table scans and pool pressure
+    db
+      .select({ listId: individualContacts.listId, total: count() })
+      .from(individualContacts)
+      .innerJoin(individualLists, eq(individualContacts.listId, individualLists.id))
+      .where(eq(individualLists.userId, tenant.id))
+      .groupBy(individualContacts.listId),
+    // FIX — scope campaign aggregates to this tenant's lists to avoid full-table scans and pool pressure
+    db
+      .select({ listId: individualCampaigns.listId, total: count() })
+      .from(individualCampaigns)
+      .innerJoin(individualLists, eq(individualCampaigns.listId, individualLists.id))
+      .where(eq(individualLists.userId, tenant.id))
+      .groupBy(individualCampaigns.listId),
   ]);
 
   const contactMap = Object.fromEntries(contactCounts.map((r) => [r.listId, r.total]));

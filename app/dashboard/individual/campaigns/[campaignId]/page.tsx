@@ -5,8 +5,7 @@ import { revalidatePath } from "next/cache";
 import Link from "next/link";
 import { Resend } from "resend";
 import { db } from "@/db";
-import { individualCampaigns, individualContacts, individualLists, tenants, campaignEvents, unsubscribedContacts } from "@/db/schema";
-import { createClient } from "@/utils/supabase/server";
+import { individualCampaigns, individualContacts, individualLists, campaignEvents, unsubscribedContacts } from "@/db/schema";
 import { SendCampaignButton } from "./_components/SendCampaignButton";
 import { decryptPassword, createGmailTransporter } from "@/lib/email/smtp";
 import { injectTracking } from "@/lib/tracking/inject";
@@ -14,6 +13,8 @@ import { getTenantPlan } from "@/lib/plans/get-tenant-plan";
 import { deductCredits } from "@/lib/credits/deduct";
 import { CREDIT_COSTS, INDIVIDUAL_LIMITS } from "@/lib/plans/limits";
 import { buildEmailHtml, createUnsubscribeToken } from "@/lib/email/templates";
+import { getSession } from "@/lib/auth/get-session";
+import { getTenant } from "@/lib/auth/get-tenant";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -22,17 +23,10 @@ async function sendCampaign(formData: FormData) {
   const campaignId = Number(formData.get("campaignId"));
   if (!campaignId) return;
 
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const { user } = await getSession();
   if (!user?.email) return;
 
-  const tenantRows = await db
-    // FIX — select only tenant fields required for send action ownership + billing checks
-    .select({ id: tenants.id, tier: tenants.tier })
-    .from(tenants)
-    .where(eq(tenants.email, user.email))
-    .limit(1);
-  const tenant = tenantRows[0];
+  const tenant = await getTenant(user.email);
   if (!tenant) return;
 
   const campaignRows = await db
@@ -121,13 +115,7 @@ async function sendCampaign(formData: FormData) {
   }
 
   // ── Send emails ───────────────────────────────────────────────────
-  const tenantSmtp = await db
-    .select({ smtpEmail: tenants.smtpEmail, smtpPassword: tenants.smtpPassword, smtpVerified: tenants.smtpVerified })
-    .from(tenants)
-    .where(eq(tenants.id, tenant.id))
-    .limit(1);
-
-  const smtp = tenantSmtp[0];
+  const smtp = tenant;
   const useGmail = smtp?.smtpVerified && smtp.smtpEmail && smtp.smtpPassword;
   const trackingEnabled = currentPlan === "premium";
 
@@ -207,34 +195,14 @@ export default async function CampaignDetailPage({
   params: Promise<{ campaignId: string }>;
   searchParams: Promise<{ error?: string; need?: string; have?: string; success?: string }>;
 }) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const { user } = await getSession();
   if (!user?.email) redirect("/login");
 
-  const tenantRows = await db
-    // FIX — select only tenant fields required by campaign detail page
-    .select({
-      id: tenants.id,
-      tier: tenants.tier,
-      smtpEmail: tenants.smtpEmail,
-      smtpVerified: tenants.smtpVerified,
-      smtpPassword: tenants.smtpPassword,
-    })
-    .from(tenants)
-    .where(eq(tenants.email, user.email))
-    .limit(1);
-
-  const tenant = tenantRows[0];
+  const tenant = await getTenant(user.email);
   if (!tenant || tenant.tier !== "individual") redirect("/dashboard");
 
-  const smtpRow = await db
-    .select({ smtpEmail: tenants.smtpEmail, smtpVerified: tenants.smtpVerified })
-    .from(tenants)
-    .where(eq(tenants.id, tenant.id))
-    .limit(1);
-
-  const sendingFrom = smtpRow[0]?.smtpVerified && smtpRow[0]?.smtpEmail
-    ? smtpRow[0].smtpEmail
+  const sendingFrom = tenant.smtpVerified && tenant.smtpEmail
+    ? tenant.smtpEmail
     : "onboarding@resend.dev";
 
   const { campaignId } = await params;

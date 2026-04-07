@@ -1,13 +1,14 @@
-import { count, eq } from "drizzle-orm";
+import { and, count, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { db } from "@/db";
-import { individualContacts, individualLists, individualCampaigns, tenants } from "@/db/schema";
-import { createClient } from "@/utils/supabase/server";
+import { individualContacts, individualLists, individualCampaigns } from "@/db/schema";
 import { DeleteContactButton } from "./_components/DeleteContactButton";
 import { getTenantPlan } from "@/lib/plans/get-tenant-plan";
 import { INDIVIDUAL_LIMITS } from "@/lib/plans/limits";
+import { getSession } from "@/lib/auth/get-session";
+import { getTenant } from "@/lib/auth/get-tenant";
 
 
 async function addContact(formData: FormData) {
@@ -17,15 +18,13 @@ async function addContact(formData: FormData) {
   const email = (formData.get("email") as string)?.trim().toLowerCase();
   if (!listId || !name || !email) return;
 
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const { user } = await getSession();
   if (!user?.email) return;
 
-  const tenantRows = await db.select({ id: tenants.id }).from(tenants).where(eq(tenants.email, user.email)).limit(1);
-  if (!tenantRows[0]) return;
+  const tenant = await getTenant(user.email);
+  if (!tenant) return;
 
-  const tenantId = tenantRows[0].id;
-  const { plan } = await getTenantPlan(tenantId);
+  const { plan } = await getTenantPlan(tenant.id);
   const maxContacts = INDIVIDUAL_LIMITS[plan].maxContactsPerList;
 
   const countResult = await db.select({ total: count() }).from(individualContacts).where(eq(individualContacts.listId, listId));
@@ -49,8 +48,7 @@ async function deleteContact(formData: FormData) {
   const listId = Number(formData.get("listId"));
   if (!contactId || !listId) return;
 
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const { user } = await getSession();
   if (!user?.email) return;
 
   await db.delete(individualContacts).where(eq(individualContacts.id, contactId));
@@ -64,17 +62,10 @@ export default async function ListDetailPage({
   params: Promise<{ listId: string }>;
   searchParams: Promise<{ error?: string }>;
 }) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const { user } = await getSession();
   if (!user?.email) redirect("/login");
 
-  // FIX — select only tenant fields required by list detail page
-  const tenantRows = await db
-    .select({ id: tenants.id, tier: tenants.tier })
-    .from(tenants)
-    .where(eq(tenants.email, user.email))
-    .limit(1);
-  const tenant = tenantRows[0];
+  const tenant = await getTenant(user.email);
   if (!tenant || tenant.tier !== "individual") redirect("/dashboard");
 
   const { listId: listIdParam } = await params;
@@ -86,7 +77,11 @@ export default async function ListDetailPage({
   const MAX_CONTACTS = INDIVIDUAL_LIMITS[plan].maxContactsPerList;
 
   const [listRows, contacts, campaignCount] = await Promise.all([
-    db.select().from(individualLists).where(eq(individualLists.id, listId)).limit(1),
+    db
+      .select()
+      .from(individualLists)
+      .where(and(eq(individualLists.id, listId), eq(individualLists.userId, tenant.id)))
+      .limit(1),
     db.select().from(individualContacts).where(eq(individualContacts.listId, listId)).orderBy(individualContacts.createdAt),
     db.select({ total: count() }).from(individualCampaigns).where(eq(individualCampaigns.listId, listId)),
   ]);

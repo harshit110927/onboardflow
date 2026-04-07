@@ -7,9 +7,9 @@ import {
   individualCampaigns,
   individualContacts,
   individualLists,
-  tenants,
 } from "@/db/schema";
-import { createClient } from "@/utils/supabase/server";
+import { getSession } from "@/lib/auth/get-session";
+import { getTenant } from "@/lib/auth/get-tenant";
 
 import { getTenantPlan } from "@/lib/plans/get-tenant-plan";
 import { INDIVIDUAL_LIMITS } from "@/lib/plans/limits";
@@ -162,24 +162,10 @@ export default async function IndividualDashboardPage() {
   // FIX — disable cache for per-user dashboard data to avoid stale cross-user rendering
   noStore();
 
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const { user } = await getSession();
   if (!user?.email) redirect("/login");
 
-  const tenantRows = await db
-    // FIX — include tenant profile fields needed for personalized dashboard header
-    .select({
-      id: tenants.id,
-      tier: tenants.tier,
-      email: tenants.email,
-      name: tenants.name,
-      createdAt: tenants.createdAt,
-    })
-    .from(tenants)
-    .where(eq(tenants.email, user.email))
-    .limit(1);
-
-  const tenant = tenantRows[0];
+  const tenant = await getTenant(user.email);
   if (!tenant || tenant.tier !== "individual") redirect("/dashboard");
 
   // All queries in parallel

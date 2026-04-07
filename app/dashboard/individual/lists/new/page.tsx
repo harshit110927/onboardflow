@@ -2,8 +2,9 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { eq, count } from "drizzle-orm";
 import { db } from "@/db";
-import { individualLists, tenants } from "@/db/schema";
-import { createClient } from "@/utils/supabase/server";
+import { individualLists } from "@/db/schema";
+import { getSession } from "@/lib/auth/get-session";
+import { getTenant } from "@/lib/auth/get-tenant";
 import { getTenantPlan } from "@/lib/plans/get-tenant-plan";
 import { INDIVIDUAL_LIMITS } from "@/lib/plans/limits";
 
@@ -16,18 +17,10 @@ async function createList(formData: FormData) {
 
   if (!name || name.length > 100) return;
 
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const { user } = await getSession();
   if (!user?.email) redirect("/login");
 
-  const tenantRows = await db
-    // FIX — select only tenant fields required for create list action
-    .select({ id: tenants.id, tier: tenants.tier })
-    .from(tenants)
-    .where(eq(tenants.email, user.email))
-    .limit(1);
-
-  const tenant = tenantRows[0];
+  const tenant = await getTenant(user.email);
   if (!tenant || tenant.tier !== "individual") redirect("/dashboard");
 
   // Check limit
@@ -54,18 +47,11 @@ async function createList(formData: FormData) {
 
 // ── Page ────────────────────────────────────────────────────────────────────
 export default async function NewListPage() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const { user } = await getSession();
   if (!user?.email) redirect("/login");
 
-  const tenantRows = await db
-    // FIX — select only tenant fields required by new list page
-    .select({ id: tenants.id, tier: tenants.tier })
-    .from(tenants)
-    .where(eq(tenants.email, user.email))
-    .limit(1);
-
-  if (tenantRows[0]?.tier !== "individual") redirect("/dashboard");
+  const tenant = await getTenant(user.email);
+  if (tenant?.tier !== "individual") redirect("/dashboard");
 
   return (
     <div className="min-h-screen bg-background">
