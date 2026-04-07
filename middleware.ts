@@ -6,7 +6,12 @@ import { updateSession } from "@/utils/supabase/middleware";
 
 // MODIFIED — tier selection
 export async function middleware(request: NextRequest) {
+  const start = Date.now();
   const { pathname } = request.nextUrl;
+  const finish = (response: NextResponse) => {
+    console.log(`[MIDDLEWARE] ${pathname} — ${Date.now() - start}ms`);
+    return response;
+  };
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -23,12 +28,14 @@ export async function middleware(request: NextRequest) {
     },
   );
 
+  console.time("[AUTH] getUser");
   const {
     data: { user },
   } = await supabase.auth.getUser();
+  console.timeEnd("[AUTH] getUser");
 
   if (pathname === "/tier-selection" && !user?.email) {
-    return NextResponse.redirect(new URL("/login", request.url));
+    return finish(NextResponse.redirect(new URL("/login", request.url)));
   }
 
   if (user?.email) {
@@ -43,16 +50,17 @@ export async function middleware(request: NextRequest) {
 
     if (pathname.startsWith("/dashboard")) {
       if (!tier && pathname !== "/tier-selection") {
-        return NextResponse.redirect(new URL("/tier-selection", request.url));
+        return finish(NextResponse.redirect(new URL("/tier-selection", request.url)));
       }
     }
 
     if (pathname === "/tier-selection" && tier) {
-      return NextResponse.redirect(new URL(`/dashboard/${tier}`, request.url));
+      return finish(NextResponse.redirect(new URL(`/dashboard/${tier}`, request.url)));
     }
   }
 
-  return updateSession(request);
+  const response = await updateSession(request);
+  return finish(response);
 }
 
 // MODIFIED — tier selection
