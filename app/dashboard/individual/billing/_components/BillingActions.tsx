@@ -11,7 +11,7 @@ type Props = {
     priceUsd: number;
     credits: number;
     bonus: number;
-    highlights: string[];
+    highlights: readonly string[];
   };
   userEmail: string;
   tier: "individual" | "enterprise";

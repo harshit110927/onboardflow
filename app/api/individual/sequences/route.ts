@@ -4,10 +4,12 @@ import { db } from "@/db";
 import { tenants, individualLists, individualCampaigns, individualContacts, unsubscribedContacts } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { getTenantPlan } from "@/lib/plans/get-tenant-plan";
+import { INDIVIDUAL_LIMITS } from "@/lib/plans/limits";
 import { decryptPassword, createGmailTransporter } from "@/lib/email/smtp";
 import { buildEmailHtml, createUnsubscribeToken } from "@/lib/email/templates";
 import { Resend } from "resend";
 import crypto from "crypto";
+import { getMonthlyEmailUsage, incrementEmailUsage } from "@/lib/rate-limit/email-usage";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -89,6 +91,13 @@ export async function POST(req: Request) {
     );
 
     if (activeContacts.length > 0) {
+      // FIX — enforce monthly email cap before first sequence send
+      const monthlyLimit = INDIVIDUAL_LIMITS[plan].maxEmailsPerMonth;
+      const monthlyUsed = await getMonthlyEmailUsage(tenant.id);
+      if (monthlyUsed + activeContacts.length > monthlyLimit) {
+        return NextResponse.json({ error: "Monthly email limit reached." }, { status: 400 });
+      }
+
       const firstStep = steps[0];
       const useGmail = tenant.smtpVerified && tenant.smtpEmail && tenant.smtpPassword;
 
@@ -101,7 +110,12 @@ export async function POST(req: Request) {
             from: tenant.smtpEmail!,
             to: contact.email,
             subject: firstStep.subject,
-            html: buildEmailHtml({ body, contactEmail: contact.email, unsubscribeToken: createUnsubscribeToken(contact.email) }),
+            html: buildEmailHtml({
+              body,
+              contactEmail: contact.email,
+              unsubscribeToken: createUnsubscribeToken(contact.email),
+              senderEmail: tenant.smtpEmail!,
+            }),
           });
         }
       } else {
@@ -111,7 +125,12 @@ export async function POST(req: Request) {
             from: "OnboardFlow <onboarding@resend.dev>",
             to: contact.email,
             subject: firstStep.subject,
-            html: buildEmailHtml({ body, contactEmail: contact.email, unsubscribeToken: createUnsubscribeToken(contact.email) }),
+            html: buildEmailHtml({
+              body,
+              contactEmail: contact.email,
+              unsubscribeToken: createUnsubscribeToken(contact.email),
+              senderEmail: "onboarding@resend.dev",
+            }),
           });
         }
       }
@@ -120,6 +139,8 @@ export async function POST(req: Request) {
         .update(individualCampaigns)
         .set({ status: "sent", sentAt: new Date() })
         .where(eq(individualCampaigns.id, firstId));
+
+      await incrementEmailUsage(tenant.id, activeContacts.length);
     }
 
     return NextResponse.json({ success: true, sequenceId });

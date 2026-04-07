@@ -3,9 +3,10 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { eq, desc } from "drizzle-orm";
 import { db } from "@/db";
-import { tenants, creditTransactions } from "@/db/schema";
-import { createClient } from "@/utils/supabase/server";
+import { creditTransactions } from "@/db/schema";
 import { INDIVIDUAL_CREDIT_PACKS } from "@/lib/plans/limits";
+import { getSession } from "@/lib/auth/get-session";
+import { getTenant } from "@/lib/auth/get-tenant";
 import { BillingActions } from "./_components/BillingActions";
 
 export default async function IndividualBillingPage({
@@ -13,19 +14,10 @@ export default async function IndividualBillingPage({
 }: {
   searchParams: Promise<{ success?: string; cancelled?: string }>;
 }) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { user } = await getSession();
   if (!user?.email) redirect("/login");
 
-  const tenantRows = await db
-    .select()
-    .from(tenants)
-    .where(eq(tenants.email, user.email))
-    .limit(1);
-
-  const tenant = tenantRows[0];
+  const tenant = await getTenant(user.email);
   if (!tenant || tenant.tier !== "individual") redirect("/dashboard");
 
   const recentTransactions = await db
@@ -73,6 +65,29 @@ export default async function IndividualBillingPage({
           </div>
           <p className="text-sm text-muted-foreground mb-1">1 email send = 10 credits</p>
           <p className="text-sm text-muted-foreground mb-6">1 AI campaign = 25 credits</p>
+
+          {/* FIX — add explicit features unlocked by credits above pack grid */}
+          <div className="rounded-lg border border-border bg-secondary/20 p-5 mb-6">
+            <h3 className="text-sm font-semibold text-foreground mb-3">What credits unlock</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {[
+                { icon: "✉️", title: "Email Sending", desc: "10 credits per email beyond your 50/month free limit" },
+                { icon: "✦", title: "AI Mail Writing", desc: "25 credits per AI-generated campaign (subject + body)" },
+                { icon: "🎨", title: "HTML Mail Personalization", desc: "Full HTML editor to customize every email's design" },
+                { icon: "📊", title: "Open & Click Analytics", desc: "See who opened your emails and what they clicked" },
+                { icon: "🔁", title: "Multi-step Sequences", desc: "Auto-send follow-up emails on a schedule" },
+                { icon: "📬", title: "Gmail Sending", desc: "Send from your own Gmail address for better deliverability" },
+              ].map((feature) => (
+                <div key={feature.title} className="flex items-start gap-3">
+                  <span className="text-base shrink-0">{feature.icon}</span>
+                  <div>
+                    <p className="text-sm font-medium text-foreground">{feature.title}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">{feature.desc}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {INDIVIDUAL_CREDIT_PACKS.map((pack) => (
