@@ -5,17 +5,28 @@ export function buildEmailHtml(options: {
   campaignId?: number;
   contactEmail?: string;
   unsubscribeToken?: string;
+  senderEmail?: string;
 }): string {
-  const { body, unsubscribeToken, contactEmail } = options;
+  const { body, unsubscribeToken, contactEmail, senderEmail } = options;
 
+  const appUrl = BASE_URL || "https://www.onboardflow.xyz";
   const unsubscribeUrl = unsubscribeToken && contactEmail
-    ? `${BASE_URL}/unsubscribe?token=${unsubscribeToken}&email=${encodeURIComponent(contactEmail)}`
-    : `${BASE_URL}/unsubscribe`;
+    ? `${appUrl}/unsubscribe?token=${unsubscribeToken}&email=${encodeURIComponent(contactEmail)}`
+    : `${appUrl}/unsubscribe`;
 
-  const htmlBody = body
-    .split("\n")
-    .map((line) => line.trim() ? `<p style="margin:0 0 12px 0;">${line}</p>` : "")
-    .join("");
+  // FIX — support both plain-text and HTML email body formats for better output fidelity
+  const hasHtml = /<\/?[a-z][\s\S]*>/i.test(body);
+  const escapedBody = body
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+  const htmlBody = hasHtml
+    ? body
+    : escapedBody
+        .split("\n")
+        .map((line) => line.trim() ? `<p style="margin:0 0 12px 0;">${line}</p>` : "")
+        .join("");
+  const fromLabel = senderEmail ?? "OnboardFlow";
 
   return `<!DOCTYPE html>
 <html>
@@ -49,10 +60,10 @@ export function buildEmailHtml(options: {
           <tr>
             <td style="background:#f3f4f6;padding:20px 32px;border-radius:0 0 12px 12px;border:1px solid #e5e7eb;border-top:none;">
               <p style="margin:0;font-size:12px;color:#9ca3af;line-height:1.6;">
-                You received this email from OnboardFlow.<br />
+                Sent via ${fromLabel}.<br />
                 <a href="${unsubscribeUrl}" style="color:#6366f1;text-decoration:underline;">Unsubscribe</a>
                 &nbsp;·&nbsp;
-                <a href="${BASE_URL}/privacy" style="color:#6366f1;text-decoration:underline;">Privacy Policy</a>
+                <a href="${appUrl}/privacy" style="color:#6366f1;text-decoration:underline;">Privacy Policy</a>
               </p>
             </td>
           </tr>

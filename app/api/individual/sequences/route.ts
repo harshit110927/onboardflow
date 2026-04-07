@@ -121,7 +121,12 @@ export async function POST(req: Request) {
             from: tenant.smtpEmail!,
             to: contact.email,
             subject: firstStep.subject,
-            html: buildEmailHtml({ body, contactEmail: contact.email, unsubscribeToken: createUnsubscribeToken(contact.email) }),
+            html: buildEmailHtml({
+              body,
+              contactEmail: contact.email,
+              unsubscribeToken: createUnsubscribeToken(contact.email),
+              senderEmail: tenant.smtpEmail!,
+            }),
           });
         }
       } else {
@@ -131,7 +136,12 @@ export async function POST(req: Request) {
             from: "OnboardFlow <onboarding@resend.dev>",
             to: contact.email,
             subject: firstStep.subject,
-            html: buildEmailHtml({ body, contactEmail: contact.email, unsubscribeToken: createUnsubscribeToken(contact.email) }),
+            html: buildEmailHtml({
+              body,
+              contactEmail: contact.email,
+              unsubscribeToken: createUnsubscribeToken(contact.email),
+              senderEmail: "onboarding@resend.dev",
+            }),
           });
         }
       }
