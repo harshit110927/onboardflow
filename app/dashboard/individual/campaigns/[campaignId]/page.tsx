@@ -1,5 +1,5 @@
 // MODIFIED — razorpay credits migration — updated individual campaign overage deductions to credits-only cost constants
-import { eq, and, count, sql } from "drizzle-orm";
+import { eq, and, count } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import Link from "next/link";
@@ -15,6 +15,7 @@ import { CREDIT_COSTS, INDIVIDUAL_LIMITS } from "@/lib/plans/limits";
 import { buildEmailHtml, createUnsubscribeToken } from "@/lib/email/templates";
 import { getSession } from "@/lib/auth/get-session";
 import { getTenant } from "@/lib/auth/get-tenant";
+import { getMonthlyEmailUsage, incrementEmailUsage } from "@/lib/rate-limit/email-usage";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -77,22 +78,7 @@ async function sendCampaign(formData: FormData) {
   const { plan: currentPlan } = await getTenantPlan(tenant.id);
   // FIX — use plan-specific monthly cap (free: 50, premium: 5000)
   const monthlyLimit = INDIVIDUAL_LIMITS[currentPlan].maxEmailsPerMonth;
-  const today = new Date().toISOString().slice(0, 10);
-  const month = today.slice(0, 7);
-
-  await db.execute(sql`
-    INSERT INTO email_usage (tenant_id, date, month, daily_count, monthly_count)
-    VALUES (${tenant.id}, ${today}, ${month}, 0, 0)
-    ON CONFLICT (tenant_id, date) DO NOTHING
-  `);
-
-  const usageRows = await db.execute(sql`
-    SELECT COALESCE(SUM(daily_count), 0) AS monthly_count
-    FROM email_usage
-    WHERE tenant_id = ${tenant.id} AND month = ${month}
-  `);
-
-  const monthlyUsed = Number((usageRows as any)[0]?.monthly_count ?? 0);
+  const monthlyUsed = await getMonthlyEmailUsage(tenant.id);
   const emailsToSend = activeContacts.length;
 
   // FIX — hard-block free tier at 50 monthly emails before any overage credit logic
@@ -169,6 +155,8 @@ async function sendCampaign(formData: FormData) {
     .update(individualCampaigns)
     .set({ status: "sent", sentAt: new Date() })
     .where(eq(individualCampaigns.id, campaignId));
+
+  await incrementEmailUsage(tenant.id, emailsToSend);
 
   revalidatePath(`/dashboard/individual/campaigns/${campaignId}`);
   // FIX — redirect after send so user sees a definitive success state and refreshed data

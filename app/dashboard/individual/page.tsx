@@ -1,4 +1,4 @@
-import { count, desc, eq, sql } from "drizzle-orm";
+import { count, desc, eq } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { unstable_noStore as noStore } from "next/cache";
@@ -10,6 +10,7 @@ import {
 } from "@/db/schema";
 import { getSession } from "@/lib/auth/get-session";
 import { getTenant } from "@/lib/auth/get-tenant";
+import { getMonthlyEmailUsage } from "@/lib/rate-limit/email-usage";
 
 import { getTenantPlan } from "@/lib/plans/get-tenant-plan";
 import { INDIVIDUAL_LIMITS } from "@/lib/plans/limits";
@@ -170,7 +171,7 @@ export default async function IndividualDashboardPage() {
 
   // All queries in parallel
   // FIX — moved tenant plan lookup into Promise.all to remove a sequential DB round trip
-  const [lists, contactCounts, campaignCounts, recentCampaignsRaw, emailUsageResult, planInfo] =
+  const [lists, contactCounts, campaignCounts, recentCampaignsRaw, monthlyEmailsUsed, planInfo] =
     await Promise.all([
       // 1. All lists
       db
@@ -219,13 +220,7 @@ export default async function IndividualDashboardPage() {
         .orderBy(desc(individualCampaigns.createdAt))
         .limit(3),
       // FIX — fetch monthly email usage so dashboard and checklist reflect real send usage
-      // FIX — gracefully fallback to zero on transient DB pool saturation to keep dashboard responsive
-      db.execute(sql`
-        SELECT COALESCE(SUM(daily_count), 0) AS monthly_count
-        FROM email_usage
-        WHERE tenant_id = ${tenant.id}
-        AND month = ${new Date().toISOString().slice(0, 7)}
-      `).catch(() => [{ monthly_count: 0 }]) as Promise<any>,
+      getMonthlyEmailUsage(tenant.id).catch(() => 0),
       getTenantPlan(tenant.id),
     ]);
 
@@ -246,7 +241,6 @@ export default async function IndividualDashboardPage() {
       ? Math.max(...lists.map((l) => contactMap[l.id] ?? 0))
       : 0;
 
-  const monthlyEmailsUsed = Number(emailUsageResult[0]?.monthly_count ?? 0);
   const allListsFull =
     lists.length > 0 && lists.every((list) => (contactMap[list.id] ?? 0) >= MAX_CONTACTS);
   // FIX — enforce ordered checklist completion using actual monthly email usage for send completion

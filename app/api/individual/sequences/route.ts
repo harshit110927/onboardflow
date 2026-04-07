@@ -9,6 +9,7 @@ import { decryptPassword, createGmailTransporter } from "@/lib/email/smtp";
 import { buildEmailHtml, createUnsubscribeToken } from "@/lib/email/templates";
 import { Resend } from "resend";
 import crypto from "crypto";
+import { getMonthlyEmailUsage, incrementEmailUsage } from "@/lib/rate-limit/email-usage";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -91,20 +92,8 @@ export async function POST(req: Request) {
 
     if (activeContacts.length > 0) {
       // FIX — enforce monthly email cap before first sequence send
-      const today = new Date().toISOString().slice(0, 10);
-      const month = today.slice(0, 7);
       const monthlyLimit = INDIVIDUAL_LIMITS[plan].maxEmailsPerMonth;
-      await db.execute(sql`
-        INSERT INTO email_usage (tenant_id, date, month, daily_count, monthly_count)
-        VALUES (${tenant.id}, ${today}, ${month}, 0, 0)
-        ON CONFLICT (tenant_id, date) DO NOTHING
-      `);
-      const usageRows = await db.execute(sql`
-        SELECT COALESCE(SUM(daily_count), 0) AS monthly_count
-        FROM email_usage
-        WHERE tenant_id = ${tenant.id} AND month = ${month}
-      `);
-      const monthlyUsed = Number((usageRows as any)[0]?.monthly_count ?? 0);
+      const monthlyUsed = await getMonthlyEmailUsage(tenant.id);
       if (monthlyUsed + activeContacts.length > monthlyLimit) {
         return NextResponse.json({ error: "Monthly email limit reached." }, { status: 400 });
       }
@@ -150,6 +139,8 @@ export async function POST(req: Request) {
         .update(individualCampaigns)
         .set({ status: "sent", sentAt: new Date() })
         .where(eq(individualCampaigns.id, firstId));
+
+      await incrementEmailUsage(tenant.id, activeContacts.length);
     }
 
     return NextResponse.json({ success: true, sequenceId });
