@@ -5,8 +5,7 @@ import { revalidatePath } from "next/cache";
 import Link from "next/link";
 import { Resend } from "resend";
 import { db } from "@/db";
-import { individualCampaigns, individualContacts, individualLists, tenants, campaignEvents, unsubscribedContacts } from "@/db/schema";
-import { createClient } from "@/utils/supabase/server";
+import { individualCampaigns, individualContacts, individualLists, campaignEvents, unsubscribedContacts } from "@/db/schema";
 import { SendCampaignButton } from "./_components/SendCampaignButton";
 import { decryptPassword, createGmailTransporter } from "@/lib/email/smtp";
 import { injectTracking } from "@/lib/tracking/inject";
@@ -14,6 +13,8 @@ import { getTenantPlan } from "@/lib/plans/get-tenant-plan";
 import { deductCredits } from "@/lib/credits/deduct";
 import { CREDIT_COSTS, INDIVIDUAL_LIMITS } from "@/lib/plans/limits";
 import { buildEmailHtml, createUnsubscribeToken } from "@/lib/email/templates";
+import { getSession } from "@/lib/auth/get-session";
+import { getTenant } from "@/lib/auth/get-tenant";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -22,16 +23,10 @@ async function sendCampaign(formData: FormData) {
   const campaignId = Number(formData.get("campaignId"));
   if (!campaignId) return;
 
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const { user } = await getSession();
   if (!user?.email) return;
 
-  const tenantRows = await db
-    .select()
-    .from(tenants)
-    .where(eq(tenants.email, user.email))
-    .limit(1);
-  const tenant = tenantRows[0];
+  const tenant = await getTenant(user.email);
   if (!tenant) return;
 
   const campaignRows = await db
@@ -45,7 +40,8 @@ async function sendCampaign(formData: FormData) {
     })
     .from(individualCampaigns)
     .innerJoin(individualLists, eq(individualCampaigns.listId, individualLists.id))
-    .where(eq(individualCampaigns.id, campaignId))
+    // FIX — enforce tenant ownership while loading campaign for send
+    .where(and(eq(individualCampaigns.id, campaignId), eq(individualLists.userId, tenant.id)))
     .limit(1);
 
   const campaign = campaignRows[0];
@@ -57,7 +53,10 @@ async function sendCampaign(formData: FormData) {
     .from(individualContacts)
     .where(eq(individualContacts.listId, campaign.listId));
 
-  if (contacts.length === 0) return;
+  if (contacts.length === 0) {
+    // FIX — return explicit UI feedback instead of silent no-op when a campaign has no contacts
+    redirect(`/dashboard/individual/campaigns/${campaignId}?error=no_contacts`);
+  }
 
   // Filter out unsubscribed contacts
   const unsubscribed = await db
@@ -69,11 +68,15 @@ async function sendCampaign(formData: FormData) {
     (c) => !unsubscribedEmails.has(c.email.toLowerCase())
   );
 
-  if (activeContacts.length === 0) return;
+  if (activeContacts.length === 0) {
+    // FIX — return explicit UI feedback when every contact is unsubscribed
+    redirect(`/dashboard/individual/campaigns/${campaignId}?error=no_active_contacts`);
+  }
 
   // ── Monthly email limit + credit check ────────────────────────────
   const { plan: currentPlan } = await getTenantPlan(tenant.id);
-  const monthlyLimit = INDIVIDUAL_LIMITS.free.maxEmailsPerMonth;
+  // FIX — use plan-specific monthly cap (free: 50, premium: 5000)
+  const monthlyLimit = INDIVIDUAL_LIMITS[currentPlan].maxEmailsPerMonth;
   const today = new Date().toISOString().slice(0, 10);
   const month = today.slice(0, 7);
 
@@ -92,6 +95,11 @@ async function sendCampaign(formData: FormData) {
   const monthlyUsed = Number((usageRows as any)[0]?.monthly_count ?? 0);
   const emailsToSend = activeContacts.length;
 
+  // FIX — hard-block free tier at 50 monthly emails before any overage credit logic
+  if (currentPlan === "free" && (monthlyUsed >= 50 || monthlyUsed + emailsToSend > monthlyLimit)) {
+    redirect(`/dashboard/individual/campaigns/${campaignId}?error=monthly_limit`);
+  }
+
   if (monthlyUsed + emailsToSend > monthlyLimit) {
     const overage = monthlyUsed + emailsToSend - monthlyLimit;
     const creditCost = overage * CREDIT_COSTS.individual.emailSend;
@@ -107,13 +115,7 @@ async function sendCampaign(formData: FormData) {
   }
 
   // ── Send emails ───────────────────────────────────────────────────
-  const tenantSmtp = await db
-    .select({ smtpEmail: tenants.smtpEmail, smtpPassword: tenants.smtpPassword, smtpVerified: tenants.smtpVerified })
-    .from(tenants)
-    .where(eq(tenants.id, tenant.id))
-    .limit(1);
-
-  const smtp = tenantSmtp[0];
+  const smtp = tenant;
   const useGmail = smtp?.smtpVerified && smtp.smtpEmail && smtp.smtpPassword;
   const trackingEnabled = currentPlan === "premium";
 
@@ -131,6 +133,7 @@ async function sendCampaign(formData: FormData) {
         campaignId: campaign.id,
         contactEmail: contact.email,
         unsubscribeToken: unsubToken,
+        senderEmail: smtp.smtpEmail!,
       });
       await transporter.sendMail({
         from: smtp.smtpEmail!,
@@ -151,6 +154,7 @@ async function sendCampaign(formData: FormData) {
         campaignId: campaign.id,
         contactEmail: contact.email,
         unsubscribeToken: unsubToken,
+        senderEmail: "onboarding@resend.dev",
       });
       await resend.emails.send({
         from: "OnboardFlow <onboarding@resend.dev>",
@@ -167,6 +171,8 @@ async function sendCampaign(formData: FormData) {
     .where(eq(individualCampaigns.id, campaignId));
 
   revalidatePath(`/dashboard/individual/campaigns/${campaignId}`);
+  // FIX — redirect after send so user sees a definitive success state and refreshed data
+  redirect(`/dashboard/individual/campaigns/${campaignId}?success=sent`);
 }
 
 function StatusBadge({ status }: { status: string }) {
@@ -187,29 +193,16 @@ export default async function CampaignDetailPage({
   searchParams,
 }: {
   params: Promise<{ campaignId: string }>;
-  searchParams: Promise<{ error?: string; need?: string; have?: string }>;
+  searchParams: Promise<{ error?: string; need?: string; have?: string; success?: string }>;
 }) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const { user } = await getSession();
   if (!user?.email) redirect("/login");
 
-  const tenantRows = await db
-    .select()
-    .from(tenants)
-    .where(eq(tenants.email, user.email))
-    .limit(1);
-
-  const tenant = tenantRows[0];
+  const tenant = await getTenant(user.email);
   if (!tenant || tenant.tier !== "individual") redirect("/dashboard");
 
-  const smtpRow = await db
-    .select({ smtpEmail: tenants.smtpEmail, smtpVerified: tenants.smtpVerified })
-    .from(tenants)
-    .where(eq(tenants.id, tenant.id))
-    .limit(1);
-
-  const sendingFrom = smtpRow[0]?.smtpVerified && smtpRow[0]?.smtpEmail
-    ? smtpRow[0].smtpEmail
+  const sendingFrom = tenant.smtpVerified && tenant.smtpEmail
+    ? tenant.smtpEmail
     : "onboarding@resend.dev";
 
   const { campaignId } = await params;
@@ -289,6 +282,29 @@ export default async function CampaignDetailPage({
             <Link href="/dashboard/individual/billing" className="underline font-medium">
               Purchase credits →
             </Link>
+          </div>
+        )}
+        {sp.error === "no_contacts" && (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-800">
+            This campaign&apos;s list has no contacts yet. Add contacts before sending.
+          </div>
+        )}
+        {sp.error === "no_active_contacts" && (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-800">
+            All contacts in this list are unsubscribed. Add new active contacts before sending.
+          </div>
+        )}
+        {sp.error === "monthly_limit" && (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-800">
+            You&apos;ve used all 50 free emails this month.
+            <Link href="/dashboard/individual/billing" className="underline font-medium ml-1">
+              Purchase credits to send more →
+            </Link>
+          </div>
+        )}
+        {sp.success === "sent" && (
+          <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm text-emerald-700">
+            Campaign sent successfully.
           </div>
         )}
 

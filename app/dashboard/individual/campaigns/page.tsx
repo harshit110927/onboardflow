@@ -1,10 +1,11 @@
-import { eq, count } from "drizzle-orm";
+import { and, eq, count } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { revalidatePath } from "next/cache";
 import { db } from "@/db";
-import { individualCampaigns, individualLists, tenants } from "@/db/schema";
-import { createClient } from "@/utils/supabase/server";
+import { individualCampaigns, individualLists } from "@/db/schema";
+import { getSession } from "@/lib/auth/get-session";
+import { getTenant } from "@/lib/auth/get-tenant";
 import { DeleteCampaignButton } from "./_components/DeleteCampaignButton";
 
 async function deleteCampaign(formData: FormData) {
@@ -12,23 +13,18 @@ async function deleteCampaign(formData: FormData) {
   const campaignId = Number(formData.get("campaignId"));
   if (!campaignId) return;
 
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const { user } = await getSession();
   if (!user?.email) return;
 
-  const tenantRows = await db
-    .select({ id: tenants.id })
-    .from(tenants)
-    .where(eq(tenants.email, user.email))
-    .limit(1);
-  if (!tenantRows[0]) return;
+  const tenant = await getTenant(user.email);
+  if (!tenant) return;
 
   // Verify ownership via list
   const owned = await db
     .select({ id: individualCampaigns.id })
     .from(individualCampaigns)
     .innerJoin(individualLists, eq(individualCampaigns.listId, individualLists.id))
-    .where(eq(individualCampaigns.id, campaignId))
+    .where(and(eq(individualCampaigns.id, campaignId), eq(individualLists.userId, tenant.id)))
     .limit(1);
   if (!owned[0]) return;
 
@@ -50,17 +46,10 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 export default async function CampaignsPage() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const { user } = await getSession();
   if (!user?.email) redirect("/login");
 
-  const tenantRows = await db
-    .select()
-    .from(tenants)
-    .where(eq(tenants.email, user.email))
-    .limit(1);
-
-  const tenant = tenantRows[0];
+  const tenant = await getTenant(user.email);
   if (!tenant || tenant.tier !== "individual") redirect("/dashboard");
 
   const [campaigns, lists] = await Promise.all([

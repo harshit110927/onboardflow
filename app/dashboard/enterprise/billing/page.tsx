@@ -3,9 +3,10 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { eq, desc } from "drizzle-orm";
 import { db } from "@/db";
-import { tenants, creditTransactions } from "@/db/schema";
-import { createClient } from "@/utils/supabase/server";
+import { creditTransactions } from "@/db/schema";
 import { ENTERPRISE_CREDIT_PACKS } from "@/lib/plans/limits";
+import { getSession } from "@/lib/auth/get-session";
+import { getTenant } from "@/lib/auth/get-tenant";
 import { BillingActions } from "../../individual/billing/_components/BillingActions";
 
 export default async function EnterpriseBillingPage({
@@ -13,19 +14,10 @@ export default async function EnterpriseBillingPage({
 }: {
   searchParams: Promise<{ success?: string; cancelled?: string }>;
 }) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { user } = await getSession();
   if (!user?.email) redirect("/login");
 
-  const tenantRows = await db
-    .select()
-    .from(tenants)
-    .where(eq(tenants.email, user.email))
-    .limit(1);
-
-  const tenant = tenantRows[0];
+  const tenant = await getTenant(user.email);
   if (!tenant || tenant.tier !== "enterprise") redirect("/dashboard");
 
   const recentTransactions = await db
