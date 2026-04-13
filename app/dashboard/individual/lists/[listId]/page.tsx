@@ -1,13 +1,14 @@
-import { count, eq } from "drizzle-orm";
+import { and, count, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { db } from "@/db";
-import { individualContacts, individualLists, individualCampaigns, tenants } from "@/db/schema";
-import { createClient } from "@/utils/supabase/server";
+import { individualContacts, individualLists, individualCampaigns } from "@/db/schema";
 import { DeleteContactButton } from "./_components/DeleteContactButton";
 import { getTenantPlan } from "@/lib/plans/get-tenant-plan";
 import { INDIVIDUAL_LIMITS } from "@/lib/plans/limits";
+import { getSession } from "@/lib/auth/get-session";
+import { getTenant } from "@/lib/auth/get-tenant";
 
 
 async function addContact(formData: FormData) {
@@ -17,19 +18,20 @@ async function addContact(formData: FormData) {
   const email = (formData.get("email") as string)?.trim().toLowerCase();
   if (!listId || !name || !email) return;
 
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const { user } = await getSession();
   if (!user?.email) return;
 
-  const tenantRows = await db.select({ id: tenants.id }).from(tenants).where(eq(tenants.email, user.email)).limit(1);
-  if (!tenantRows[0]) return;
+  const tenant = await getTenant(user.email);
+  if (!tenant) return;
 
-  const tenantId = tenantRows[0].id;
-  const { plan } = await getTenantPlan(tenantId);
+  const { plan } = await getTenantPlan(tenant.id);
   const maxContacts = INDIVIDUAL_LIMITS[plan].maxContactsPerList;
 
   const countResult = await db.select({ total: count() }).from(individualContacts).where(eq(individualContacts.listId, listId));
-  if ((countResult[0]?.total ?? 0) >= maxContacts) return;
+  // FIX — redirect with explicit error when contact limit is reached so UI can show feedback
+  if ((countResult[0]?.total ?? 0) >= maxContacts) {
+    redirect(`/dashboard/individual/lists/${listId}?error=contact_limit`);
+  }
 
   try {
     await db.insert(individualContacts).values({ listId, name, email });
@@ -46,8 +48,7 @@ async function deleteContact(formData: FormData) {
   const listId = Number(formData.get("listId"));
   if (!contactId || !listId) return;
 
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const { user } = await getSession();
   if (!user?.email) return;
 
   await db.delete(individualContacts).where(eq(individualContacts.id, contactId));
@@ -56,18 +57,19 @@ async function deleteContact(formData: FormData) {
 
 export default async function ListDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ listId: string }>;
+  searchParams: Promise<{ error?: string }>;
 }) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const { user } = await getSession();
   if (!user?.email) redirect("/login");
 
-  const tenantRows = await db.select().from(tenants).where(eq(tenants.email, user.email)).limit(1);
-  const tenant = tenantRows[0];
+  const tenant = await getTenant(user.email);
   if (!tenant || tenant.tier !== "individual") redirect("/dashboard");
 
   const { listId: listIdParam } = await params;
+  const sp = await searchParams;
   const listId = Number(listIdParam);
   if (isNaN(listId)) redirect("/dashboard/individual/lists");
 
@@ -75,7 +77,11 @@ export default async function ListDetailPage({
   const MAX_CONTACTS = INDIVIDUAL_LIMITS[plan].maxContactsPerList;
 
   const [listRows, contacts, campaignCount] = await Promise.all([
-    db.select().from(individualLists).where(eq(individualLists.id, listId)).limit(1),
+    db
+      .select()
+      .from(individualLists)
+      .where(and(eq(individualLists.id, listId), eq(individualLists.userId, tenant.id)))
+      .limit(1),
     db.select().from(individualContacts).where(eq(individualContacts.listId, listId)).orderBy(individualContacts.createdAt),
     db.select({ total: count() }).from(individualCampaigns).where(eq(individualCampaigns.listId, listId)),
   ]);
@@ -128,6 +134,12 @@ export default async function ListDetailPage({
             </Link>
           </div>
         </div>
+
+        {sp.error === "contact_limit" && (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-800">
+            You&apos;ve reached this list&apos;s contact limit on your current plan. Remove contacts or upgrade limits to add more.
+          </div>
+        )}
 
         {/* Progress bar */}
         <div className="flex flex-col gap-1.5">

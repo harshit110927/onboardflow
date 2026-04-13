@@ -23,7 +23,9 @@ type RazorpayPaymentCapturedEvent = {
           tenant_id?: string;
           pack_id?: string;
           credits?: string;
+          user_email?: string;
           tier?: "individual" | "enterprise";
+          label?: string;
         };
       };
     };
@@ -70,15 +72,18 @@ export async function POST(req: Request) {
   const tenantId = notes?.tenant_id;
   const packId = notes?.pack_id;
   const tier = notes?.tier;
-  const creditAmount = Number(notes?.credits ?? 0);
+  const credits = notes?.credits ?? "0";
+  const userEmail = notes?.user_email;
+  const labelFromNotes = notes?.label;
+  const creditAmount = Number(credits);
 
-  if (!tenantId || !packId || !tier || !Number.isFinite(creditAmount) || creditAmount <= 0) {
+  if (!tenantId || !packId || !tier || !userEmail || !Number.isFinite(creditAmount) || creditAmount <= 0) {
     return new NextResponse("Invalid notes", { status: 400 });
   }
 
   const packs = tier === "enterprise" ? ENTERPRISE_CREDIT_PACKS : INDIVIDUAL_CREDIT_PACKS;
   const pack = packs.find((item) => item.id === packId);
-  const label = pack?.label ?? "Credit Pack";
+  const label = labelFromNotes || pack?.label || "Credit Pack";
 
   const tenantRows = await db
     .select({ id: tenants.id })
@@ -95,7 +100,7 @@ export async function POST(req: Request) {
     .update(tenants)
     .set({
       credits: sql`${tenants.credits} + ${creditAmount}`,
-      creditsUpdatedAt: new Date(),
+      creditsUpdatedAt: sql`NOW()`,
     })
     .where(eq(tenants.id, tenant.id));
 
@@ -103,7 +108,7 @@ export async function POST(req: Request) {
     tenantId: tenant.id,
     amount: creditAmount,
     type: "purchase",
-    description: `Credit pack — ${label} (${creditAmount.toLocaleString()} credits)`,
+    description: `Credit pack — ${label} (${credits} credits)`,
   });
 
   await db.insert(processedWebhookEvents).values({
