@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
 import { db } from "@/db";
 import { tenants, individualLists, individualCampaigns, individualContacts, unsubscribedContacts } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { getTenantPlan } from "@/lib/plans/get-tenant-plan";
 import { INDIVIDUAL_LIMITS } from "@/lib/plans/limits";
 import { decryptPassword, createGmailTransporter } from "@/lib/email/smtp";
@@ -107,6 +107,13 @@ export async function POST(req: Request) {
     const firstId = insertedIds[0];
 
     if (activeContacts.length > 0) {
+      // FIX — enforce monthly email cap before first sequence send
+      const monthlyLimit = INDIVIDUAL_LIMITS[plan].maxEmailsPerMonth;
+      const monthlyUsed = await getMonthlyEmailUsage(tenant.id);
+      if (monthlyUsed + activeContacts.length > monthlyLimit) {
+        return NextResponse.json({ error: "Monthly email limit reached." }, { status: 400 });
+      }
+
       const firstStep = steps[0];
       const useGmail = tenant.smtpVerified && tenant.smtpEmail && tenant.smtpPassword;
 

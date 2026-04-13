@@ -231,6 +231,10 @@ export default async function IndividualDashboardPage() {
   const MAX_CONTACTS = limits.maxContactsPerList;
   const MAX_EMAILS_PER_MONTH = limits.maxEmailsPerMonth;
 
+  const limits = INDIVIDUAL_LIMITS[planInfo.plan];
+  const MAX_LISTS = limits.maxLists;
+  const MAX_CONTACTS = limits.maxContactsPerList;
+
   // Build lookup maps
   const contactMap = Object.fromEntries(
     contactCounts.map((r) => [r.listId, r.total])
