@@ -1,4 +1,4 @@
-// MODIFIED — razorpay credits migration — replaced Stripe actions with Razorpay credit-pack purchase card flow
+// MODIFIED — razorpay credits migration — Razorpay credit-pack purchase card flow
 "use client";
 
 import { useState } from "react";
@@ -11,7 +11,7 @@ type Props = {
     priceUsd: number;
     credits: number;
     bonus: number;
-    highlights: string[];
+    highlights: readonly string[];
   };
   userEmail: string;
   tier: "individual" | "enterprise";

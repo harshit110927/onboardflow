@@ -56,7 +56,7 @@ export function TierSelectionClient() {
               "Full SDK & API access",
               "Unlimited users",
               "Webhook support",
-              "Stripe subscription gating",
+              "Credit-based billing controls",
               "Developer dashboard",
             ].map((feature) => (
               <li
