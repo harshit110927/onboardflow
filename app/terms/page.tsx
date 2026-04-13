@@ -33,12 +33,12 @@ export default function TermsPage() {
 
           <section className="flex flex-col gap-2">
             <h2 className="text-base font-semibold">4. Payment Terms</h2>
-            <p>Subscription plans are billed monthly. Credit packs are one-time purchases. All payments are processed securely via Stripe. Prices are listed in USD and subject to change with 30 days notice.</p>
+            <p>Credits are purchased as one-time packs. All payments are processed securely via Razorpay. Prices are shown in INR and USD equivalents and may change with 30 days notice.</p>
           </section>
 
           <section className="flex flex-col gap-2">
             <h2 className="text-base font-semibold">5. Refund Policy</h2>
-            <p>Credit pack purchases are non-refundable. Subscription plans may receive a pro-rated refund if cancelled within 7 days of the billing date. Contact support to request a refund.</p>
+            <p>Credit pack purchases are non-refundable. Contact support if a payment was captured but credits were not reflected after webhook processing.</p>
           </section>
 
           <section className="flex flex-col gap-2">

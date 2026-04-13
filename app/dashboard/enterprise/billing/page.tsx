@@ -1,11 +1,12 @@
-// MODIFIED — razorpay credits migration — switched enterprise billing to Razorpay credit packs and removed Stripe subscription upgrade UI
+// MODIFIED — razorpay credits migration — enterprise billing uses Razorpay credit packs
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { eq, desc } from "drizzle-orm";
 import { db } from "@/db";
-import { tenants, creditTransactions } from "@/db/schema";
-import { createClient } from "@/utils/supabase/server";
+import { creditTransactions } from "@/db/schema";
 import { ENTERPRISE_CREDIT_PACKS } from "@/lib/plans/limits";
+import { getSession } from "@/lib/auth/get-session";
+import { getTenant } from "@/lib/auth/get-tenant";
 import { BillingActions } from "../../individual/billing/_components/BillingActions";
 
 export default async function EnterpriseBillingPage({
@@ -13,20 +14,13 @@ export default async function EnterpriseBillingPage({
 }: {
   searchParams: Promise<{ success?: string; cancelled?: string }>;
 }) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { user } = await getSession();
   if (!user?.email) redirect("/login");
+  const userEmail = user.email;
 
-  const tenantRows = await db
-    .select()
-    .from(tenants)
-    .where(eq(tenants.email, user.email))
-    .limit(1);
-
-  const tenant = tenantRows[0];
+  const tenant = await getTenant(user.email);
   if (!tenant || tenant.tier !== "enterprise") redirect("/dashboard");
+  const tenantTier = tenant.tier;
 
   const recentTransactions = await db
     .select()
@@ -47,7 +41,8 @@ export default async function EnterpriseBillingPage({
 
         {params.success === "credits" && (
           <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm font-medium text-emerald-700">
-            ✓ Credits added to your account. They're ready to use.
+            ✓ Payment received. Credits will appear in your account within
+            {" "}30 seconds as we process the payment.
           </div>
         )}
 
@@ -75,8 +70,8 @@ export default async function EnterpriseBillingPage({
               <BillingActions
                 key={pack.id}
                 pack={pack}
-                userEmail={tenant.email}
-                tier="enterprise"
+                userEmail={userEmail}
+                tier={tenantTier}
               />
             ))}
           </div>

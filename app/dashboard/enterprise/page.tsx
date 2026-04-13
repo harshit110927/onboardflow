@@ -1,36 +1,21 @@
 // MODIFIED — razorpay credits migration — added shared CreditMeter to enterprise dashboard header
-import { createClient } from "@/utils/supabase/server";
 import { redirect } from "next/navigation";
 import { db } from "@/db";
-import { tenants, endUsers } from "@/db/schema";
+import { endUsers } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import Link from "next/link";
 import { getTenantPlan } from "@/lib/plans/get-tenant-plan";
 import { ApiKeyCard } from "@/app/dashboard/ApiKeyCard";
 import CreditMeter from "@/app/_components/CreditMeter";
+import { getSession } from "@/lib/auth/get-session";
+import { getTenant } from "@/lib/auth/get-tenant";
 
 export default async function EnterpriseDashboardPage() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
-
-  const tierCheck = await db
-    .select({ tier: tenants.tier })
-    .from(tenants)
-    .where(eq(tenants.email, user.email!))
-    .limit(1);
-
-  const tier = tierCheck[0]?.tier ?? null;
-  if (!tier) redirect("/tier-selection");
-  if (tier !== "enterprise") redirect("/dashboard/individual");
-
-  const tenantRows = await db
-    .select()
-    .from(tenants)
-    .where(eq(tenants.email, user.email!))
-    .limit(1);
-
-  const tenant = tenantRows[0];
+  const { user } = await getSession();
+  if (!user?.email) redirect("/login");
+  const tenant = await getTenant(user.email);
+  if (!tenant) redirect("/tier-selection");
+  if (tenant.tier !== "enterprise") redirect("/dashboard/individual");
   if (!tenant) return <div>Error loading account. Please refresh.</div>;
 
   const planInfo = await getTenantPlan(tenant.id);

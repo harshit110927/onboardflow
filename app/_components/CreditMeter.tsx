@@ -2,6 +2,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
 type Props = {
@@ -13,6 +14,7 @@ type Props = {
 export default function CreditMeter({ credits, tier, billingPath }: Props) {
   const [open, setOpen] = useState(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
+  const router = useRouter();
 
   useEffect(() => {
     function onClickOutside(event: MouseEvent) {
@@ -34,18 +36,28 @@ export default function CreditMeter({ credits, tier, billingPath }: Props) {
         : "bg-red-100 text-red-700";
 
   const percent = Math.max(4, Math.min(100, Math.round((credits / 10000) * 100)));
+  const isZero = credits === 0;
 
   return (
     <div className="relative" ref={wrapperRef}>
       <button
         type="button"
-        onClick={() => setOpen((prev) => !prev)}
-        className={`inline-flex items-center gap-2 rounded-full px-2.5 py-1 text-xs font-medium ${toneClass}`}
+        onClick={() => {
+          if (isZero) {
+            router.push(billingPath);
+            return;
+          }
+          setOpen((prev) => !prev);
+        }}
+        className={`inline-flex items-center gap-2 rounded-full px-2.5 py-1 text-xs font-medium ${isZero ? "bg-secondary text-muted-foreground" : toneClass}`}
       >
-        <span className="h-1.5 w-12 rounded-full bg-black/10 overflow-hidden">
-          <span className="block h-full bg-current" style={{ width: `${percent}%` }} />
-        </span>
-        <span>{credits.toLocaleString()} credits</span>
+        {/* FIX — show explicit zero-credits CTA state instead of empty progress bar */}
+        {!isZero && (
+          <span className="h-1.5 w-12 rounded-full bg-black/10 overflow-hidden">
+            <span className="block h-full bg-current" style={{ width: `${percent}%` }} />
+          </span>
+        )}
+        <span>{isZero ? "0 credits — Buy to unlock features" : `${credits.toLocaleString()} credits`}</span>
       </button>
 
       {open && (

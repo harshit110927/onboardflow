@@ -4,12 +4,12 @@ import { db } from "@/db";
 import { tenants, individualLists, individualCampaigns, individualContacts, unsubscribedContacts } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { getTenantPlan } from "@/lib/plans/get-tenant-plan";
+import { INDIVIDUAL_LIMITS } from "@/lib/plans/limits";
 import { decryptPassword, createGmailTransporter } from "@/lib/email/smtp";
 import { buildEmailHtml, createUnsubscribeToken } from "@/lib/email/templates";
 import { Resend } from "resend";
 import crypto from "crypto";
-
-const resend = new Resend(process.env.RESEND_API_KEY);
+import { getMonthlyEmailUsage, incrementEmailUsage } from "@/lib/rate-limit/email-usage";
 
 type StepInput = {
   subject: string;
@@ -19,8 +19,16 @@ type StepInput = {
 
 export async function POST(req: Request) {
   try {
+    const resendApiKey = process.env.RESEND_API_KEY;
+    if (!resendApiKey) {
+      return NextResponse.json({ error: "RESEND_API_KEY is not configured" }, { status: 503 });
+    }
+    const resend = new Resend(resendApiKey);
+
     const supabase = await createClient();
+    console.time("[AUTH] getUser");
     const { data: { user } } = await supabase.auth.getUser();
+    console.timeEnd("[AUTH] getUser");
     if (!user?.email) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const tenantRows = await db
@@ -53,6 +61,29 @@ export async function POST(req: Request) {
 
     if (!listRows[0]) return NextResponse.json({ error: "List not found." }, { status: 404 });
 
+    const contacts = await db
+      .select({ name: individualContacts.name, email: individualContacts.email })
+      .from(individualContacts)
+      .where(eq(individualContacts.listId, listId));
+
+    // Filter unsubscribed
+    const unsubscribed = await db
+      .select({ email: unsubscribedContacts.email })
+      .from(unsubscribedContacts);
+    const unsubscribedEmails = new Set(unsubscribed.map((u) => u.email.toLowerCase()));
+    const activeContacts = contacts.filter(
+      (c) => !unsubscribedEmails.has(c.email.toLowerCase())
+    );
+
+    // Validate monthly cap before creating sequence campaign rows
+    if (activeContacts.length > 0) {
+      const monthlyLimit = INDIVIDUAL_LIMITS[plan].maxEmailsPerMonth;
+      const monthlyUsed = await getMonthlyEmailUsage(tenant.id);
+      if (monthlyUsed + activeContacts.length > monthlyLimit) {
+        return NextResponse.json({ error: "Monthly email limit reached." }, { status: 400 });
+      }
+    }
+
     const sequenceId = crypto.randomUUID();
 
     const insertedIds: number[] = [];
@@ -74,19 +105,6 @@ export async function POST(req: Request) {
     }
 
     const firstId = insertedIds[0];
-    const contacts = await db
-      .select({ name: individualContacts.name, email: individualContacts.email })
-      .from(individualContacts)
-      .where(eq(individualContacts.listId, listId));
-
-    // Filter unsubscribed
-    const unsubscribed = await db
-      .select({ email: unsubscribedContacts.email })
-      .from(unsubscribedContacts);
-    const unsubscribedEmails = new Set(unsubscribed.map((u) => u.email.toLowerCase()));
-    const activeContacts = contacts.filter(
-      (c) => !unsubscribedEmails.has(c.email.toLowerCase())
-    );
 
     if (activeContacts.length > 0) {
       const firstStep = steps[0];
@@ -101,7 +119,12 @@ export async function POST(req: Request) {
             from: tenant.smtpEmail!,
             to: contact.email,
             subject: firstStep.subject,
-            html: buildEmailHtml({ body, contactEmail: contact.email, unsubscribeToken: createUnsubscribeToken(contact.email) }),
+            html: buildEmailHtml({
+              body,
+              contactEmail: contact.email,
+              unsubscribeToken: createUnsubscribeToken(contact.email),
+              senderEmail: tenant.smtpEmail!,
+            }),
           });
         }
       } else {
@@ -111,7 +134,12 @@ export async function POST(req: Request) {
             from: "OnboardFlow <onboarding@resend.dev>",
             to: contact.email,
             subject: firstStep.subject,
-            html: buildEmailHtml({ body, contactEmail: contact.email, unsubscribeToken: createUnsubscribeToken(contact.email) }),
+            html: buildEmailHtml({
+              body,
+              contactEmail: contact.email,
+              unsubscribeToken: createUnsubscribeToken(contact.email),
+              senderEmail: "onboarding@resend.dev",
+            }),
           });
         }
       }
@@ -120,6 +148,8 @@ export async function POST(req: Request) {
         .update(individualCampaigns)
         .set({ status: "sent", sentAt: new Date() })
         .where(eq(individualCampaigns.id, firstId));
+
+      await incrementEmailUsage(tenant.id, activeContacts.length);
     }
 
     return NextResponse.json({ success: true, sequenceId });
