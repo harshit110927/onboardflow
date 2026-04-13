@@ -9,8 +9,6 @@ import {
   INDIVIDUAL_CREDIT_PACKS,
 } from "@/lib/plans/limits";
 
-type Currency = "INR" | "USD";
-
 type RazorpayOrderResponse = {
   id: string;
   amount: number;
@@ -28,9 +26,8 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const body = (await req.json()) as { packId?: string; currency?: Currency };
+    const body = (await req.json()) as { packId?: string };
     const packId = body.packId;
-    const requestedCurrency: Currency = body.currency === "USD" ? "USD" : "INR";
 
     if (!packId) {
       return NextResponse.json({ error: "Missing packId" }, { status: 400 });
@@ -55,8 +52,8 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Invalid packId" }, { status: 400 });
     }
 
-    const currency: Currency = requestedCurrency;
-    const amount = currency === "USD" ? pack.priceUsd * 100 : pack.amountInPaise;
+    const currency = "INR";
+    const amount = pack.amountInPaise;
 
     const keyId = process.env.RAZORPAY_KEY_ID;
     const keySecret = process.env.RAZORPAY_KEY_SECRET;
@@ -82,6 +79,7 @@ export async function POST(req: Request) {
           credits: String(pack.credits),
           user_email: tenant.email,
           tier: tenant.tier,
+          label: pack.label,
         },
       }),
     });
