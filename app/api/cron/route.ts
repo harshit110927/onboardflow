@@ -13,14 +13,18 @@ import { deductCredits } from "@/lib/credits/deduct";
 import { buildEmailHtml } from "@/lib/email/templates";
 import { CREDIT_COSTS } from "@/lib/plans/limits";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
-
 const hasReceived = (user: { automationsReceived?: string[] | null }, tag: string) => {
   return (user.automationsReceived || []).includes(tag);
 };
 
 export async function GET(req: Request) {
   try {
+    const resendApiKey = process.env.RESEND_API_KEY;
+    if (!resendApiKey) {
+      return NextResponse.json({ error: "RESEND_API_KEY is not configured" }, { status: 503 });
+    }
+    const resend = new Resend(resendApiKey);
+
     const authHeader = req.headers.get("authorization");
     const cronSecret = process.env.CRON_SECRET;
     if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {

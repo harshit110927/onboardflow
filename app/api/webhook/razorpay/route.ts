@@ -23,7 +23,9 @@ type RazorpayPaymentCapturedEvent = {
           tenant_id?: string;
           pack_id?: string;
           credits?: string;
+          user_email?: string;
           tier?: "individual" | "enterprise";
+          label?: string;
         };
       };
     };
@@ -56,29 +58,22 @@ export async function POST(req: Request) {
   const payment = event.payload.payment.entity;
   const eventId = `rz_${payment.id}`;
 
-  const processed = await db
-    .select({ id: processedWebhookEvents.id })
-    .from(processedWebhookEvents)
-    .where(eq(processedWebhookEvents.stripeEventId, eventId))
-    .limit(1);
-
-  if (processed.length > 0) {
-    return new NextResponse("OK", { status: 200 });
-  }
-
   const notes = payment.notes;
   const tenantId = notes?.tenant_id;
   const packId = notes?.pack_id;
   const tier = notes?.tier;
-  const creditAmount = Number(notes?.credits ?? 0);
+  const credits = notes?.credits ?? "0";
+  const userEmail = notes?.user_email;
+  const labelFromNotes = notes?.label;
+  const creditAmount = Number(credits);
 
-  if (!tenantId || !packId || !tier || !Number.isFinite(creditAmount) || creditAmount <= 0) {
+  if (!tenantId || !packId || !tier || !userEmail || !Number.isFinite(creditAmount) || creditAmount <= 0) {
     return new NextResponse("Invalid notes", { status: 400 });
   }
 
   const packs = tier === "enterprise" ? ENTERPRISE_CREDIT_PACKS : INDIVIDUAL_CREDIT_PACKS;
   const pack = packs.find((item) => item.id === packId);
-  const label = pack?.label ?? "Credit Pack";
+  const label = labelFromNotes || pack?.label || "Credit Pack";
 
   const tenantRows = await db
     .select({ id: tenants.id })
@@ -91,24 +86,38 @@ export async function POST(req: Request) {
     return new NextResponse("Tenant not found", { status: 404 });
   }
 
-  await db
-    .update(tenants)
-    .set({
-      credits: sql`${tenants.credits} + ${creditAmount}`,
-      creditsUpdatedAt: new Date(),
-    })
-    .where(eq(tenants.id, tenant.id));
+  const processed = await db.transaction(async (tx) => {
+    const marker = await tx
+      .insert(processedWebhookEvents)
+      .values({ stripeEventId: eventId })
+      .onConflictDoNothing()
+      .returning({ id: processedWebhookEvents.id });
 
-  await db.insert(creditTransactions).values({
-    tenantId: tenant.id,
-    amount: creditAmount,
-    type: "purchase",
-    description: `Credit pack — ${label} (${creditAmount.toLocaleString()} credits)`,
+    if (marker.length === 0) {
+      return false;
+    }
+
+    await tx
+      .update(tenants)
+      .set({
+        credits: sql`${tenants.credits} + ${creditAmount}`,
+        creditsUpdatedAt: sql`NOW()`,
+      })
+      .where(eq(tenants.id, tenant.id));
+
+    await tx.insert(creditTransactions).values({
+      tenantId: tenant.id,
+      amount: creditAmount,
+      type: "purchase",
+      description: `Credit pack — ${label} (${credits} credits)`,
+    });
+
+    return true;
   });
 
-  await db.insert(processedWebhookEvents).values({
-    stripeEventId: eventId,
-  });
+  if (!processed) {
+    return new NextResponse("OK", { status: 200 });
+  }
 
   return new NextResponse("OK", { status: 200 });
 }

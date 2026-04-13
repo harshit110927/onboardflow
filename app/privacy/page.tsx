@@ -28,7 +28,7 @@ export default function PrivacyPage() {
 
           <section className="flex flex-col gap-2">
             <h2 className="text-base font-semibold">3. Data Processors</h2>
-            <p>We use the following third-party services to operate OnboardFlow: Supabase (database and authentication), Resend (transactional email delivery), Stripe (payment processing), and Vercel (hosting). Each processor has their own privacy policy and data processing agreements.</p>
+            <p>We use the following third-party services to operate OnboardFlow: Supabase (database and authentication), Resend (transactional email delivery), Razorpay (payment processing), and Vercel (hosting). Each processor has their own privacy policy and data processing agreements.</p>
           </section>
 
           <section className="flex flex-col gap-2">
