@@ -1,7 +1,7 @@
-import { cache } from "react";
 import { db } from "@/db";
 import { tenants } from "@/db/schema";
 import { eq } from "drizzle-orm";
+import { cache } from "react"; // (assuming you're using Next.js cache)
 import type { PlanTier, EnterprisePlanTier } from "./limits";
 
 export type TenantPlanInfo = {

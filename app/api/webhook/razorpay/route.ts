@@ -8,6 +8,7 @@ import { INDIVIDUAL_PLANS, ENTERPRISE_PLANS } from "@/lib/plans/limits";
 export async function POST(req: Request) {
   const body = await req.text();
   const signature = req.headers.get("x-razorpay-signature");
+  const razorpayEventIdHeader = req.headers.get("x-razorpay-event-id");
 
   if (!signature || !process.env.RAZORPAY_WEBHOOK_SECRET) {
     return new NextResponse("Missing signature", { status: 400 });
@@ -25,7 +26,9 @@ export async function POST(req: Request) {
   const event = JSON.parse(body);
   const eventType = event.event;
 
-  const eventId = `rz_${event.payload?.subscription?.entity?.id ?? event.payload?.payment?.entity?.id ?? Date.now()}`;
+  const eventId =
+    razorpayEventIdHeader ??
+    `rz_${eventType}_${event.payload?.subscription?.entity?.id ?? event.payload?.payment?.entity?.id ?? event.created_at ?? Date.now()}`;
   const processed = await db
     .select({ id: processedWebhookEvents.id })
     .from(processedWebhookEvents)
@@ -40,16 +43,38 @@ export async function POST(req: Request) {
     const sub = event.payload.subscription.entity;
     const notes = sub.notes;
     const tenantId = notes?.tenant_id;
-    const planId = notes?.plan_id;
+    const planIdFromNotes = notes?.plan_id;
 
-    if (!tenantId || !planId) return new NextResponse("Missing notes", { status: 400 });
+    if (!tenantId) return new NextResponse("Missing tenant note", { status: 400 });
 
-    const plan = allPlans.find((p) => p.id === planId);
+    const razorpayPlanIdMap: Record<string, string | undefined> = {
+      ind_starter: process.env.RAZORPAY_PLAN_IND_STARTER,
+      ind_growth: process.env.RAZORPAY_PLAN_IND_GROWTH,
+      ind_pro: process.env.RAZORPAY_PLAN_IND_PRO,
+      ent_basic: process.env.RAZORPAY_PLAN_ENT_BASIC,
+      ent_advanced: process.env.RAZORPAY_PLAN_ENT_ADVANCED,
+    };
+
+    let resolvedPlanId = planIdFromNotes;
+    if (!resolvedPlanId) {
+      const byRazorpayPlanId = Object.entries(razorpayPlanIdMap).find(
+        ([, razorpayPlanId]) => razorpayPlanId && razorpayPlanId === sub.plan_id,
+      );
+      resolvedPlanId = byRazorpayPlanId?.[0];
+    }
+
+    if (!resolvedPlanId) return new NextResponse("Missing plan mapping", { status: 400 });
+
+    const plan = allPlans.find((p) => p.id === resolvedPlanId);
     if (!plan) return new NextResponse("Unknown plan", { status: 400 });
 
-    const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + 35);
-
+    const renewalFromWebhook = typeof sub.current_end === "number"
+      ? new Date(sub.current_end * 1000)
+      : null;
+    const expiresAt = renewalFromWebhook ?? new Date();
+    if (!renewalFromWebhook) {
+      expiresAt.setDate(expiresAt.getDate() + 35);
+    }
     await db
       .update(tenants)
       .set({
