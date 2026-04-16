@@ -26,13 +26,9 @@ export async function POST(req: Request) {
   const event = JSON.parse(body);
   const eventType = event.event;
 
-<<<<<<< codex/migrate-to-subscription-based-model-js2kvm
   const eventId =
     razorpayEventIdHeader ??
     `rz_${eventType}_${event.payload?.subscription?.entity?.id ?? event.payload?.payment?.entity?.id ?? event.created_at ?? Date.now()}`;
-=======
-  const eventId = `rz_${event.payload?.subscription?.entity?.id ?? event.payload?.payment?.entity?.id ?? Date.now()}`;
->>>>>>> main
   const processed = await db
     .select({ id: processedWebhookEvents.id })
     .from(processedWebhookEvents)
