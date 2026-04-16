@@ -27,7 +27,7 @@ export default async function NewSequencePage({
 
   const { plan } = await getTenantPlan(tenant.id);
 
-  if (plan !== "premium") {
+  if (!["growth", "pro"].includes(plan)) {
     return (
       <div className="min-h-screen bg-background">
         <div className="max-w-2xl mx-auto px-4 py-10 flex flex-col gap-6">
@@ -38,15 +38,15 @@ export default async function NewSequencePage({
           </div>
           <div className="rounded-lg border border-border bg-card p-8 text-center flex flex-col gap-4">
             <p className="text-2xl">🔒</p>
-            <h1 className="text-xl font-bold text-foreground">Sequences are a Premium feature</h1>
+            <h1 className="text-xl font-bold text-foreground">Sequences are a Growth/Pro feature</h1>
             <p className="text-sm text-muted-foreground">
-              Upgrade to Premium to create multi-step email sequences that send automatically.
+              Upgrade to Growth to create multi-step email sequences that send automatically.
             </p>
             <Link
               href="/dashboard/individual/billing"
               className="self-center text-sm rounded-md bg-primary text-primary-foreground px-4 py-2 hover:opacity-90 transition-opacity"
             >
-              Upgrade to Premium
+              Upgrade to Growth
             </Link>
           </div>
         </div>

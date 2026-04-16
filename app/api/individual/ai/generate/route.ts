@@ -1,23 +1,23 @@
-// MODIFIED — razorpay credits migration — switched AI overage deduction to shared credit cost constant
 import { NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
 import { db } from "@/db";
 import { tenants, aiUsage } from "@/db/schema";
 import { eq, count, and, gte } from "drizzle-orm";
 import { getTenantPlan } from "@/lib/plans/get-tenant-plan";
-import { CREDIT_COSTS, INDIVIDUAL_LIMITS } from "@/lib/plans/limits";
+import { INDIVIDUAL_LIMITS, type PlanTier } from "@/lib/plans/limits";
 import { generateCampaign } from "@/lib/ai/generate-campaign";
 import type { CampaignTone, CampaignType } from "@/lib/ai/generate-campaign";
-import { deductCredits } from "@/lib/credits/deduct";
 
 export async function POST(req: Request) {
   try {
     const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
     if (!user?.email) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const tenantRows = await db
-      .select({ id: tenants.id, tier: tenants.tier, credits: tenants.credits })
+      .select({ id: tenants.id, tier: tenants.tier })
       .from(tenants)
       .where(eq(tenants.email, user.email))
       .limit(1);
@@ -28,15 +28,15 @@ export async function POST(req: Request) {
     }
 
     const planInfo = await getTenantPlan(tenant.id);
+    const limits = INDIVIDUAL_LIMITS[planInfo.plan as PlanTier];
 
-    if (planInfo.plan === "free") {
+    if (!limits.aiEnabled) {
       return NextResponse.json(
-        { error: "AI writing is available on Premium. Upgrade to access this feature." },
-        { status: 403 }
+        { error: "AI writing is available on Growth and Pro plans." },
+        { status: 403 },
       );
     }
 
-    // Count this month's usage
     const startOfMonth = new Date();
     startOfMonth.setDate(1);
     startOfMonth.setHours(0, 0, 0, 0);
@@ -44,39 +44,19 @@ export async function POST(req: Request) {
     const usageRows = await db
       .select({ total: count() })
       .from(aiUsage)
-      .where(
-        and(
-          eq(aiUsage.tenantId, tenant.id),
-          gte(aiUsage.generatedAt, startOfMonth)
-        )
-      );
+      .where(and(eq(aiUsage.tenantId, tenant.id), gte(aiUsage.generatedAt, startOfMonth)));
 
     const monthlyUsed = usageRows[0]?.total ?? 0;
-    const monthlyLimit = INDIVIDUAL_LIMITS.premium.maxAiGenerationsPerMonth;
+    const monthlyLimit = planInfo.plan === "pro" ? 120 : 40;
 
     if (monthlyUsed >= monthlyLimit) {
-      const creditCost = CREDIT_COSTS.individual.aiCampaignSend;
-      const deduction = await deductCredits(
-        tenant.id,
-        creditCost,
-        "usage_ai",
-        "AI email generation (overage)"
+      return NextResponse.json(
+        { error: `You've used all ${monthlyLimit} AI generations this month.` },
+        { status: 429 },
       );
-      if (!deduction.success) {
-        return NextResponse.json(
-          {
-            error: `You've used all ${monthlyLimit} monthly AI generations. You need ${creditCost} credits but have ${deduction.creditsHave}. Purchase credits to continue.`,
-            needsCredits: true,
-            creditsNeeded: creditCost,
-            creditsHave: deduction.creditsHave,
-          },
-          { status: 402 }
-        );
-      }
     }
 
-
-    const { businessDescription, tone, campaignType } = await req.json() as {
+    const { businessDescription, tone, campaignType } = (await req.json()) as {
       businessDescription: string;
       tone: CampaignTone;
       campaignType: CampaignType;
@@ -88,7 +68,6 @@ export async function POST(req: Request) {
 
     const result = await generateCampaign(businessDescription, tone, campaignType);
 
-    // Log usage
     await db.insert(aiUsage).values({
       tenantId: tenant.id,
       tokensUsed: result.tokensUsed,

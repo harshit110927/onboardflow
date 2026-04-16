@@ -52,8 +52,8 @@ export async function POST(req: Request) {
     }
 
     const { plan } = await getTenantPlan(tenant.id);
-    if (plan !== "premium") {
-      return NextResponse.json({ error: "Unlimited drip steps require Premium." }, { status: 403 });
+    if (plan !== "advanced") {
+      return NextResponse.json({ error: "Unlimited drip steps require Advanced plan." }, { status: 403 });
     }
 
     const { steps } = await req.json() as {
