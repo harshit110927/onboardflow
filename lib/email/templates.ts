@@ -6,8 +6,9 @@ export function buildEmailHtml(options: {
   contactEmail?: string;
   unsubscribeToken?: string;
   senderEmail?: string;
+  trackingPixelUrl?: string;
 }): string {
-  const { body, unsubscribeToken, contactEmail, senderEmail } = options;
+  const { body, unsubscribeToken, contactEmail, senderEmail, trackingPixelUrl } = options;
 
   const appUrl = BASE_URL || "https://www.onboardflow.xyz";
   const unsubscribeUrl = unsubscribeToken && contactEmail
@@ -53,6 +54,7 @@ export function buildEmailHtml(options: {
               <div style="font-size:15px;line-height:1.7;color:#374151;">
                 ${htmlBody}
               </div>
+              ${trackingPixelUrl ? `<img src="${trackingPixelUrl}" width="1" height="1" alt="" style="display:block;opacity:0;width:1px;height:1px;border:0;" />` : ""}
             </td>
           </tr>
 

@@ -19,7 +19,7 @@ export type GeneratedCampaign = {
 
 async function generateWithProvider(prompt: string): Promise<{ text: string; tokensUsed: number }> {
   // ── GEMINI (current) ──────────────────────────────────────────────
-  const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+  const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
   const result = await model.generateContent(prompt);
   const text = result.response.text();
   const tokensUsed = result.response.usageMetadata?.totalTokenCount ?? 0;

@@ -9,12 +9,30 @@ import { INDIVIDUAL_LIMITS, type PlanTier } from "@/lib/plans/limits";
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export async function POST(req: Request, { params }: { params: Promise<{ listId: string }> }) {
+  const accept = req.headers.get("accept") ?? "";
+  const referer = req.headers.get("referer");
+  const wantsHtml = accept.includes("text/html");
+
+  function respond(payload: { imported?: number; skipped?: number; errors?: string[]; error?: string }, status = 200) {
+    if (wantsHtml && referer) {
+      const url = new URL(referer);
+      if (payload.error) {
+        url.searchParams.set("import_error", payload.error);
+      } else {
+        url.searchParams.set("imported", String(payload.imported ?? 0));
+        url.searchParams.set("skipped", String(payload.skipped ?? 0));
+      }
+      return NextResponse.redirect(url, { status: 303 });
+    }
+    return NextResponse.json(payload, { status });
+  }
+
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user?.email) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!user?.email) return respond({ error: "Unauthorized" }, 401);
 
   const tenantRows = await db
     .select({ id: tenants.id, tier: tenants.tier })
@@ -24,12 +42,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ listId:
 
   const tenant = tenantRows[0];
   if (!tenant || tenant.tier !== "individual") {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return respond({ error: "Unauthorized" }, 401);
   }
 
   const { listId: listIdRaw } = await params;
   const listId = Number(listIdRaw);
-  if (Number.isNaN(listId)) return NextResponse.json({ error: "Invalid list id" }, { status: 400 });
+  if (Number.isNaN(listId)) return respond({ error: "Invalid list id" }, 400);
 
   const listRows = await db
     .select({ id: individualLists.id })
@@ -37,29 +55,29 @@ export async function POST(req: Request, { params }: { params: Promise<{ listId:
     .where(and(eq(individualLists.id, listId), eq(individualLists.userId, tenant.id)))
     .limit(1);
 
-  if (!listRows[0]) return NextResponse.json({ error: "List not found" }, { status: 404 });
+  if (!listRows[0]) return respond({ error: "List not found" }, 404);
 
   const { plan } = await getTenantPlan(tenant.id);
   const limits = INDIVIDUAL_LIMITS[plan as PlanTier];
   if (!limits.csvImportEnabled) {
-    return NextResponse.json({ error: "CSV import is available on Growth and Pro." }, { status: 403 });
+    return respond({ error: "CSV import is available on Growth and Pro." }, 403);
   }
 
   const formData = await req.formData();
   const file = formData.get("file");
   if (!(file instanceof File)) {
-    return NextResponse.json({ error: "CSV file is required" }, { status: 400 });
+    return respond({ error: "CSV file is required" }, 400);
   }
 
   const text = await file.text();
   const lines = text.split(/\r?\n/).filter((line) => line.trim().length > 0);
-  if (lines.length < 2) return NextResponse.json({ imported: 0, skipped: 0, errors: ["No rows found"] });
+  if (lines.length < 2) return respond({ imported: 0, skipped: 0, errors: ["No rows found"] });
 
   const headers = lines[0].split(",").map((h) => h.trim().toLowerCase());
   const nameIdx = headers.indexOf("name");
   const emailIdx = headers.indexOf("email");
   if (nameIdx < 0 || emailIdx < 0) {
-    return NextResponse.json({ error: "CSV must include name and email columns" }, { status: 400 });
+    return respond({ error: "CSV must include name and email columns" }, 400);
   }
 
   const rows = lines.slice(1).map((line) => {
@@ -91,9 +109,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ listId:
   const currentCount = countRows[0]?.total ?? 0;
 
   if (currentCount + validRows.length > limits.maxContactsPerList) {
-    return NextResponse.json(
+    return respond(
       { error: `Import exceeds limit of ${limits.maxContactsPerList} contacts for your plan.` },
-      { status: 400 },
+      400,
     );
   }
 
@@ -107,5 +125,5 @@ export async function POST(req: Request, { params }: { params: Promise<{ listId:
     imported = inserted.length;
   }
 
-  return NextResponse.json({ imported, skipped: validRows.length - imported, errors });
+  return respond({ imported, skipped: validRows.length - imported, errors });
 }

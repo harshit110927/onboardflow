@@ -59,7 +59,7 @@ export default async function ListDetailPage({
   searchParams,
 }: {
   params: Promise<{ listId: string }>;
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; imported?: string; skipped?: string; import_error?: string }>;
 }) {
   const { user } = await getSession();
   if (!user?.email) redirect("/login");
@@ -144,6 +144,17 @@ export default async function ListDetailPage({
         {sp.error === "contact_limit" && (
           <div className="rounded-lg border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-800">
             You&apos;ve reached this list&apos;s contact limit on your current plan. Remove contacts or upgrade limits to add more.
+          </div>
+        )}
+        {sp.import_error && (
+          <div className="rounded-lg border border-destructive/20 bg-destructive/5 px-5 py-4 text-sm text-destructive">
+            CSV import failed: {sp.import_error}
+          </div>
+        )}
+        {sp.imported && (
+          <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm text-emerald-700">
+            CSV import complete. Imported {sp.imported} contact{sp.imported === "1" ? "" : "s"}
+            {sp.skipped ? `, skipped ${sp.skipped}.` : "."}
           </div>
         )}
 

@@ -8,7 +8,7 @@ import { db } from "@/db";
 import { individualCampaigns, individualContacts, individualLists, campaignEvents, unsubscribedContacts } from "@/db/schema";
 import { SendCampaignButton } from "./_components/SendCampaignButton";
 import { decryptPassword, createGmailTransporter } from "@/lib/email/smtp";
-import { injectTracking } from "@/lib/tracking/inject";
+import { createOpenTrackingUrl, injectTracking } from "@/lib/tracking/inject";
 import { getTenantPlan } from "@/lib/plans/get-tenant-plan";
 import { INDIVIDUAL_LIMITS, type PlanTier } from "@/lib/plans/limits";
 import { buildEmailHtml, createUnsubscribeToken } from "@/lib/email/templates";
@@ -100,12 +100,16 @@ async function sendCampaign(formData: FormData) {
         ? injectTracking(rawBody, campaign.id, contact.email)
         : rawBody;
       const unsubToken = createUnsubscribeToken(contact.email);
+      const trackingPixelUrl = trackingEnabled
+        ? createOpenTrackingUrl(campaign.id, contact.email)
+        : undefined;
       const htmlBody = buildEmailHtml({
         body: trackedBody,
         campaignId: campaign.id,
         contactEmail: contact.email,
         unsubscribeToken: unsubToken,
         senderEmail: smtp.smtpEmail!,
+        trackingPixelUrl,
       });
       await transporter.sendMail({
         from: smtp.smtpEmail!,
@@ -124,12 +128,16 @@ async function sendCampaign(formData: FormData) {
         ? injectTracking(rawBody, campaign.id, contact.email)
         : rawBody;
       const unsubToken = createUnsubscribeToken(contact.email);
+      const trackingPixelUrl = trackingEnabled
+        ? createOpenTrackingUrl(campaign.id, contact.email)
+        : undefined;
       const htmlBody = buildEmailHtml({
         body: trackedBody,
         campaignId: campaign.id,
         contactEmail: contact.email,
         unsubscribeToken: unsubToken,
         senderEmail: "onboarding@resend.dev",
+        trackingPixelUrl,
       });
       await resend.emails.send({
         from: "OnboardFlow <onboarding@resend.dev>",

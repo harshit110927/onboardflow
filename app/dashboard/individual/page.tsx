@@ -230,19 +230,20 @@ export default async function IndividualDashboardPage() {
 
   // Build lookup maps
   const contactMap = Object.fromEntries(
-    contactCounts.map((r) => [r.listId, r.total])
+    contactCounts.map((r: { listId: number; total: number }) => [r.listId, r.total])
   );
   const campaignMap = Object.fromEntries(
-    campaignCounts.map((r) => [r.listId, r.total])
+    campaignCounts.map((r: { listId: number; total: number }) => [r.listId, r.total])
   );
 
   const largestListContacts =
     lists.length > 0
-      ? Math.max(...lists.map((l) => contactMap[l.id] ?? 0))
+      ? Math.max(...lists.map((l: { id: number }) => contactMap[l.id] ?? 0))
       : 0;
 
   const allListsFull =
-    lists.length > 0 && lists.every((list) => (contactMap[list.id] ?? 0) >= MAX_CONTACTS);
+    lists.length > 0 &&
+    lists.every((list: { id: number }) => (contactMap[list.id] ?? 0) >= MAX_CONTACTS);
   // FIX — enforce ordered checklist completion using actual monthly email usage for send completion
   const steps = [
     {
@@ -340,7 +341,7 @@ export default async function IndividualDashboardPage() {
             {lists.length === 0 ? (
               <EmptyState />
             ) : (
-              lists.map((list) => (
+              lists.map((list: { id: number; name: string; description: string | null; createdAt: Date | null }) => (
                 <ListCard
                   key={list.id}
                   list={list}
@@ -370,7 +371,13 @@ export default async function IndividualDashboardPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {recentCampaignsRaw.map((c) => (
+                  {recentCampaignsRaw.map((c: {
+                    id: number;
+                    subject: string;
+                    status: string;
+                    createdAt: Date | null;
+                    listName: string;
+                  }) => (
                     <tr key={c.id} className="border-b border-border last:border-0 hover:bg-secondary/30 transition-colors">
                       <td className="px-4 py-3 text-foreground font-medium">{c.subject}</td>
                       <td className="px-4 py-3 text-muted-foreground">{c.listName}</td>

@@ -75,6 +75,7 @@ export async function POST(req: Request) {
     if (!renewalFromWebhook) {
       expiresAt.setDate(expiresAt.getDate() + 35);
     }
+
     await db
       .update(tenants)
       .set({
