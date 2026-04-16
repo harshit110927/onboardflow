@@ -49,6 +49,7 @@ Rules:
 - Subject line: max 60 characters, no clickbait
 - Body: max 150 words, plain text only
 - Include one clear call to action
+- Use {name} when personalizing the recipient in the body
 - No spam trigger words (free, winner, urgent, guaranteed)
 - No HTML tags
 

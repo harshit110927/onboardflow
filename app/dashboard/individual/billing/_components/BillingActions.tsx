@@ -1,20 +1,17 @@
-// MODIFIED — razorpay credits migration — replaced Stripe actions with Razorpay credit-pack purchase card flow
 "use client";
 
 import { useState } from "react";
 
+type PlanCard = {
+  id: string;
+  label: string;
+  priceInr: number;
+  priceUsd: number;
+  highlights: readonly string[];
+};
+
 type Props = {
-  pack: {
-    id: string;
-    label: string;
-    priceInr: number;
-    priceUsd: number;
-    credits: number;
-    bonus: number;
-    highlights: readonly string[];
-  };
-  userEmail: string;
-  tier: "individual" | "enterprise";
+  plan: PlanCard;
 };
 
 declare global {
@@ -43,60 +40,37 @@ function loadRazorpayScript() {
   return razorpayScriptPromise;
 }
 
-export function BillingActions({ pack, userEmail, tier }: Props) {
+export function BillingActions({ plan }: Props) {
   const [loading, setLoading] = useState(false);
 
-  async function handlePurchase() {
+  async function handleSubscribe() {
     setLoading(true);
     try {
-      const scriptLoaded = await loadRazorpayScript();
-      if (!scriptLoaded || !window.Razorpay) {
-        alert("Unable to load Razorpay. Please try again.");
-        setLoading(false);
-        return;
-      }
+      const loaded = await loadRazorpayScript();
+      if (!loaded || !window.Razorpay) throw new Error("Razorpay failed to load");
 
-      const res = await fetch("/api/razorpay/create-order", {
+      const res = await fetch("/api/razorpay/create-subscription", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ packId: pack.id }),
+        body: JSON.stringify({ planId: plan.id }),
       });
 
-      const data = (await res.json()) as {
-        orderId?: string;
-        amount?: number;
-        error?: string;
-      };
+      const data = (await res.json()) as { subscriptionId?: string; error?: string };
+      if (!res.ok || !data.subscriptionId) throw new Error(data.error ?? "Failed to create subscription");
 
-      if (!res.ok || !data.orderId || !data.amount) {
-        throw new Error(data.error ?? "Failed to create order");
-      }
-
-      const billingPath =
-        tier === "enterprise"
-          ? "/dashboard/enterprise/billing"
-          : "/dashboard/individual/billing";
-
-      const razorpay = new window.Razorpay({
+      const rz = new window.Razorpay({
         key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
-        amount: data.amount,
-        currency: "INR",
+        subscription_id: data.subscriptionId,
         name: "OnboardFlow",
-        description: `${pack.label} — ${pack.credits.toLocaleString()} Credits`,
-        order_id: data.orderId,
-        prefill: { email: userEmail },
+        description: `${plan.label} subscription`,
         theme: { color: "#6366f1" },
-        handler: () => {
-          window.location.href = `${billingPath}?success=credits`;
-        },
-        modal: {
-          ondismiss: () => setLoading(false),
-        },
+        handler: () => window.location.reload(),
+        modal: { ondismiss: () => setLoading(false) },
       });
 
-      razorpay.open();
+      rz.open();
     } catch {
-      alert("Unable to start checkout. Please try again.");
+      alert("Unable to start subscription checkout.");
       setLoading(false);
     }
   }
@@ -104,36 +78,25 @@ export function BillingActions({ pack, userEmail, tier }: Props) {
   return (
     <div className="rounded-lg border border-border bg-card p-4 flex flex-col gap-4">
       <div>
-        <h3 className="text-lg font-semibold text-foreground">{pack.label}</h3>
+        <h3 className="text-lg font-semibold text-foreground">{plan.label}</h3>
         <p className="text-sm text-muted-foreground mt-1">
-          ₹{pack.priceInr.toLocaleString("en-IN")} / ${pack.priceUsd}
+          ₹{plan.priceInr.toLocaleString("en-IN")} / ${plan.priceUsd} per month
         </p>
-      </div>
-
-      <div>
-        <p className="text-xl font-bold text-foreground">
-          {pack.credits.toLocaleString()} credits
-        </p>
-        {pack.bonus > 0 && (
-          <span className="inline-flex mt-1 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">
-            +{pack.bonus}% bonus
-          </span>
-        )}
       </div>
 
       <ul className="text-sm text-muted-foreground space-y-1">
-        {pack.highlights.map((highlight) => (
+        {plan.highlights.map((highlight) => (
           <li key={highlight}>• {highlight}</li>
         ))}
       </ul>
 
       <button
         type="button"
-        onClick={handlePurchase}
+        onClick={handleSubscribe}
         disabled={loading}
         className="mt-auto rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
       >
-        {loading ? "Loading..." : "Buy Now"}
+        {loading ? "Loading..." : "Subscribe"}
       </button>
     </div>
   );

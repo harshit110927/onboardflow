@@ -13,7 +13,7 @@ import { getTenant } from "@/lib/auth/get-tenant";
 import { getMonthlyEmailUsage } from "@/lib/rate-limit/email-usage";
 
 import { getTenantPlan } from "@/lib/plans/get-tenant-plan";
-import { INDIVIDUAL_LIMITS } from "@/lib/plans/limits";
+import { INDIVIDUAL_LIMITS, type PlanTier } from "@/lib/plans/limits";
 
 // ── Local components ────────────────────────────────────────────────────────
 
@@ -224,7 +224,7 @@ export default async function IndividualDashboardPage() {
       getTenantPlan(tenant.id),
     ]);
 
-  const limits = INDIVIDUAL_LIMITS[planInfo.plan];
+  const limits = INDIVIDUAL_LIMITS[planInfo.plan as PlanTier];
   const MAX_LISTS = limits.maxLists;
   const MAX_CONTACTS = limits.maxContactsPerList;
 
@@ -282,11 +282,11 @@ export default async function IndividualDashboardPage() {
           </div>
           <div className="flex items-center gap-3">
             <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${
-              planInfo.plan === "premium"
+              planInfo.plan !== "free"
                 ? "bg-emerald-100 text-emerald-700"
                 : "bg-secondary text-muted-foreground"
             }`}>
-              {planInfo.plan === "premium" ? "Premium" : "Free Plan"}
+              {planInfo.plan === "free" ? "Free" : planInfo.plan.charAt(0).toUpperCase() + planInfo.plan.slice(1)}
             </span>
             <Link
               href="/dashboard/individual/lists/new"
@@ -308,24 +308,25 @@ export default async function IndividualDashboardPage() {
           {/* FIX — replace campaigns quota with monthly email usage quota */}
           <QuotaBar
             used={monthlyEmailsUsed}
-            max={50}
+            max={limits.maxEmailsPerMonth}
             label="Emails This Month"
           />
         </div>
-        {monthlyEmailsUsed >= 40 && monthlyEmailsUsed < 50 && (
+        {monthlyEmailsUsed >= Math.floor(limits.maxEmailsPerMonth * 0.8) &&
+          monthlyEmailsUsed < limits.maxEmailsPerMonth && (
           <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-            ⚠️ You&apos;ve used {monthlyEmailsUsed}/50 free emails this month.{" "}
+            ⚠️ You&apos;ve used {monthlyEmailsUsed}/{limits.maxEmailsPerMonth} emails this month.{" "}
             <Link href="/dashboard/individual/billing" className="underline">
-              Purchase credits
+              Upgrade plan
             </Link>{" "}
             to send more when you hit the limit.
           </div>
         )}
-        {monthlyEmailsUsed >= 50 && (
+        {monthlyEmailsUsed >= limits.maxEmailsPerMonth && (
           <div className="rounded-lg border border-destructive/20 bg-destructive/5 px-4 py-3 text-sm text-destructive">
-            ✕ Monthly email limit reached. Purchase credits to continue sending.{" "}
+            ✕ Monthly email limit reached. Upgrade plan to continue sending.{" "}
             <Link href="/dashboard/individual/billing" className="underline font-medium">
-              Buy credits →
+              Upgrade →
             </Link>
           </div>
         )}

@@ -4,7 +4,7 @@ import { db } from "@/db";
 import { tenants, individualLists, individualCampaigns, individualContacts, unsubscribedContacts } from "@/db/schema";
 import { eq, sql } from "drizzle-orm";
 import { getTenantPlan } from "@/lib/plans/get-tenant-plan";
-import { INDIVIDUAL_LIMITS } from "@/lib/plans/limits";
+import { INDIVIDUAL_LIMITS, type PlanTier } from "@/lib/plans/limits";
 import { decryptPassword, createGmailTransporter } from "@/lib/email/smtp";
 import { buildEmailHtml, createUnsubscribeToken } from "@/lib/email/templates";
 import { Resend } from "resend";
@@ -37,8 +37,8 @@ export async function POST(req: Request) {
     }
 
     const { plan } = await getTenantPlan(tenant.id);
-    if (plan !== "premium") {
-      return NextResponse.json({ error: "Sequences require Premium." }, { status: 403 });
+    if (!["growth", "pro"].includes(plan)) {
+      return NextResponse.json({ error: "Sequences require Growth or Pro." }, { status: 403 });
     }
 
     const { listId, steps } = await req.json() as { listId: number; steps: StepInput[] };
@@ -92,7 +92,7 @@ export async function POST(req: Request) {
 
     if (activeContacts.length > 0) {
       // FIX — enforce monthly email cap before first sequence send
-      const monthlyLimit = INDIVIDUAL_LIMITS[plan].maxEmailsPerMonth;
+      const monthlyLimit = INDIVIDUAL_LIMITS[plan as PlanTier].maxEmailsPerMonth;
       const monthlyUsed = await getMonthlyEmailUsage(tenant.id);
       if (monthlyUsed + activeContacts.length > monthlyLimit) {
         return NextResponse.json({ error: "Monthly email limit reached." }, { status: 400 });

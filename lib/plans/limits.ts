@@ -1,156 +1,130 @@
-// MODIFIED — razorpay credits migration — replaced shared credit packs with tier-specific Razorpay packs and updated credit cost constants
-
-export type PlanTier = "free" | "premium";
+export type PlanTier = "free" | "starter" | "growth" | "pro";
+export type EnterprisePlanTier = "free" | "basic" | "advanced";
 export type AccountTier = "individual" | "enterprise";
 
 export type IndividualLimits = {
   maxLists: number;
   maxContactsPerList: number;
-  maxCampaignsPerList: number;
   maxEmailsPerMonth: number;
-  maxAiGenerationsPerMonth: number;
-  sequencesEnabled: boolean;
+  csvImportEnabled: boolean;
   trackingEnabled: boolean;
+  aiEnabled: boolean;
 };
 
 export type EnterpriseLimits = {
   maxTrackedUsers: number;
-  maxEmailsPerDay: number;
   maxEmailsPerMonth: number;
   maxDripSteps: number;
-  maxApiCallsPerMonth: number;
   webhooksEnabled: boolean;
   advancedAnalyticsEnabled: boolean;
 };
 
-export type CreditPack = {
-  id: string;
-  priceInr: number;
-  priceUsd: number;
-  amountInPaise: number;
-  credits: number;
-  bonus: number;
-  label: string;
-  highlights: string[];
-};
-
 export const INDIVIDUAL_LIMITS: Record<PlanTier, IndividualLimits> = {
   free: {
-    maxLists: 3,
-    maxContactsPerList: 10,
-    // FIX — free tier now allows effectively unlimited campaigns; monthly email cap is the hard limiter
-    maxCampaignsPerList: 999,
+    maxLists: 1,
+    maxContactsPerList: 25,
     maxEmailsPerMonth: 50,
-    maxAiGenerationsPerMonth: 0,
-    sequencesEnabled: false,
+    csvImportEnabled: false,
     trackingEnabled: false,
+    aiEnabled: false,
   },
-  premium: {
-    maxLists: 25,
-    maxContactsPerList: 500,
-    maxCampaignsPerList: 10,
-    maxEmailsPerMonth: 5000,
-    maxAiGenerationsPerMonth: 20,
-    sequencesEnabled: true,
+  starter: {
+    maxLists: 3,
+    maxContactsPerList: 100,
+    maxEmailsPerMonth: 500,
+    csvImportEnabled: false,
+    trackingEnabled: false,
+    aiEnabled: false,
+  },
+  growth: {
+    maxLists: 10,
+    maxContactsPerList: 200,
+    maxEmailsPerMonth: 2000,
+    csvImportEnabled: true,
     trackingEnabled: true,
+    aiEnabled: true,
+  },
+  pro: {
+    maxLists: 15,
+    maxContactsPerList: 500,
+    maxEmailsPerMonth: 6000,
+    csvImportEnabled: true,
+    trackingEnabled: true,
+    aiEnabled: true,
   },
 };
 
-export const ENTERPRISE_LIMITS: Record<PlanTier, EnterpriseLimits> = {
+export const ENTERPRISE_LIMITS: Record<EnterprisePlanTier, EnterpriseLimits> = {
   free: {
     maxTrackedUsers: 50,
-    maxEmailsPerDay: 20,
     maxEmailsPerMonth: 300,
     maxDripSteps: 3,
-    maxApiCallsPerMonth: 1000,
     webhooksEnabled: false,
     advancedAnalyticsEnabled: false,
   },
-  premium: {
+  basic: {
+    maxTrackedUsers: 500,
+    maxEmailsPerMonth: 3000,
+    maxDripSteps: 3,
+    webhooksEnabled: false,
+    advancedAnalyticsEnabled: false,
+  },
+  advanced: {
     maxTrackedUsers: 2000,
-    maxEmailsPerDay: 500,
     maxEmailsPerMonth: 10000,
     maxDripSteps: Infinity,
-    maxApiCallsPerMonth: 50000,
     webhooksEnabled: true,
     advancedAnalyticsEnabled: true,
   },
 };
 
-export const CREDIT_COSTS = {
-  individual: {
-    emailSend: 10,
-    aiCampaignSend: 25,
-  },
-  enterprise: {
-    emailSend: 10,
-  },
-} as const;
-
-// FIX — align tier-specific credit packs with current pricing model
-export const INDIVIDUAL_CREDIT_PACKS = [
+export const INDIVIDUAL_PLANS = [
   {
-    id: "credits_ind_5",
-    priceInr: 420,
-    priceUsd: 5,
-    amountInPaise: 42000,
-    credits: 5000,
-    bonus: 0,
+    id: "ind_starter",
     label: "Starter",
-    highlights: ["500 emails", "200 AI campaigns"],
+    priceUsd: 5,
+    priceInr: 420,
+    amountInPaise: 42000,
+    planTier: "starter" as PlanTier,
+    highlights: ["500 emails/month", "3 lists", "100 contacts/list"],
   },
   {
-    id: "credits_ind_10",
-    priceInr: 840,
+    id: "ind_growth",
+    label: "Growth",
     priceUsd: 10,
+    priceInr: 840,
     amountInPaise: 84000,
-    credits: 11000,
-    bonus: 10,
-    label: "Basic",
-    highlights: ["1,100 emails", "440 AI campaigns"],
+    planTier: "growth" as PlanTier,
+    highlights: ["2,000 emails/month", "10 lists", "CSV import", "AI writing", "Open/click tracking"],
   },
   {
-    id: "credits_ind_25",
-    priceInr: 2100,
-    priceUsd: 25,
-    amountInPaise: 210000,
-    credits: 30000,
-    bonus: 20,
+    id: "ind_pro",
     label: "Pro",
-    highlights: ["3,000 emails", "1,200 AI campaigns"],
+    priceUsd: 25,
+    priceInr: 2100,
+    amountInPaise: 210000,
+    planTier: "pro" as PlanTier,
+    highlights: ["6,000 emails/month", "15 lists", "500 contacts/list", "Everything in Growth"],
   },
 ] as const;
 
-// FIX — enterprise packs now include only $50 / $100 / $200 options
-export const ENTERPRISE_CREDIT_PACKS = [
+export const ENTERPRISE_PLANS = [
   {
-    id: "credits_ent_50",
-    priceInr: 4200,
+    id: "ent_basic",
+    label: "Basic",
+    priceUsd: 25,
+    priceInr: 2100,
+    amountInPaise: 210000,
+    planTier: "basic" as EnterprisePlanTier,
+    highlights: ["3,000 emails/month", "500 tracked users", "3 drip steps"],
+  },
+  {
+    id: "ent_advanced",
+    label: "Advanced",
     priceUsd: 50,
+    priceInr: 4200,
     amountInPaise: 420000,
-    credits: 65000,
-    bonus: 30,
-    label: "Growth",
-    highlights: ["6,500 drip emails", "Full automation"],
-  },
-  {
-    id: "credits_ent_100",
-    priceInr: 8400,
-    priceUsd: 100,
-    amountInPaise: 840000,
-    credits: 140000,
-    bonus: 40,
-    label: "Scale",
-    highlights: ["14,000 drip emails", "Full automation"],
-  },
-  {
-    id: "credits_ent_200",
-    priceInr: 16800,
-    priceUsd: 200,
-    amountInPaise: 1680000,
-    credits: 300000,
-    bonus: 50,
-    label: "Enterprise",
-    highlights: ["30,000 drip emails", "Full automation"],
+    planTier: "advanced" as EnterprisePlanTier,
+    highlights: ["10,000 emails/month", "2,000 tracked users", "Unlimited drip steps", "Webhooks", "Advanced analytics"],
   },
 ] as const;

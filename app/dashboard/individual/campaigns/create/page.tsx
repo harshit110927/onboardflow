@@ -6,7 +6,7 @@ import { individualCampaigns, individualLists } from "@/db/schema";
 import { getSession } from "@/lib/auth/get-session";
 import { getTenant } from "@/lib/auth/get-tenant";
 import { getTenantPlan } from "@/lib/plans/get-tenant-plan";
-import { INDIVIDUAL_LIMITS } from "@/lib/plans/limits";
+import { INDIVIDUAL_LIMITS, type PlanTier } from "@/lib/plans/limits";
 import { CreateCampaignForm } from "../_components/CreateCampaignForm";
 
 async function createCampaign(formData: FormData) {
@@ -32,17 +32,7 @@ async function createCampaign(formData: FormData) {
     .limit(1);
   if (!listRows[0]) return;
 
-  const { plan } = await getTenantPlan(tenant.id);
-  const maxCampaigns = INDIVIDUAL_LIMITS[plan].maxCampaignsPerList;
-
-  const existing = await db
-    .select({ total: count() })
-    .from(individualCampaigns)
-    .where(eq(individualCampaigns.listId, listId));
-
-  if ((existing[0]?.total ?? 0) >= maxCampaigns) {
-    redirect(`/dashboard/individual/campaigns/create?error=limit&listId=${listId}`);
-  }
+  await getTenantPlan(tenant.id);
 
   await db.insert(individualCampaigns).values({
     listId,
@@ -67,7 +57,7 @@ export default async function CreateCampaignPage({
   if (!tenant || tenant.tier !== "individual") redirect("/dashboard");
 
   const { plan } = await getTenantPlan(tenant.id);
-  const MAX_CAMPAIGNS_PER_LIST = INDIVIDUAL_LIMITS[plan].maxCampaignsPerList;
+  const limits = INDIVIDUAL_LIMITS[plan as PlanTier];
 
   const params = await searchParams;
 
@@ -87,11 +77,7 @@ export default async function CreateCampaignPage({
     campaignCounts.map((r) => [r.listId, r.total])
   );
 
-  const availableLists = lists.filter(
-    (l) => (campaignMap[l.id] ?? 0) < MAX_CAMPAIGNS_PER_LIST
-  );
-
-  const limitError = params.error === "limit";
+  const availableLists = lists;
 
   return (
     <div className="min-h-screen bg-background">
@@ -113,23 +99,14 @@ export default async function CreateCampaignPage({
             </p>
           </div>
 
-          {limitError && (
-            <div className="rounded-md bg-destructive/10 border border-destructive/20 px-4 py-3 text-sm text-destructive">
-              This list has reached its campaign limit on your current plan.
-            </div>
-          )}
-
           {availableLists.length === 0 ? (
             <div className="text-center py-6">
-              <p className="font-medium text-foreground">All lists have reached their campaign limit</p>
-              <p className="text-sm text-muted-foreground mt-1">
-                Upgrade to Premium for up to 10 campaigns per list.
-              </p>
+              <p className="font-medium text-foreground">You need at least one list to create campaigns</p>
               <Link
-                href="/dashboard/individual/campaigns"
+                href="/dashboard/individual/lists/new"
                 className="mt-4 inline-block text-sm rounded-md border border-border px-4 py-2 hover:bg-secondary transition-colors"
               >
-                View Existing Campaigns
+                Create List
               </Link>
             </div>
           ) : (
@@ -137,7 +114,7 @@ export default async function CreateCampaignPage({
               <CreateCampaignForm
                 availableLists={availableLists}
                 defaultListId={params.listId}
-                isPremium={plan === "premium"}
+                aiEnabled={limits.aiEnabled}
                 createAction={createCampaign}
               />
               <Link
