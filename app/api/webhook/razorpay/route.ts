@@ -26,9 +26,13 @@ export async function POST(req: Request) {
   const event = JSON.parse(body);
   const eventType = event.event;
 
+<<<<<<< codex/migrate-to-subscription-based-model-js2kvm
   const eventId =
     razorpayEventIdHeader ??
     `rz_${eventType}_${event.payload?.subscription?.entity?.id ?? event.payload?.payment?.entity?.id ?? event.created_at ?? Date.now()}`;
+=======
+  const eventId = `rz_${event.payload?.subscription?.entity?.id ?? event.payload?.payment?.entity?.id ?? Date.now()}`;
+>>>>>>> main
   const processed = await db
     .select({ id: processedWebhookEvents.id })
     .from(processedWebhookEvents)
@@ -43,6 +47,7 @@ export async function POST(req: Request) {
     const sub = event.payload.subscription.entity;
     const notes = sub.notes;
     const tenantId = notes?.tenant_id;
+<<<<<<< codex/migrate-to-subscription-based-model-js2kvm
     const planIdFromNotes = notes?.plan_id;
 
     if (!tenantId) return new NextResponse("Missing tenant note", { status: 400 });
@@ -76,6 +81,18 @@ export async function POST(req: Request) {
       expiresAt.setDate(expiresAt.getDate() + 35);
     }
 
+=======
+    const planId = notes?.plan_id;
+
+    if (!tenantId || !planId) return new NextResponse("Missing notes", { status: 400 });
+
+    const plan = allPlans.find((p) => p.id === planId);
+    if (!plan) return new NextResponse("Unknown plan", { status: 400 });
+
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + 35);
+
+>>>>>>> main
     await db
       .update(tenants)
       .set({
