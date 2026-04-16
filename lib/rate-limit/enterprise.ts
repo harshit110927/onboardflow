@@ -1,19 +1,16 @@
-// MODIFIED — phase 1 premium foundation
 import { db } from "@/db";
 import { sql } from "drizzle-orm";
-import { ENTERPRISE_LIMITS } from "@/lib/plans/limits";
+import { ENTERPRISE_LIMITS, type EnterprisePlanTier } from "@/lib/plans/limits";
 import { getTenantPlan } from "@/lib/plans/get-tenant-plan";
 
 export type RateLimitResult =
   | { allowed: true }
   | { allowed: false; reason: string; isOverage?: boolean };
 
-export async function checkEmailRateLimit(
-  tenantId: string
-): Promise<RateLimitResult> {
+export async function checkEmailRateLimit(tenantId: string): Promise<RateLimitResult> {
   try {
     const { plan } = await getTenantPlan(tenantId);
-    const limits = ENTERPRISE_LIMITS[plan];
+    const limits = ENTERPRISE_LIMITS[plan as EnterprisePlanTier];
 
     const today = new Date().toISOString().slice(0, 10);
     const month = today.slice(0, 7);
@@ -25,9 +22,7 @@ export async function checkEmailRateLimit(
     `);
 
     const rows = await db.execute(sql`
-      SELECT
-        daily_count,
-        (
+      SELECT (
           SELECT COALESCE(SUM(daily_count), 0)
           FROM email_usage
           WHERE tenant_id = ${tenantId}
@@ -38,34 +33,14 @@ export async function checkEmailRateLimit(
       AND date = ${today}
     `);
 
-    const row = rows[0] as {
-      daily_count: number;
-      monthly_count: number;
-    };
-
+    const row = rows[0] as { monthly_count: number };
     if (!row) return { allowed: true };
-
-    if (Number(row.daily_count) >= limits.maxEmailsPerDay) {
-      return {
-        allowed: false,
-        reason: `Daily email limit reached (${limits.maxEmailsPerDay}/day on ${plan} plan). ${
-          plan === "free"
-            ? "Upgrade to Enterprise Premium for 500 emails/day."
-            : "Purchase credits to send more emails today."
-        }`,
-        isOverage: plan === "premium",
-      };
-    }
 
     if (Number(row.monthly_count) >= limits.maxEmailsPerMonth) {
       return {
         allowed: false,
-        reason: `Monthly email limit reached (${limits.maxEmailsPerMonth}/month on ${plan} plan). ${
-          plan === "free"
-            ? "Upgrade to Enterprise Premium for 10,000 emails/month."
-            : "Purchase credits to send more emails this month."
-        }`,
-        isOverage: plan === "premium",
+        reason: `Monthly email limit reached (${limits.maxEmailsPerMonth}/month on ${plan} plan).`,
+        isOverage: false,
       };
     }
 
@@ -101,20 +76,16 @@ export async function incrementEmailCount(tenantId: string): Promise<void> {
 
 export async function checkEndUserLimit(
   tenantId: string,
-  currentCount: number
+  currentCount: number,
 ): Promise<RateLimitResult> {
   try {
     const { plan } = await getTenantPlan(tenantId);
-    const limits = ENTERPRISE_LIMITS[plan];
+    const limits = ENTERPRISE_LIMITS[plan as EnterprisePlanTier];
 
     if (currentCount >= limits.maxTrackedUsers) {
       return {
         allowed: false,
-        reason: `End user tracking limit reached (${limits.maxTrackedUsers} users on ${plan} plan). ${
-          plan === "free"
-            ? "Upgrade to Enterprise Premium to track up to 2,000 users."
-            : "Purchase credits to track additional users."
-        }`,
+        reason: `End user tracking limit reached (${limits.maxTrackedUsers} users on ${plan} plan).`,
       };
     }
     return { allowed: true };

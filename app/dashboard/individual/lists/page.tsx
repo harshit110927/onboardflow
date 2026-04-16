@@ -6,10 +6,9 @@ import { db } from "@/db";
 import { individualContacts, individualLists, individualCampaigns } from "@/db/schema";
 import { getSession } from "@/lib/auth/get-session";
 import { getTenant } from "@/lib/auth/get-tenant";
+import { getTenantPlan } from "@/lib/plans/get-tenant-plan";
+import { INDIVIDUAL_LIMITS, type PlanTier } from "@/lib/plans/limits";
 import { DeleteListButton } from "./_components/DeleteListButton";
-
-const MAX_LISTS = 3;
-const MAX_CONTACTS = 10;
 
 async function deleteList(formData: FormData) {
   "use server";
@@ -39,6 +38,10 @@ export default async function ListsPage() {
 
   const tenant = await getTenant(user.email);
   if (!tenant || tenant.tier !== "individual") redirect("/dashboard");
+  const { plan } = await getTenantPlan(tenant.id);
+  const limits = INDIVIDUAL_LIMITS[plan as PlanTier];
+  const MAX_LISTS = limits.maxLists;
+  const MAX_CONTACTS = limits.maxContactsPerList;
 
   const [lists, contactCounts, campaignCounts] = await Promise.all([
     db.select().from(individualLists).where(eq(individualLists.userId, tenant.id)).orderBy(individualLists.createdAt),
@@ -83,7 +86,7 @@ export default async function ListsPage() {
             </Link>
           ) : (
             <span className="text-xs px-3 py-2 rounded-md border border-border text-muted-foreground">
-              List limit reached (3/3)
+              List limit reached ({MAX_LISTS}/{MAX_LISTS})
             </span>
           )}
         </div>

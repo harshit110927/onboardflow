@@ -14,9 +14,7 @@ export default async function IndividualSettingsPage() {
   // FIX — derive effective plan inline in settings instead of extra plan query
   const now = new Date();
   const planInfo = {
-    plan: (tenant.plan === "premium" && (tenant.planExpiresAt === null || tenant.planExpiresAt > now))
-      ? "premium"
-      : "free",
+    plan: (tenant.planExpiresAt === null || tenant.planExpiresAt > now) ? tenant.plan : "free",
   } as const;
 
   return (
@@ -47,7 +45,7 @@ export default async function IndividualSettingsPage() {
               <span className="text-sm font-medium text-foreground capitalize">{planInfo.plan}</span>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">Credits</span>
+              <span className="text-sm text-muted-foreground">Plan</span>
               <span className="text-sm font-medium text-foreground">{tenant.credits?.toLocaleString() ?? 0}</span>
             </div>
             <div className="flex items-center justify-between">
@@ -63,9 +61,9 @@ export default async function IndividualSettingsPage() {
         <div className="rounded-lg border border-border bg-card p-6">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-base font-semibold text-foreground">Credits & Billing</h2>
+              <h2 className="text-base font-semibold text-foreground">Renewal & Billing</h2>
               <p className="text-sm text-muted-foreground mt-0.5">
-                Purchase credits or view transaction history.
+                Manage your plan and subscription status.
               </p>
             </div>
             <Link

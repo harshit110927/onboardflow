@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { db } from "@/db";
@@ -45,7 +45,7 @@ export default async function ListCampaignsPage({
     db
       .select()
       .from(individualLists)
-      .where(eq(individualLists.id, listId))
+      .where(and(eq(individualLists.id, listId), eq(individualLists.userId, tenant.id)))
       .limit(1),
 
     db
@@ -57,8 +57,6 @@ export default async function ListCampaignsPage({
 
   const list = listRows[0];
   if (!list) redirect("/dashboard/individual/lists");
-
-  const hasCampaign = campaigns.length > 0;
 
   return (
     <div className="min-h-screen bg-background">
@@ -88,19 +86,17 @@ export default async function ListCampaignsPage({
               Campaigns for {list.name}
             </h1>
             <p className="text-sm text-muted-foreground mt-1">
-              {hasCampaign
-                ? "This list already has a campaign. 1 campaign per list on the free plan."
+              {campaigns.length > 0
+                ? "Manage drafts, scheduled, and sent campaigns for this list."
                 : "No campaigns yet for this list."}
             </p>
           </div>
-          {!hasCampaign && (
-            <Link
-              href={`/dashboard/individual/campaigns/create?listId=${listId}`}
-              className="text-sm rounded-md bg-primary text-primary-foreground px-4 py-2 hover:opacity-90 transition-opacity"
-            >
-              + Create Campaign
-            </Link>
-          )}
+          <Link
+            href={`/dashboard/individual/campaigns/create?listId=${listId}`}
+            className="text-sm rounded-md bg-primary text-primary-foreground px-4 py-2 hover:opacity-90 transition-opacity"
+          >
+            + Create Campaign
+          </Link>
         </div>
 
         {/* Empty state */}
@@ -159,15 +155,12 @@ export default async function ListCampaignsPage({
               );
             })}
 
-            {/* Limit notice */}
             <div className="rounded-md bg-secondary/50 border border-border px-4 py-3 text-sm text-muted-foreground">
-              Free plan supports 1 campaign per list. 
-              <Link
-                href="/dashboard/individual"
-                className="ml-1 text-primary hover:underline"
-              >
-                Back to dashboard
+              Need a higher monthly send cap?{" "}
+              <Link href="/dashboard/individual/billing" className="text-primary hover:underline">
+                Upgrade your plan
               </Link>
+              .
             </div>
           </div>
         )}

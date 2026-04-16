@@ -1,8 +1,7 @@
-// MODIFIED — razorpay credits migration — added shared CreditMeter to individual top navigation
+// MODIFIED — subscription migration
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
-import CreditMeter from "@/app/_components/CreditMeter";
 import { getSession } from "@/lib/auth/get-session";
 import { getTenant } from "@/lib/auth/get-tenant";
 import { NavLinks } from "./_components/NavLinks";
@@ -20,13 +19,8 @@ export default async function IndividualLayout({
 
   // FIX — derive effective plan inline to avoid extra getTenantPlan DB call in layout
   const now = new Date();
-  const effectivePlan = tenant.plan === "premium" &&
-    (tenant.planExpiresAt === null || tenant.planExpiresAt > now)
-    ? "premium"
-    : "free";
+  const effectivePlan = tenant.planExpiresAt && tenant.planExpiresAt < now ? "free" : tenant.plan;
   const initials = user.email.slice(0, 2).toUpperCase();
-  // FIX — use tenant credits directly from existing tenant query
-  const creditBalance = tenant.credits ?? 0;
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -50,16 +44,9 @@ export default async function IndividualLayout({
 
           {/* Right side */}
           <div className="flex items-center gap-3 shrink-0">
-            <span className={`text-xs px-2.5 py-1 rounded-full font-medium hidden sm:block ${effectivePlan === "premium" ? "bg-emerald-100 text-emerald-700" : "bg-secondary text-muted-foreground"}`}>
-              {effectivePlan === "premium" ? "Premium" : "Free Plan"}
+            <span className={`text-xs px-2.5 py-1 rounded-full font-medium hidden sm:block ${effectivePlan !== "free" ? "bg-emerald-100 text-emerald-700" : "bg-secondary text-muted-foreground"}`}>
+              {effectivePlan === "free" ? "Free" : String(effectivePlan).charAt(0).toUpperCase() + String(effectivePlan).slice(1)}
             </span>
-            <div className="hidden sm:block">
-              <CreditMeter
-                credits={creditBalance}
-                tier="individual"
-                billingPath="/dashboard/individual/billing"
-              />
-            </div>
             <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-xs font-semibold">
               {initials}
             </div>
