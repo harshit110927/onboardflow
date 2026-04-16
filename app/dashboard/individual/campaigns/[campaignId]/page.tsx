@@ -8,10 +8,9 @@ import { db } from "@/db";
 import { individualCampaigns, individualContacts, individualLists, campaignEvents, unsubscribedContacts } from "@/db/schema";
 import { SendCampaignButton } from "./_components/SendCampaignButton";
 import { decryptPassword, createGmailTransporter } from "@/lib/email/smtp";
-import { injectTracking } from "@/lib/tracking/inject";
+import { createOpenTrackingUrl, injectTracking } from "@/lib/tracking/inject";
 import { getTenantPlan } from "@/lib/plans/get-tenant-plan";
-import { deductCredits } from "@/lib/credits/deduct";
-import { CREDIT_COSTS, INDIVIDUAL_LIMITS } from "@/lib/plans/limits";
+import { INDIVIDUAL_LIMITS, type PlanTier } from "@/lib/plans/limits";
 import { buildEmailHtml, createUnsubscribeToken } from "@/lib/email/templates";
 import { getSession } from "@/lib/auth/get-session";
 import { getTenant } from "@/lib/auth/get-tenant";
@@ -74,52 +73,43 @@ async function sendCampaign(formData: FormData) {
     redirect(`/dashboard/individual/campaigns/${campaignId}?error=no_active_contacts`);
   }
 
-  // ── Monthly email limit + credit check ────────────────────────────
+  // ── Monthly email limit check ────────────────────────────
   const { plan: currentPlan } = await getTenantPlan(tenant.id);
-  // FIX — use plan-specific monthly cap (free: 50, premium: 5000)
-  const monthlyLimit = INDIVIDUAL_LIMITS[currentPlan].maxEmailsPerMonth;
+  const limits = INDIVIDUAL_LIMITS[currentPlan as PlanTier];
   const monthlyUsed = await getMonthlyEmailUsage(tenant.id);
   const emailsToSend = activeContacts.length;
 
-  // FIX — hard-block free tier at 50 monthly emails before any overage credit logic
-  if (currentPlan === "free" && (monthlyUsed >= 50 || monthlyUsed + emailsToSend > monthlyLimit)) {
+  if (monthlyUsed + emailsToSend > limits.maxEmailsPerMonth) {
     redirect(`/dashboard/individual/campaigns/${campaignId}?error=monthly_limit`);
-  }
-
-  if (monthlyUsed + emailsToSend > monthlyLimit) {
-    const overage = monthlyUsed + emailsToSend - monthlyLimit;
-    const creditCost = overage * CREDIT_COSTS.individual.emailSend;
-    const deduction = await deductCredits(
-      tenant.id,
-      creditCost,
-      "usage_email",
-      `Email campaign overage — ${overage} extra email${overage !== 1 ? "s" : ""}`
-    );
-    if (!deduction.success) {
-      redirect(`/dashboard/individual/campaigns/${campaignId}?error=credits&need=${deduction.creditsNeeded}&have=${deduction.creditsHave}`);
-    }
   }
 
   // ── Send emails ───────────────────────────────────────────────────
   const smtp = tenant;
   const useGmail = smtp?.smtpVerified && smtp.smtpEmail && smtp.smtpPassword;
-  const trackingEnabled = currentPlan === "premium";
+  const trackingEnabled = limits.trackingEnabled;
 
   if (useGmail) {
     const decrypted = decryptPassword(smtp.smtpPassword!);
     const transporter = createGmailTransporter(smtp.smtpEmail!, decrypted);
     for (const contact of activeContacts) {
-      const rawBody = campaign.body.replace(/\{contact_name\}/g, contact.name);
+      const rawBody = campaign.body
+        .replace(/\{name\}/g, contact.name)
+        .replace(/\{email\}/g, contact.email)
+        .replace(/\{contact_name\}/g, contact.name);
       const trackedBody = trackingEnabled
         ? injectTracking(rawBody, campaign.id, contact.email)
         : rawBody;
       const unsubToken = createUnsubscribeToken(contact.email);
+      const trackingPixelUrl = trackingEnabled
+        ? createOpenTrackingUrl(campaign.id, contact.email)
+        : undefined;
       const htmlBody = buildEmailHtml({
         body: trackedBody,
         campaignId: campaign.id,
         contactEmail: contact.email,
         unsubscribeToken: unsubToken,
         senderEmail: smtp.smtpEmail!,
+        trackingPixelUrl,
       });
       await transporter.sendMail({
         from: smtp.smtpEmail!,
@@ -130,17 +120,24 @@ async function sendCampaign(formData: FormData) {
     }
   } else {
     for (const contact of activeContacts) {
-      const rawBody = campaign.body.replace(/\{contact_name\}/g, contact.name);
+      const rawBody = campaign.body
+        .replace(/\{name\}/g, contact.name)
+        .replace(/\{email\}/g, contact.email)
+        .replace(/\{contact_name\}/g, contact.name);
       const trackedBody = trackingEnabled
         ? injectTracking(rawBody, campaign.id, contact.email)
         : rawBody;
       const unsubToken = createUnsubscribeToken(contact.email);
+      const trackingPixelUrl = trackingEnabled
+        ? createOpenTrackingUrl(campaign.id, contact.email)
+        : undefined;
       const htmlBody = buildEmailHtml({
         body: trackedBody,
         campaignId: campaign.id,
         contactEmail: contact.email,
         unsubscribeToken: unsubToken,
         senderEmail: "onboarding@resend.dev",
+        trackingPixelUrl,
       });
       await resend.emails.send({
         from: "OnboardFlow <onboarding@resend.dev>",
@@ -229,7 +226,7 @@ export default async function CampaignDetailPage({
   let openCount = 0;
   let clickCount = 0;
 
-  if (plan === "premium" && campaign.status === "sent") {
+  if (INDIVIDUAL_LIMITS[plan as PlanTier].trackingEnabled && campaign.status === "sent") {
     const [opens, clicks] = await Promise.all([
       db.select({ total: count() }).from(campaignEvents)
         .where(and(eq(campaignEvents.campaignId, campaign.id), eq(campaignEvents.eventType, "open"))),
@@ -264,15 +261,7 @@ export default async function CampaignDetailPage({
           <span className="text-foreground truncate">{campaign.subject}</span>
         </div>
 
-        {sp.error === "credits" && (
-          <div className="rounded-lg border border-destructive/20 bg-destructive/5 px-5 py-4 text-sm text-destructive">
-            Not enough credits to send. You need {sp.need} credits but have {sp.have}.{" "}
-            <Link href="/dashboard/individual/billing" className="underline font-medium">
-              Purchase credits →
-            </Link>
-          </div>
-        )}
-        {sp.error === "no_contacts" && (
+                {sp.error === "no_contacts" && (
           <div className="rounded-lg border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-800">
             This campaign&apos;s list has no contacts yet. Add contacts before sending.
           </div>
@@ -284,10 +273,7 @@ export default async function CampaignDetailPage({
         )}
         {sp.error === "monthly_limit" && (
           <div className="rounded-lg border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-800">
-            You&apos;ve used all 50 free emails this month.
-            <Link href="/dashboard/individual/billing" className="underline font-medium ml-1">
-              Purchase credits to send more →
-            </Link>
+            You&apos;ve reached your monthly email limit for the current plan. Upgrade to continue sending.
           </div>
         )}
         {sp.success === "sent" && (
@@ -353,7 +339,7 @@ export default async function CampaignDetailPage({
         {campaign.status === "sent" && (
           <div className="rounded-lg border border-border bg-card p-6">
             <h2 className="text-base font-semibold text-foreground mb-4">Campaign Analytics</h2>
-            {plan === "premium" ? (
+            {INDIVIDUAL_LIMITS[plan as PlanTier].trackingEnabled ? (
               <div className="grid grid-cols-2 gap-4">
                 <div className="rounded-lg bg-secondary/40 p-4 text-center">
                   <p className="text-2xl font-bold text-foreground">
@@ -372,7 +358,7 @@ export default async function CampaignDetailPage({
               </div>
             ) : (
               <div className="text-center py-4">
-                <p className="text-sm text-muted-foreground">Upgrade to Premium to see open and click rates.</p>
+                <p className="text-sm text-muted-foreground">Upgrade to a plan with tracking to see open and click rates.</p>
                 <Link href="/dashboard/individual/billing" className="mt-2 inline-block text-sm text-primary underline">
                   Upgrade now
                 </Link>

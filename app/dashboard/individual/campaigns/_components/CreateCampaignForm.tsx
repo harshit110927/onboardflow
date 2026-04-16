@@ -8,11 +8,11 @@ type List = { id: number; name: string };
 type Props = {
   availableLists: List[];
   defaultListId?: string;
-  isPremium: boolean;
+  aiEnabled: boolean;
   createAction: (formData: FormData) => Promise<void>;
 };
 
-export function CreateCampaignForm({ availableLists, defaultListId, isPremium, createAction }: Props) {
+export function CreateCampaignForm({ availableLists, defaultListId, aiEnabled, createAction }: Props) {
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
 
@@ -42,7 +42,7 @@ export function CreateCampaignForm({ availableLists, defaultListId, isPremium, c
             Subject Line <span className="text-destructive">*</span>
           </label>
           <AiWriteButton
-            isPremium={isPremium}
+            aiEnabled={aiEnabled}
             onGenerated={(s, b) => { setSubject(s); setBody(b); }}
           />
         </div>

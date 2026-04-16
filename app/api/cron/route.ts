@@ -8,10 +8,9 @@ import { and, eq, isNotNull } from "drizzle-orm";
 import { checkEmailRateLimit, incrementEmailCount } from "@/lib/rate-limit/enterprise";
 import { decryptPassword, createGmailTransporter } from "@/lib/email/smtp";
 import { getTenantPlan } from "@/lib/plans/get-tenant-plan";
+import { ENTERPRISE_LIMITS, type EnterprisePlanTier } from "@/lib/plans/limits";
 import { deliverWebhookEvent } from "@/lib/webhooks/deliver";
-import { deductCredits } from "@/lib/credits/deduct";
 import { buildEmailHtml } from "@/lib/email/templates";
-import { CREDIT_COSTS } from "@/lib/plans/limits";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -52,7 +51,10 @@ export async function GET(req: Request) {
         delayHours: number;
       }[];
 
-      if (plan === "premium") {
+      const enterprisePlan = plan as EnterprisePlanTier;
+      const limits = ENTERPRISE_LIMITS[enterprisePlan];
+
+      if (enterprisePlan === "advanced") {
         const dbSteps = await db
           .select()
           .from(dripSteps)
@@ -79,6 +81,10 @@ export async function GET(req: Request) {
           { eventTrigger: tenant.step2 || "invited_teammate", emailSubject: tenant.emailSubject2 || "Keep going", emailBody: tenant.emailBody2 || "Invite your team now.", delayHours: 24 },
           { eventTrigger: tenant.step3 || "upgraded_to_pro", emailSubject: tenant.emailSubject3 || "Almost there", emailBody: tenant.emailBody3 || "Upgrade to Pro.", delayHours: 24 },
         ];
+      }
+
+      if (Number.isFinite(limits.maxDripSteps)) {
+        automationSteps = automationSteps.slice(0, limits.maxDripSteps);
       }
 
       for (const user of users) {
@@ -123,18 +129,9 @@ export async function GET(req: Request) {
           const limit = await checkEmailRateLimit(tenant.id);
 
           if (!limit.allowed) {
-            if (limit.isOverage) {
-              const deduction = await deductCredits(tenant.id, CREDIT_COSTS.enterprise.emailSend, "usage_email", "Enterprise automated email (credit overage)");
-              if (!deduction.success) {
-                console.warn(`🚫 No credits for tenant ${tenant.email}: ${deduction.error}`);
-                emailsBlocked++;
-                break;
-              }
-            } else {
-              console.warn(`🚫 Rate limit hit for tenant ${tenant.email}: ${limit.reason}`);
-              emailsBlocked++;
-              break;
-            }
+            console.warn(`🚫 Rate limit hit for tenant ${tenant.email}: ${limit.reason}`);
+            emailsBlocked++;
+            continue;
           }
 
           try {
@@ -238,7 +235,10 @@ export async function GET(req: Request) {
             const decrypted = decryptPassword(seqTenant.smtpPassword!);
             const transporter = createGmailTransporter(seqTenant.smtpEmail!, decrypted);
             for (const contact of contacts) {
-              const body = step.body.replace(/\{contact_name\}/g, contact.name);
+              const body = step.body
+                .replace(/\{name\}/g, contact.name)
+                .replace(/\{email\}/g, contact.email)
+                .replace(/\{contact_name\}/g, contact.name);
               await transporter.sendMail({
                 from: seqTenant.smtpEmail!,
                 to: contact.email,
@@ -248,7 +248,10 @@ export async function GET(req: Request) {
             }
           } else {
             for (const contact of contacts) {
-              const body = step.body.replace(/\{contact_name\}/g, contact.name);
+              const body = step.body
+                .replace(/\{name\}/g, contact.name)
+                .replace(/\{email\}/g, contact.email)
+                .replace(/\{contact_name\}/g, contact.name);
               await resend.emails.send({
                 from: "OnboardFlow <onboarding@resend.dev>",
                 to: contact.email,

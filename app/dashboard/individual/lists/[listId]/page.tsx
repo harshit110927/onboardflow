@@ -6,10 +6,9 @@ import { db } from "@/db";
 import { individualContacts, individualLists, individualCampaigns } from "@/db/schema";
 import { DeleteContactButton } from "./_components/DeleteContactButton";
 import { getTenantPlan } from "@/lib/plans/get-tenant-plan";
-import { INDIVIDUAL_LIMITS } from "@/lib/plans/limits";
+import { INDIVIDUAL_LIMITS, type PlanTier } from "@/lib/plans/limits";
 import { getSession } from "@/lib/auth/get-session";
 import { getTenant } from "@/lib/auth/get-tenant";
-
 
 async function addContact(formData: FormData) {
   "use server";
@@ -25,7 +24,7 @@ async function addContact(formData: FormData) {
   if (!tenant) return;
 
   const { plan } = await getTenantPlan(tenant.id);
-  const maxContacts = INDIVIDUAL_LIMITS[plan].maxContactsPerList;
+  const maxContacts = INDIVIDUAL_LIMITS[plan as PlanTier].maxContactsPerList;
 
   const countResult = await db.select({ total: count() }).from(individualContacts).where(eq(individualContacts.listId, listId));
   // FIX — redirect with explicit error when contact limit is reached so UI can show feedback
@@ -60,7 +59,7 @@ export default async function ListDetailPage({
   searchParams,
 }: {
   params: Promise<{ listId: string }>;
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; imported?: string; skipped?: string; import_error?: string }>;
 }) {
   const { user } = await getSession();
   if (!user?.email) redirect("/login");
@@ -74,7 +73,8 @@ export default async function ListDetailPage({
   if (isNaN(listId)) redirect("/dashboard/individual/lists");
 
   const { plan } = await getTenantPlan(tenant.id);
-  const MAX_CONTACTS = INDIVIDUAL_LIMITS[plan].maxContactsPerList;
+  const limits = INDIVIDUAL_LIMITS[plan as PlanTier];
+  const MAX_CONTACTS = limits.maxContactsPerList;
 
   const [listRows, contacts, campaignCount] = await Promise.all([
     db
@@ -119,7 +119,13 @@ export default async function ListDetailPage({
               <span>{campaigns} {campaigns === 1 ? "campaign" : "campaigns"}</span>
             </div>
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
+            {limits.csvImportEnabled && (
+              <form action={`/api/individual/lists/${list.id}/import-csv`} method="post" encType="multipart/form-data" className="flex items-center gap-2">
+                <input name="file" type="file" accept=".csv" required className="text-xs" />
+                <button type="submit" className="text-sm rounded-md border border-border px-3 py-2 hover:bg-secondary transition-colors">Import CSV</button>
+              </form>
+            )}
             <Link
               href={`/dashboard/individual/lists/${list.id}/sequences/new`}
               className="text-sm rounded-md border border-border px-4 py-2 hover:bg-secondary transition-colors"
@@ -138,6 +144,17 @@ export default async function ListDetailPage({
         {sp.error === "contact_limit" && (
           <div className="rounded-lg border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-800">
             You&apos;ve reached this list&apos;s contact limit on your current plan. Remove contacts or upgrade limits to add more.
+          </div>
+        )}
+        {sp.import_error && (
+          <div className="rounded-lg border border-destructive/20 bg-destructive/5 px-5 py-4 text-sm text-destructive">
+            CSV import failed: {sp.import_error}
+          </div>
+        )}
+        {sp.imported && (
+          <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm text-emerald-700">
+            CSV import complete. Imported {sp.imported} contact{sp.imported === "1" ? "" : "s"}
+            {sp.skipped ? `, skipped ${sp.skipped}.` : "."}
           </div>
         )}
 
