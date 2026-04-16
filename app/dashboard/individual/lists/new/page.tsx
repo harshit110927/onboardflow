@@ -6,7 +6,7 @@ import { individualLists } from "@/db/schema";
 import { getSession } from "@/lib/auth/get-session";
 import { getTenant } from "@/lib/auth/get-tenant";
 import { getTenantPlan } from "@/lib/plans/get-tenant-plan";
-import { INDIVIDUAL_LIMITS } from "@/lib/plans/limits";
+import { INDIVIDUAL_LIMITS, type PlanTier } from "@/lib/plans/limits";
 
 
 // ── Server action: create list ───────────────────────────────────────────────
@@ -25,7 +25,7 @@ async function createList(formData: FormData) {
 
   // Check limit
   const { plan } = await getTenantPlan(tenant.id);
-  const maxLists = INDIVIDUAL_LIMITS[plan].maxLists;
+  const maxLists = INDIVIDUAL_LIMITS[plan as PlanTier].maxLists;
 
   const countResult = await db
     .select({ total: count() })
