@@ -116,6 +116,26 @@ const RAZORPAY_WEBHOOK_SECRET = process.env.RAZORPAY_WEBHOOK_SECRET || '';
 const CRON_SECRET = process.env.CRON_SECRET || '';
 const DB_URL = process.env.DATABASE_URL || '';
 
+
+const DEBUG = Boolean(process.env.DEBUG);
+const VERBOSE = Boolean(process.env.VERBOSE);
+const STOP_ON_FAIL = Boolean(process.env.STOP_ON_FAIL);
+const NO_COLOR = Boolean(process.env.NO_COLOR);
+
+const c = (code) => (NO_COLOR ? (x) => x : (x) => `[${code}m${x}[0m`);
+const red = c('31');
+const green = c('32');
+const yellow = c('33');
+const cyan = c('36');
+const dim = c('2');
+const bold = c('1');
+
+let HAS_IND_SESSION = false;
+let HAS_ENT_SESSION = false;
+
+const requestLog = [];
+let currentTestLabel = 'init';
+
 const TEST_USER_EMAIL = process.env.TEST_USER_EMAIL || '';
 const TEST_ENTERPRISE_EMAIL = process.env.TEST_ENTERPRISE_EMAIL || '';
 
@@ -134,17 +154,17 @@ const state = {
 let sql = null;
 
 function pass(category, name) {
-  console.log(`PASS  [${category}] ${name}`);
+  console.log(`${green('PASS')}  [${category}] ${name}`);
   state.passed += 1;
 }
 
 function fail(category, name, error) {
-  console.log(`FAIL  [${category}] ${name} — ${error}`);
+  console.log(`${red('FAIL')}  [${category}] ${name} — ${error}`);
   state.failed += 1;
 }
 
 function skip(category, name, reason) {
-  console.log(`SKIP  [${category}] ${name} — ${reason}`);
+  console.log(`${yellow('SKIP')}  [${category}] ${name} — ${reason}`);
   state.skipped += 1;
 }
 
@@ -171,6 +191,7 @@ async function api(path, options = {}) {
   const finalHeaders = { ...headers };
   if (cookie) finalHeaders.cookie = cookie;
 
+  const start = Date.now();
   const res = await fetch(`${BASE_URL}${path}`, {
     method,
     headers: finalHeaders,
@@ -186,11 +207,50 @@ async function api(path, options = {}) {
     // non-json response
   }
 
+  requestLog.push({
+    test: currentTestLabel,
+    method,
+    path,
+    status: res.status,
+    location: res.headers.get('location') || '',
+    durationMs: Date.now() - start,
+    body: text?.slice(0, 600) || '',
+  });
+
+  if (DEBUG) {
+    console.log(dim(`[REQ] ${method} ${path} -> ${res.status} (${Date.now() - start}ms)`));
+  }
+
   return { res, text, json };
+}
+
+
+
+function likelyCauseFromRequest(entry) {
+  if (!entry) return 'No HTTP request was recorded for this test.';
+  const location = entry.location || '';
+  if ([302, 303, 307, 308].includes(entry.status) && location.includes('/login')) {
+    return 'Session cookie appears missing/expired; middleware redirected to /login.';
+  }
+  if (entry.status === 401) return 'Unauthorized: auth/session/API key missing or invalid for this route.';
+  if (entry.status === 403) return 'Forbidden: plan gate or permission check blocked access.';
+  if (entry.status === 429) return 'Rate limiter blocked this request.';
+  if (entry.status === 500) return 'Server-side exception; inspect server logs for stack trace.';
+  return 'Behavior differs from assertion; inspect response body and route implementation.';
+}
+
+async function preflightSession(cookie, dashboardPath) {
+  if (!cookie) return { ok: false, reason: 'cookie env var missing' };
+  const { res } = await api(dashboardPath, { cookie });
+  if (res.status === 200) return { ok: true, reason: 'ok' };
+  const location = res.headers.get('location') || '';
+  return { ok: false, reason: `status=${res.status}${location ? ` location=${location}` : ''}` };
 }
 
 async function runTest(category, name, fn, opts = {}) {
   try {
+    currentTestLabel = `[${category}] ${name}`;
+    if (VERBOSE) console.log(cyan(`→ ${currentTestLabel}`));
     if (opts.skipIf && opts.skipIf()) {
       skip(category, name, opts.skipReason || 'prerequisite missing');
       return;
@@ -198,7 +258,19 @@ async function runTest(category, name, fn, opts = {}) {
     await fn();
     pass(category, name);
   } catch (err) {
+    const entry = [...requestLog].reverse().find((r) => r.test === currentTestLabel);
     fail(category, name, err?.message || String(err));
+    if (entry) {
+      console.log(dim(`      ↳ Request: ${entry.method} ${entry.path} -> ${entry.status}`));
+      if (entry.location) console.log(dim(`      ↳ Location: ${entry.location}`));
+      if (entry.body) console.log(dim(`      ↳ Body: ${entry.body.slice(0, 240)}`));
+      console.log(dim(`      ↳ Likely cause: ${likelyCauseFromRequest(entry)}`));
+    } else {
+      console.log(dim('      ↳ No request captured for this test (likely local assertion/setup failure).'));
+    }
+    if (STOP_ON_FAIL) {
+      throw err;
+    }
   }
 }
 
@@ -266,6 +338,18 @@ async function resolveTenantIds() {
   await initDb();
   const { enterpriseTenantId, individualTenantId } = await resolveTenantIds();
 
+  const indSession = await preflightSession(IND_COOKIE, '/dashboard/individual');
+  const entSession = await preflightSession(ENT_COOKIE, '/dashboard/enterprise');
+  HAS_IND_SESSION = indSession.ok;
+  HAS_ENT_SESSION = entSession.ok;
+
+  if (!HAS_IND_SESSION) {
+    console.log(yellow(`Session preflight (individual): ${indSession.reason}`));
+  }
+  if (!HAS_ENT_SESSION) {
+    console.log(yellow(`Session preflight (enterprise): ${entSession.reason}`));
+  }
+
   // ---------------------------------------------------------------------------
   // 1. Auth and middleware
   // ---------------------------------------------------------------------------
@@ -278,19 +362,19 @@ async function resolveTenantIds() {
   await runTest('auth/middleware', 'Authenticated user with tier=individual is routed to individual dashboard access', async () => {
     const { res } = await api('/dashboard/individual', { cookie: IND_COOKIE });
     assert(res.status === 200, `expected 200 got ${res.status}`);
-  }, { skipIf: () => !IND_COOKIE, skipReason: 'TEST_INDIVIDUAL_COOKIE missing' });
+  }, { skipIf: () => !HAS_IND_SESSION, skipReason: 'TEST_INDIVIDUAL_COOKIE missing' });
 
   await runTest('auth/middleware', 'Authenticated user with tier=enterprise is routed to enterprise dashboard access', async () => {
     const { res } = await api('/dashboard/enterprise', { cookie: ENT_COOKIE });
     assert(res.status === 200, `expected 200 got ${res.status}`);
-  }, { skipIf: () => !ENT_COOKIE, skipReason: 'TEST_ENTERPRISE_COOKIE missing' });
+  }, { skipIf: () => !HAS_ENT_SESSION, skipReason: 'TEST_ENTERPRISE_COOKIE missing' });
 
   await runTest('auth/middleware', '/tier-selection inaccessible to users who already have a tier', async () => {
     const { res } = await api('/tier-selection', { cookie: ENT_COOKIE });
     assert([302, 303, 307, 308].includes(res.status), `expected redirect got ${res.status}`);
     const location = res.headers.get('location') || '';
     assert(location.includes('/dashboard/enterprise'), `expected redirect to enterprise dashboard got ${location}`);
-  }, { skipIf: () => !ENT_COOKIE, skipReason: 'TEST_ENTERPRISE_COOKIE missing' });
+  }, { skipIf: () => !HAS_ENT_SESSION, skipReason: 'TEST_ENTERPRISE_COOKIE missing' });
 
   await runTest('auth/middleware', 'Authenticated user with no tier redirects to /tier-selection', async () => {
     // Needs a cookie for a user whose tenant.tier is NULL.
@@ -326,7 +410,7 @@ async function resolveTenantIds() {
       assert(res.status === 403, `expected 403 (free tier behavior) got ${res.status}`);
     });
   }, {
-    skipIf: () => !sql || !individualTenantId || !IND_COOKIE || !process.env.TEST_INDIVIDUAL_LIST_ID,
+    skipIf: () => !sql || !individualTenantId || !HAS_IND_SESSION || !process.env.TEST_INDIVIDUAL_LIST_ID,
     skipReason: 'DATABASE_URL + individual tenant + cookie + TEST_INDIVIDUAL_LIST_ID required',
   });
 
@@ -353,7 +437,7 @@ async function resolveTenantIds() {
       assert(res.status === 403, `expected downgraded free-tier block (403), got ${res.status}`);
     });
   }, {
-    skipIf: () => !sql || !individualTenantId || !IND_COOKIE || !process.env.TEST_INDIVIDUAL_LIST_ID,
+    skipIf: () => !sql || !individualTenantId || !HAS_IND_SESSION || !process.env.TEST_INDIVIDUAL_LIST_ID,
     skipReason: 'DATABASE_URL + individual tenant + cookie + list id required',
   });
 
@@ -645,7 +729,7 @@ async function resolveTenantIds() {
       assert(res.status === 403, `expected 403 got ${res.status}`);
     });
   }, {
-    skipIf: () => !sql || !individualTenantId || !IND_COOKIE || !process.env.TEST_INDIVIDUAL_LIST_ID,
+    skipIf: () => !sql || !individualTenantId || !HAS_IND_SESSION || !process.env.TEST_INDIVIDUAL_LIST_ID,
     skipReason: 'DATABASE_URL + individual tenant + cookie + list id required',
   });
 
@@ -672,7 +756,7 @@ async function resolveTenantIds() {
       assert([200, 303].includes(res.status), `expected 200/303 got ${res.status}`);
     });
   }, {
-    skipIf: () => !sql || !individualTenantId || !IND_COOKIE || !process.env.TEST_INDIVIDUAL_LIST_ID,
+    skipIf: () => !sql || !individualTenantId || !HAS_IND_SESSION || !process.env.TEST_INDIVIDUAL_LIST_ID,
     skipReason: 'DATABASE_URL + individual tenant + cookie + list id required',
   });
 
@@ -692,7 +776,7 @@ async function resolveTenantIds() {
       assert(res.status === 403, `expected 403 got ${res.status}`);
     });
   }, {
-    skipIf: () => !sql || !individualTenantId || !IND_COOKIE,
+    skipIf: () => !sql || !individualTenantId || !HAS_IND_SESSION,
     skipReason: 'DATABASE_URL + individual tenant + cookie required',
   });
 
@@ -713,7 +797,7 @@ async function resolveTenantIds() {
       assert(res.status !== 403, `expected non-403 in pro tier got ${res.status}`);
     });
   }, {
-    skipIf: () => !sql || !individualTenantId || !IND_COOKIE,
+    skipIf: () => !sql || !individualTenantId || !HAS_IND_SESSION,
     skipReason: 'DATABASE_URL + individual tenant + cookie required',
   });
 
@@ -742,7 +826,7 @@ async function resolveTenantIds() {
       assert(createB.res.status === 403, `expected second list blocked in free tier got ${createB.res.status}`);
     });
   }, {
-    skipIf: () => !sql || !individualTenantId || !IND_COOKIE,
+    skipIf: () => !sql || !individualTenantId || !HAS_IND_SESSION,
     skipReason: 'DATABASE_URL + individual tenant + cookie required',
   });
 
@@ -768,7 +852,7 @@ async function resolveTenantIds() {
       assert(advGet.res.status === 200, `expected advanced webhook access 200 got ${advGet.res.status}`);
     });
   }, {
-    skipIf: () => !sql || !enterpriseTenantId || !ENT_COOKIE,
+    skipIf: () => !sql || !enterpriseTenantId || !HAS_ENT_SESSION,
     skipReason: 'DATABASE_URL + enterprise tenant + cookie required',
   });
 
@@ -938,7 +1022,7 @@ async function resolveTenantIds() {
         await sql`delete from individual_lists where id = ${createdListId}`;
       });
     }
-  }, { skipIf: () => !IND_COOKIE, skipReason: 'TEST_INDIVIDUAL_COOKIE missing' });
+  }, { skipIf: () => !HAS_IND_SESSION, skipReason: 'TEST_INDIVIDUAL_COOKIE missing' });
 
   await runTest('individual/crud', 'Create contact and duplicate contact handling', async () => {
     assert(IND_COOKIE && createdListId, 'individual cookie and created list required');
@@ -959,7 +1043,7 @@ async function resolveTenantIds() {
       body: JSON.stringify({ name: 'Contact One', email }),
     });
     assert([200, 201, 409].includes(c2.res.status), `expected dedupe behavior status got ${c2.res.status}`);
-  }, { skipIf: () => !IND_COOKIE || !createdListId, skipReason: 'Requires prior list creation test to pass' });
+  }, { skipIf: () => !HAS_IND_SESSION || !createdListId, skipReason: 'Requires prior list creation test to pass' });
 
   await runTest('individual/crud', 'Create campaign', async () => {
     assert(IND_COOKIE && createdListId, 'individual cookie and created list required');
@@ -971,7 +1055,7 @@ async function resolveTenantIds() {
     });
     assert([200, 201].includes(r.res.status), `expected 200/201 got ${r.res.status}`);
     createdCampaignId = r.json?.campaign?.id || null;
-  }, { skipIf: () => !IND_COOKIE || !createdListId, skipReason: 'Requires prior list creation test to pass' });
+  }, { skipIf: () => !HAS_IND_SESSION || !createdListId, skipReason: 'Requires prior list creation test to pass' });
 
   await runTest('individual/crud', 'Send campaign / unsubscribe flow / unsubscribed resend prevention', async () => {
     throw new Error('No direct send-campaign API route exists in current app/api surface.');
@@ -1012,7 +1096,7 @@ async function resolveTenantIds() {
       assert(get.json.steps.some((s) => s.eventTrigger === 'connect_repo'), 'expected stored drip step not found');
     });
   }, {
-    skipIf: () => !sql || !enterpriseTenantId || !ENT_COOKIE,
+    skipIf: () => !sql || !enterpriseTenantId || !HAS_ENT_SESSION,
     skipReason: 'DATABASE_URL + enterprise tenant + enterprise cookie required',
   });
 
@@ -1046,7 +1130,7 @@ async function resolveTenantIds() {
       assert(del.res.status === 200, `expected delete 200 got ${del.res.status}`);
     });
   }, {
-    skipIf: () => !sql || !enterpriseTenantId || !ENT_COOKIE,
+    skipIf: () => !sql || !enterpriseTenantId || !HAS_ENT_SESSION,
     skipReason: 'DATABASE_URL + enterprise tenant + enterprise cookie required',
   });
 
@@ -1095,7 +1179,7 @@ async function resolveTenantIds() {
       });
     });
   }, {
-    skipIf: () => !sql || !enterpriseTenantId || !ENT_COOKIE || !API_KEY,
+    skipIf: () => !sql || !enterpriseTenantId || !HAS_ENT_SESSION || !API_KEY,
     skipReason: 'DATABASE_URL + enterprise tenant + enterprise cookie + API key required',
   });
 
@@ -1142,7 +1226,7 @@ async function resolveTenantIds() {
       assert(r.res.status !== 500, `${path} returned 500 for malformed JSON`);
     }
   }, {
-    skipIf: () => !IND_COOKIE,
+    skipIf: () => !HAS_IND_SESSION,
     skipReason: 'TEST_INDIVIDUAL_COOKIE missing for individual malformed JSON path coverage',
   });
 
@@ -1179,7 +1263,7 @@ async function resolveTenantIds() {
   await runTest('edge', 'Extremely long strings rejected gracefully', async () => {
     const long = 'x'.repeat(12000);
 
-    if (!IND_COOKIE) {
+    if (!HAS_IND_SESSION) {
       throw new Error('TEST_INDIVIDUAL_COOKIE required to validate list/contact zod constraints');
     }
 
@@ -1191,7 +1275,7 @@ async function resolveTenantIds() {
     });
 
     assert(r.res.status === 400 || r.res.status === 413, `expected graceful reject 400/413 got ${r.res.status}`);
-  }, { skipIf: () => !IND_COOKIE, skipReason: 'TEST_INDIVIDUAL_COOKIE missing' });
+  }, { skipIf: () => !HAS_IND_SESSION, skipReason: 'TEST_INDIVIDUAL_COOKIE missing' });
 
   await runTest('edge', 'Rate limiting returns 429 under burst load', async () => {
     let got429 = false;
@@ -1215,8 +1299,12 @@ async function resolveTenantIds() {
   await closeDb();
 
   console.log('=====================================');
-  console.log(`Results: ${state.passed} passed, ${state.failed} failed, ${state.skipped} skipped`);
+  console.log(`${bold('Results')}: ${state.passed} passed, ${state.failed} failed, ${state.skipped} skipped`);
   console.log('=====================================');
+
+  if (state.failed > 0) {
+    console.log(red('Failure diagnostics (latest request per failed test shown inline above).'));
+  }
 
   process.exit(state.failed > 0 ? 1 : 0);
 })().catch(async (err) => {
