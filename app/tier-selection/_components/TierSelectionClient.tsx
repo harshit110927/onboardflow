@@ -93,11 +93,11 @@ export function TierSelectionClient() {
           </p>
           <ul className="mt-6 space-y-3 flex-1">
             {[
-              "Up to 3 email lists",
-              "Up to 10 contacts per list",
-              "1 campaign per list",
+              "1 email list",
+              "Up to 25 contacts per list",
+              "50 emails/month",
               "Email scheduling",
-              "Basic analytics",
+              "Upgrade any time",
             ].map((feature) => (
               <li
                 key={feature}

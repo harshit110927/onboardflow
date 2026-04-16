@@ -1,6 +1,9 @@
 import { createTrackingToken } from "./hmac";
 
-const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL as string;
+const BASE_URL =
+  process.env.NEXT_PUBLIC_BASE_URL ||
+  process.env.NEXT_PUBLIC_APP_URL ||
+  "http://localhost:3000";
 
 export function injectTracking(
   body: string,
@@ -15,12 +18,16 @@ export function injectTracking(
     /https?:\/\/[^\s"'<>)]+/g,
     (url) => {
       const encodedUrl = encodeURIComponent(url);
-      return `${BASE_URL}/api/track/click?cid=${campaignId}&email=${encodedEmail}&url=${encodedUrl}&token=${token}`;
+      const trackingUrl = `${BASE_URL}/api/track/click?cid=${campaignId}&email=${encodedEmail}&url=${encodedUrl}&token=${token}`;
+      return `<a href="${trackingUrl}" target="_blank" rel="noopener noreferrer">${url}</a>`;
     }
   );
 
-  // Append tracking pixel
-  const pixel = `\n\n![](${BASE_URL}/api/track/open?cid=${campaignId}&email=${encodedEmail}&token=${token})`;
+  return tracked;
+}
 
-  return tracked + pixel;
+export function createOpenTrackingUrl(campaignId: number, contactEmail: string): string {
+  const token = createTrackingToken(campaignId, contactEmail);
+  const encodedEmail = encodeURIComponent(contactEmail);
+  return `${BASE_URL}/api/track/open?cid=${campaignId}&email=${encodedEmail}&token=${token}`;
 }

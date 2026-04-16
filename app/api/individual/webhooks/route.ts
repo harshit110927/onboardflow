@@ -28,7 +28,7 @@ export async function GET() {
     if (!tenant) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const { plan } = await getTenantPlan(tenant.id);
-    if (plan !== "premium") return NextResponse.json({ error: "Webhooks require Premium." }, { status: 403 });
+    if (plan !== "advanced") return NextResponse.json({ error: "Webhooks require Advanced plan." }, { status: 403 });
 
     const rows = await db
       .select()
@@ -47,7 +47,7 @@ export async function POST(req: Request) {
     if (!tenant) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const { plan } = await getTenantPlan(tenant.id);
-    if (plan !== "premium") return NextResponse.json({ error: "Webhooks require Premium." }, { status: 403 });
+    if (plan !== "advanced") return NextResponse.json({ error: "Webhooks require Advanced plan." }, { status: 403 });
 
     const existing = await db
       .select({ id: webhooks.id })
