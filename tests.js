@@ -33,6 +33,7 @@
  *
  * ============================================================================
  * 2) DB SEEDING (idempotent SQL)
+ * NOTE: To avoid copy/paste comment-marker issues, run: node tests.js --print-seed-sql
  * ============================================================================
  * -- Tenants
  * INSERT INTO tenants (email, name, tier, plan, has_access, api_key)
@@ -83,6 +84,30 @@
 
 const crypto = require('crypto');
 
+
+const PRINT_SEED_SQL = process.argv.includes('--print-seed-sql');
+
+const SEED_SQL = `-- Tenants
+INSERT INTO tenants (email, name, tier, plan, has_access, api_key)
+VALUES
+  ('qa-individual@example.com', 'QA Individual', 'individual', 'free', true, 'qa_individual_key_123'),
+  ('qa-enterprise@example.com', 'QA Enterprise', 'enterprise', 'advanced', true, 'qa_enterprise_key_123')
+ON CONFLICT (email) DO UPDATE
+SET tier = EXCLUDED.tier,
+    plan = EXCLUDED.plan,
+    has_access = EXCLUDED.has_access,
+    api_key = EXCLUDED.api_key;
+
+-- Optional paid windows for gating tests
+UPDATE tenants
+SET plan_expires_at = NOW() + INTERVAL '30 days',
+    plan_renewal_date = NOW() + INTERVAL '30 days'
+WHERE email IN ('qa-individual@example.com', 'qa-enterprise@example.com');
+
+-- Optional deterministic cleanup
+DELETE FROM processed_webhook_events WHERE stripe_event_id LIKE 'qa_%';
+DELETE FROM end_users WHERE email LIKE 'qa-%@example.com' OR external_id LIKE 'qa-%';`;
+
 const BASE_URL = process.env.BASE_URL || 'http://localhost:3000';
 const IND_COOKIE = process.env.TEST_INDIVIDUAL_COOKIE || '';
 const ENT_COOKIE = process.env.TEST_ENTERPRISE_COOKIE || '';
@@ -93,6 +118,11 @@ const DB_URL = process.env.DATABASE_URL || '';
 
 const TEST_USER_EMAIL = process.env.TEST_USER_EMAIL || '';
 const TEST_ENTERPRISE_EMAIL = process.env.TEST_ENTERPRISE_EMAIL || '';
+
+if (PRINT_SEED_SQL) {
+  console.log(SEED_SQL);
+  process.exit(0);
+}
 
 const state = {
   passed: 0,
