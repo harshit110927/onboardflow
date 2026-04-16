@@ -41,8 +41,13 @@ export const tenants = pgTable('tenants', {
   tier: varchar("tier", { length: 20 }).$type<"enterprise" | "individual" | null>().default(null),
 
   // MODIFIED — phase 1 premium foundation
-  plan: varchar("plan", { length: 20 }).notNull().default("free"),
+  plan: varchar("plan", { length: 20 })
+    .$type<"free" | "starter" | "growth" | "pro" | "basic" | "advanced">()
+    .notNull()
+    .default("free"),
   planExpiresAt: timestamp("plan_expires_at"),
+  razorpaySubscriptionId: text("razorpay_subscription_id"),
+  planRenewalDate: timestamp("plan_renewal_date"),
   credits: integer("credits").notNull().default(0),
   creditsUpdatedAt: timestamp("credits_updated_at").defaultNow(),
 
