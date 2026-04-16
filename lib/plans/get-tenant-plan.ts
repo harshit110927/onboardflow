@@ -28,4 +28,4 @@ export const getTenantPlan = cache(async (tenantId: string): Promise<TenantPlanI
     expiresAt: tenant.planExpiresAt,
     isActive: effectivePlan !== "free",
   };
-}
+});
