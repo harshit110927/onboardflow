@@ -33,7 +33,7 @@ async function createCampaign(formData: FormData) {
   if (!listRows[0]) return;
 
   const { plan } = await getTenantPlan(tenant.id);
-  const maxCampaigns = INDIVIDUAL_LIMITS[plan].maxCampaignsPerList;
+  const maxCampaigns = 999;
 
   const existing = await db
     .select({ total: count() })
@@ -67,7 +67,7 @@ export default async function CreateCampaignPage({
   if (!tenant || tenant.tier !== "individual") redirect("/dashboard");
 
   const { plan } = await getTenantPlan(tenant.id);
-  const MAX_CAMPAIGNS_PER_LIST = INDIVIDUAL_LIMITS[plan].maxCampaignsPerList;
+  const MAX_CAMPAIGNS_PER_LIST = 999;
 
   const params = await searchParams;
 
@@ -137,7 +137,7 @@ export default async function CreateCampaignPage({
               <CreateCampaignForm
                 availableLists={availableLists}
                 defaultListId={params.listId}
-                isPremium={plan === "premium"}
+                isPremium={plan !== "free"}
                 createAction={createCampaign}
               />
               <Link

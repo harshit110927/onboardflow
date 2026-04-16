@@ -6,10 +6,9 @@ import { db } from "@/db";
 import { individualContacts, individualLists, individualCampaigns } from "@/db/schema";
 import { DeleteContactButton } from "./_components/DeleteContactButton";
 import { getTenantPlan } from "@/lib/plans/get-tenant-plan";
-import { INDIVIDUAL_LIMITS } from "@/lib/plans/limits";
+import { INDIVIDUAL_LIMITS, type PlanTier } from "@/lib/plans/limits";
 import { getSession } from "@/lib/auth/get-session";
 import { getTenant } from "@/lib/auth/get-tenant";
-
 
 async function addContact(formData: FormData) {
   "use server";
@@ -25,7 +24,7 @@ async function addContact(formData: FormData) {
   if (!tenant) return;
 
   const { plan } = await getTenantPlan(tenant.id);
-  const maxContacts = INDIVIDUAL_LIMITS[plan].maxContactsPerList;
+  const maxContacts = INDIVIDUAL_LIMITS[plan as PlanTier].maxContactsPerList;
 
   const countResult = await db.select({ total: count() }).from(individualContacts).where(eq(individualContacts.listId, listId));
   // FIX — redirect with explicit error when contact limit is reached so UI can show feedback
@@ -74,7 +73,8 @@ export default async function ListDetailPage({
   if (isNaN(listId)) redirect("/dashboard/individual/lists");
 
   const { plan } = await getTenantPlan(tenant.id);
-  const MAX_CONTACTS = INDIVIDUAL_LIMITS[plan].maxContactsPerList;
+  const limits = INDIVIDUAL_LIMITS[plan as PlanTier];
+  const MAX_CONTACTS = limits.maxContactsPerList;
 
   const [listRows, contacts, campaignCount] = await Promise.all([
     db
@@ -119,7 +119,13 @@ export default async function ListDetailPage({
               <span>{campaigns} {campaigns === 1 ? "campaign" : "campaigns"}</span>
             </div>
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
+            {limits.csvImportEnabled && (
+              <form action={`/api/individual/lists/${list.id}/import-csv`} method="post" encType="multipart/form-data" className="flex items-center gap-2">
+                <input name="file" type="file" accept=".csv" required className="text-xs" />
+                <button type="submit" className="text-sm rounded-md border border-border px-3 py-2 hover:bg-secondary transition-colors">Import CSV</button>
+              </form>
+            )}
             <Link
               href={`/dashboard/individual/lists/${list.id}/sequences/new`}
               className="text-sm rounded-md border border-border px-4 py-2 hover:bg-secondary transition-colors"

@@ -1,34 +1,9 @@
-// MODIFIED — razorpay credits migration — added Razorpay webhook with signature verification, idempotency, and credit purchase ledgering
 import crypto from "crypto";
 import { NextResponse } from "next/server";
-import { and, eq, sql } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { db } from "@/db";
-import {
-  creditTransactions,
-  processedWebhookEvents,
-  tenants,
-} from "@/db/schema";
-import {
-  ENTERPRISE_CREDIT_PACKS,
-  INDIVIDUAL_CREDIT_PACKS,
-} from "@/lib/plans/limits";
-
-type RazorpayPaymentCapturedEvent = {
-  event: string;
-  payload: {
-    payment: {
-      entity: {
-        id: string;
-        notes?: {
-          tenant_id?: string;
-          pack_id?: string;
-          credits?: string;
-          tier?: "individual" | "enterprise";
-        };
-      };
-    };
-  };
-};
+import { tenants, processedWebhookEvents } from "@/db/schema";
+import { INDIVIDUAL_PLANS, ENTERPRISE_PLANS } from "@/lib/plans/limits";
 
 export async function POST(req: Request) {
   const body = await req.text();
@@ -39,7 +14,7 @@ export async function POST(req: Request) {
   }
 
   const expected = crypto
-    .createHmac("sha256", process.env.RAZORPAY_WEBHOOK_SECRET as string)
+    .createHmac("sha256", process.env.RAZORPAY_WEBHOOK_SECRET)
     .update(body)
     .digest("hex");
 
@@ -47,68 +22,57 @@ export async function POST(req: Request) {
     return new NextResponse("Invalid signature", { status: 400 });
   }
 
-  const event = JSON.parse(body) as RazorpayPaymentCapturedEvent;
+  const event = JSON.parse(body);
+  const eventType = event.event;
 
-  if (event.event !== "payment.captured") {
-    return new NextResponse("Ignored", { status: 200 });
-  }
-
-  const payment = event.payload.payment.entity;
-  const eventId = `rz_${payment.id}`;
-
+  const eventId = `rz_${event.payload?.subscription?.entity?.id ?? event.payload?.payment?.entity?.id ?? Date.now()}`;
   const processed = await db
     .select({ id: processedWebhookEvents.id })
     .from(processedWebhookEvents)
     .where(eq(processedWebhookEvents.stripeEventId, eventId))
     .limit(1);
 
-  if (processed.length > 0) {
-    return new NextResponse("OK", { status: 200 });
+  if (processed.length > 0) return new NextResponse("OK", { status: 200 });
+
+  const allPlans = [...INDIVIDUAL_PLANS, ...ENTERPRISE_PLANS];
+
+  if (eventType === "subscription.activated" || eventType === "subscription.charged") {
+    const sub = event.payload.subscription.entity;
+    const notes = sub.notes;
+    const tenantId = notes?.tenant_id;
+    const planId = notes?.plan_id;
+
+    if (!tenantId || !planId) return new NextResponse("Missing notes", { status: 400 });
+
+    const plan = allPlans.find((p) => p.id === planId);
+    if (!plan) return new NextResponse("Unknown plan", { status: 400 });
+
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + 35);
+
+    await db
+      .update(tenants)
+      .set({
+        plan: plan.planTier,
+        planExpiresAt: expiresAt,
+        planRenewalDate: expiresAt,
+        razorpaySubscriptionId: sub.id,
+      })
+      .where(eq(tenants.id, tenantId));
   }
 
-  const notes = payment.notes;
-  const tenantId = notes?.tenant_id;
-  const packId = notes?.pack_id;
-  const tier = notes?.tier;
-  const creditAmount = Number(notes?.credits ?? 0);
+  if (eventType === "subscription.cancelled" || eventType === "subscription.expired") {
+    const sub = event.payload.subscription.entity;
+    const notes = sub.notes;
+    const tenantId = notes?.tenant_id;
+    if (!tenantId) return new NextResponse("Missing notes", { status: 400 });
 
-  if (!tenantId || !packId || !tier || !Number.isFinite(creditAmount) || creditAmount <= 0) {
-    return new NextResponse("Invalid notes", { status: 400 });
+    await db
+      .update(tenants)
+      .set({ razorpaySubscriptionId: null })
+      .where(eq(tenants.id, tenantId));
   }
 
-  const packs = tier === "enterprise" ? ENTERPRISE_CREDIT_PACKS : INDIVIDUAL_CREDIT_PACKS;
-  const pack = packs.find((item) => item.id === packId);
-  const label = pack?.label ?? "Credit Pack";
-
-  const tenantRows = await db
-    .select({ id: tenants.id })
-    .from(tenants)
-    .where(and(eq(tenants.id, tenantId), eq(tenants.tier, tier)))
-    .limit(1);
-
-  const tenant = tenantRows[0];
-  if (!tenant) {
-    return new NextResponse("Tenant not found", { status: 404 });
-  }
-
-  await db
-    .update(tenants)
-    .set({
-      credits: sql`${tenants.credits} + ${creditAmount}`,
-      creditsUpdatedAt: new Date(),
-    })
-    .where(eq(tenants.id, tenant.id));
-
-  await db.insert(creditTransactions).values({
-    tenantId: tenant.id,
-    amount: creditAmount,
-    type: "purchase",
-    description: `Credit pack — ${label} (${creditAmount.toLocaleString()} credits)`,
-  });
-
-  await db.insert(processedWebhookEvents).values({
-    stripeEventId: eventId,
-  });
-
+  await db.insert(processedWebhookEvents).values({ stripeEventId: eventId });
   return new NextResponse("OK", { status: 200 });
 }
