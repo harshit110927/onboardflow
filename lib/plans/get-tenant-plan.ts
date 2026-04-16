@@ -9,7 +9,7 @@ export type TenantPlanInfo = {
   isActive: boolean;
 };
 
-export async function getTenantPlan(tenantId: string): Promise<TenantPlanInfo> {
+export const getTenantPlan = cache(async (tenantId: string): Promise<TenantPlanInfo> => {
   const rows = await db
     .select({ plan: tenants.plan, planExpiresAt: tenants.planExpiresAt, tier: tenants.tier })
     .from(tenants)
@@ -28,4 +28,4 @@ export async function getTenantPlan(tenantId: string): Promise<TenantPlanInfo> {
     expiresAt: tenant.planExpiresAt,
     isActive: effectivePlan !== "free",
   };
-}
+});
