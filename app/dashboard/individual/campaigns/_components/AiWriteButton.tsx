@@ -3,11 +3,11 @@
 import { useState } from "react";
 
 type Props = {
-  isPremium: boolean;
+  aiEnabled: boolean;
   onGenerated: (subject: string, body: string) => void;
 };
 
-export function AiWriteButton({ isPremium, onGenerated }: Props) {
+export function AiWriteButton({ aiEnabled, onGenerated }: Props) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -17,7 +17,7 @@ export function AiWriteButton({ isPremium, onGenerated }: Props) {
     campaignType: "welcome" as "welcome" | "nurture" | "promotional",
   });
 
-  if (!isPremium) {
+  if (!aiEnabled) {
     return (
       <div className="relative group inline-block">
         <button
@@ -27,7 +27,7 @@ export function AiWriteButton({ isPremium, onGenerated }: Props) {
           ✦ AI Write
         </button>
         <div className="absolute bottom-full left-0 mb-2 hidden group-hover:block z-10 w-56 rounded-md border border-border bg-card px-3 py-2 text-xs text-muted-foreground shadow-md">
-          Available on Premium plan.
+          Available on Growth and Pro plans.
         </div>
       </div>
     );

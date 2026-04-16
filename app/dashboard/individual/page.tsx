@@ -312,16 +312,17 @@ export default async function IndividualDashboardPage() {
             label="Emails This Month"
           />
         </div>
-        {monthlyEmailsUsed >= 40 && monthlyEmailsUsed < 50 && (
+        {monthlyEmailsUsed >= Math.floor(limits.maxEmailsPerMonth * 0.8) &&
+          monthlyEmailsUsed < limits.maxEmailsPerMonth && (
           <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-            ⚠️ You&apos;ve used {monthlyEmailsUsed}/50 free emails this month.{" "}
+            ⚠️ You&apos;ve used {monthlyEmailsUsed}/{limits.maxEmailsPerMonth} emails this month.{" "}
             <Link href="/dashboard/individual/billing" className="underline">
               Upgrade plan
             </Link>{" "}
             to send more when you hit the limit.
           </div>
         )}
-        {monthlyEmailsUsed >= 50 && (
+        {monthlyEmailsUsed >= limits.maxEmailsPerMonth && (
           <div className="rounded-lg border border-destructive/20 bg-destructive/5 px-4 py-3 text-sm text-destructive">
             ✕ Monthly email limit reached. Upgrade plan to continue sending.{" "}
             <Link href="/dashboard/individual/billing" className="underline font-medium">
