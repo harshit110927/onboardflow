@@ -7,11 +7,26 @@ import { deliverWebhookEvent } from "@/lib/webhooks/deliver";
 import { checkApiRateLimit } from "@/lib/rate-limit/api";
 
 export async function POST(req: Request) {
-  const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
-  const rateLimit = checkApiRateLimit(ip);
+  const ip =
+    req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+
+  // checkApiRateLimit is now async (hits Upstash Redis)
+  const rateLimit = await checkApiRateLimit(ip);
   if (!rateLimit.allowed) {
-    return NextResponse.json({ error: "Too many requests" }, { status: 429 });
+    return NextResponse.json(
+      { error: "Too many requests" },
+      {
+        status: 429,
+        headers: {
+          "X-RateLimit-Limit": "20",
+          "X-RateLimit-Remaining": String(rateLimit.remaining),
+          "X-RateLimit-Reset": String(rateLimit.reset),
+          "Retry-After": "60",
+        },
+      },
+    );
   }
+
   const apiKey = req.headers.get("x-api-key");
   if (!apiKey)
     return NextResponse.json({ error: "Missing API Key" }, { status: 401 });
@@ -34,10 +49,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Missing data" }, { status: 400 });
 
   const user = await db.query.endUsers.findFirst({
-    where: and(
-      eq(endUsers.tenantId, tenant.id),
-      eq(endUsers.externalId, userId)
-    ),
+    where: and(eq(endUsers.tenantId, tenant.id), eq(endUsers.externalId, userId)),
   });
 
   if (!user) {
@@ -55,7 +67,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json(
       { error: "User not found. Call /identify first." },
-      { status: 404 }
+      { status: 404 },
     );
   }
 
@@ -69,7 +81,6 @@ export async function POST(req: Request) {
       .set({ completedSteps: newSteps, lastSeenAt: new Date() })
       .where(eq(endUsers.id, user.id));
 
-    // Fire webhook — non-blocking, never fail the request
     deliverWebhookEvent(tenant.id, "user.activated", {
       userId,
       stepId,
