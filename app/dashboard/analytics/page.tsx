@@ -5,16 +5,14 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import Link from "next/link";
-import { ArrowLeft, Loader2, CheckCircle2, Circle, Send, AlertCircle } from "lucide-react";
+import { ArrowLeft, Loader2, CheckCircle2, Circle } from "lucide-react";
 import { 
   BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, LabelList 
 } from "recharts";
-import { toast } from "sonner";
 
 export default function AnalyticsPage() {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<any>(null);
-  const [nudging, setNudging] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -25,37 +23,6 @@ export default function AnalyticsPage() {
     };
     fetchData();
   }, []);
-
-  // NEW: The Bulk Nudge Handler
-  const handleNudge = async (step: string, count: number) => {
-      if (count <= 0) {
-          toast.info("Everyone has already passed this step! No one to email.");
-          return;
-      }
-      
-      if (!confirm(`⚠️ REAL EMAIL WARNING ⚠️\n\nAre you sure you want to send emails to ${count} users who are stuck at ${step}?`)) return;
-
-      setNudging(true);
-      try {
-          const res = await fetch("/api/v1/nudge", {
-              method: "POST",
-              body: JSON.stringify({ targetStep: step })
-          });
-          const json = await res.json();
-          
-          if (json.success) {
-              toast.success(`🎉 Sent ${json.count} emails successfully!`);
-              // Reload to update timestamps
-              window.location.reload(); 
-          } else {
-              toast.error(json.error || "Failed to send");
-          }
-      } catch (e) {
-          toast.error("Network error");
-      } finally {
-          setNudging(false);
-      }
-  };
 
   if (loading) return <div className="h-screen flex items-center justify-center"><Loader2 className="animate-spin text-blue-600" /></div>;
   if (!data) return <div>Error loading data</div>;
@@ -91,7 +58,7 @@ export default function AnalyticsPage() {
             <Card className="col-span-4 border-l-4 border-l-blue-600 shadow-sm">
                 <CardHeader>
                     <CardTitle>Conversion Funnel</CardTitle>
-                    <CardDescription>Visualize drop-offs and <b>nudge users</b> manually.</CardDescription>
+                    <CardDescription>Visualize onboarding drop-offs in real time.</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
                     {/* CHART */}
@@ -112,7 +79,7 @@ export default function AnalyticsPage() {
                         </ResponsiveContainer>
                     </div>
 
-                    {/* NUDGE CONTROLS */}
+                    {/* DROP-OFF COUNTS */}
                     <div className="grid grid-cols-3 gap-4 pt-4 border-t bg-slate-50/50 p-4 rounded-b-lg">
                         
                         {/* Step 1 Control */}
@@ -120,13 +87,7 @@ export default function AnalyticsPage() {
                            <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Step 1 Drop-off</div>
                            <div className="text-2xl font-bold text-slate-800">{stuckAtStep1}</div>
                            <div className="text-xs text-slate-400 mb-2">users stuck</div>
-                           <Button 
-                                size="sm" className="w-full bg-blue-600 hover:bg-blue-700"
-                                onClick={() => handleNudge("step1", stuckAtStep1)}
-                                disabled={nudging || stuckAtStep1 === 0}
-                           >
-                                <Send className="w-3 h-3 mr-2" /> Nudge
-                           </Button>
+                           <div className="text-xs text-slate-500">Auto-email handled by cron</div>
                         </div>
 
                         {/* Step 2 Control */}
@@ -134,13 +95,7 @@ export default function AnalyticsPage() {
                            <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Step 2 Drop-off</div>
                            <div className="text-2xl font-bold text-slate-800">{stuckAtStep2}</div>
                            <div className="text-xs text-slate-400 mb-2">users stuck</div>
-                           <Button 
-                                size="sm" className="w-full bg-purple-600 hover:bg-purple-700"
-                                onClick={() => handleNudge("step2", stuckAtStep2)}
-                                disabled={nudging || stuckAtStep2 === 0}
-                           >
-                                <Send className="w-3 h-3 mr-2" /> Nudge
-                           </Button>
+                           <div className="text-xs text-slate-500">Auto-email handled by cron</div>
                         </div>
                         
                         {/* Step 3 Control */}
@@ -148,13 +103,7 @@ export default function AnalyticsPage() {
                            <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Step 3 Drop-off</div>
                            <div className="text-2xl font-bold text-slate-800">{stuckAtStep3}</div>
                            <div className="text-xs text-slate-400 mb-2">users stuck</div>
-                           <Button 
-                                size="sm" className="w-full bg-green-600 hover:bg-green-700"
-                                onClick={() => handleNudge("step3", stuckAtStep3)}
-                                disabled={nudging || stuckAtStep3 === 0}
-                           >
-                                <Send className="w-3 h-3 mr-2" /> Nudge
-                           </Button>
+                           <div className="text-xs text-slate-500">Auto-email handled by cron</div>
                         </div>
 
                     </div>
