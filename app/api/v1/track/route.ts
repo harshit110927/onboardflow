@@ -22,7 +22,12 @@ export async function POST(req: Request) {
   if (!tenant)
     return NextResponse.json({ error: "Invalid API Key" }, { status: 403 });
 
-  const body = await req.json();
+  let body: { userId?: string; event?: string; stepId?: string };
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+  }
   const { userId, event, stepId } = body;
 
   if (!userId || !stepId)

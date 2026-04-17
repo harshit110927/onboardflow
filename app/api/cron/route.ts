@@ -18,6 +18,15 @@ const hasReceived = (user: { automationsReceived?: string[] | null }, tag: strin
   return (user.automationsReceived || []).includes(tag);
 };
 
+function resolveEnterprisePlan(plan: string): EnterprisePlanTier {
+  if (plan === "basic" || plan === "advanced" || plan === "free") {
+    return plan;
+  }
+  // Safety fallback: if an unexpected/individual plan gets stored on an enterprise tenant,
+  // do not crash cron execution.
+  return "free";
+}
+
 export async function GET(req: Request) {
   try {
     const authHeader = req.headers.get("authorization");
@@ -51,7 +60,7 @@ export async function GET(req: Request) {
         delayHours: number;
       }[];
 
-      const enterprisePlan = plan as EnterprisePlanTier;
+      const enterprisePlan = resolveEnterprisePlan(String(plan));
       const limits = ENTERPRISE_LIMITS[enterprisePlan];
 
       if (enterprisePlan === "advanced") {
