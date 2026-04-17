@@ -1,4 +1,4 @@
-import { and, count, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, count, desc, eq, inArray } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { revalidatePath } from "next/cache";
@@ -158,7 +158,7 @@ export default async function CampaignsPage() {
     ? await db
       .select({
         campaignId: campaignEvents.campaignId,
-        total: sql<number>`count(distinct ${campaignEvents.contactEmail})`,
+        total: count(),
       })
       .from(campaignEvents)
       .where(
@@ -172,7 +172,7 @@ export default async function CampaignsPage() {
 
   const analyticsMap = new Map<number, { opens: number }>();
   for (const row of analyticsRows) {
-    analyticsMap.set(row.campaignId, { opens: Number(row.total) });
+    analyticsMap.set(row.campaignId, { opens: row.total });
   }
 
   const contactCountByList = new Map<number, number>();
@@ -231,8 +231,9 @@ export default async function CampaignsPage() {
                     const date = (c.sentAt ?? c.createdAt)?.toLocaleDateString("en-US", { month: "short", day: "numeric" });
                     const contactsInList = contactCountByList.get(c.listId) ?? 0;
                     const metrics = analyticsMap.get(c.id) ?? { opens: 0 };
+                    const adjustedOpenCount = Math.max(0, metrics.opens - contactsInList);
                     const openPct = contactsInList > 0
-                      ? Math.min(100, Math.round((metrics.opens / contactsInList) * 100))
+                      ? Math.round((adjustedOpenCount / contactsInList) * 100)
                       : 0;
 
                     return (

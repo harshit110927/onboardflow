@@ -226,11 +226,14 @@ export default async function CampaignDetailPage({
   let openCount = 0;
   if (INDIVIDUAL_LIMITS[plan as PlanTier].trackingEnabled && campaign.status === "sent") {
     const opens = await db
-      .select({ total: sql<number>`count(distinct ${campaignEvents.contactEmail})` })
+      .select({ total: count() })
       .from(campaignEvents)
       .where(and(eq(campaignEvents.campaignId, campaign.id), eq(campaignEvents.eventType, "open")));
-    openCount = Number(opens[0]?.total ?? 0);
+    openCount = opens[0]?.total ?? 0;
   }
+
+  const adjustedOpenCount = Math.max(0, openCount - contacts.length);
+  const openRate = contacts.length > 0 ? Math.round((adjustedOpenCount / contacts.length) * 100) : 0;
 
   const created = campaign.createdAt?.toLocaleDateString("en-US", {
     month: "long", day: "numeric", year: "numeric",
@@ -338,10 +341,10 @@ export default async function CampaignDetailPage({
               <div className="grid grid-cols-1 gap-4">
                 <div className="rounded-lg bg-secondary/40 p-4 text-center">
                   <p className="text-2xl font-bold text-foreground">
-                    {contacts.length > 0 ? Math.min(100, Math.round((openCount / contacts.length) * 100)) : 0}%
+                    {openRate}%
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">Open Rate</p>
-                  <p className="text-xs text-muted-foreground">{openCount} of {contacts.length}</p>
+                  <p className="text-xs text-muted-foreground">{adjustedOpenCount} of {contacts.length}</p>
                 </div>
               </div>
             ) : (
