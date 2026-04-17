@@ -31,7 +31,13 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Empty body" }, { status: 400 });
     }
 
-    const body = JSON.parse(rawBody);
+    let body: { email?: string; event?: string };
+    try {
+      body = JSON.parse(rawBody);
+    } catch {
+      return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+    }
+
     const { email, event } = body;
 
     if (!email) {
