@@ -1,0 +1,39 @@
+{
+  "name": "onboardflow",
+  "version": "1.0.4",
+  "description": "Official SDK for OnboardFlow — track user onboarding and automate drip emails.",
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "homepage": "https://www.onboardflow.xyz",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/harshit110927/onboardflow"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup src/index.ts --format cjs,esm --dts --clean",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "onboarding",
+    "drip email",
+    "saas",
+    "analytics"
+  ],
+  "author": "OnboardFlow",
+  "license": "MIT",
+  "devDependencies": {
+    "tsup": "^8.0.0",
+    "typescript": "^5.0.0"
+  }
+}

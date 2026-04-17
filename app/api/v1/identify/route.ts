@@ -2,8 +2,12 @@ import { db } from "@/db";
 import { tenants, endUsers } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 import { NextResponse } from "next/server";
+import { Resend } from "resend";
 import { checkApiRateLimit } from "@/lib/rate-limit/api";
 import { deliverWebhookEvent } from "@/lib/webhooks/deliver";
+import { buildEmailHtml } from "@/lib/email/templates";
+
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 export async function POST(req: Request) {
   try {
@@ -31,15 +35,14 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Empty body" }, { status: 400 });
     }
 
-    let body: { userId?: string; email?: string; event?: string; stepId?: string };
+    let body: { email?: string; userId?: string; event?: string };
     try {
       body = JSON.parse(rawBody);
     } catch {
       return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
     }
 
-    const { userId, email, event, stepId } = body;
-    const stepCode = stepId ?? event;
+    const { email, event } = body;
 
     if (!email) {
       return NextResponse.json({ error: "email is required" }, { status: 400 });
@@ -49,40 +52,49 @@ export async function POST(req: Request) {
       where: and(eq(endUsers.tenantId, tenant.id), eq(endUsers.email, email)),
     });
 
+    const isNewUser = !user;
+
     if (!user) {
       [user] = await db
         .insert(endUsers)
         .values({
           tenantId: tenant.id,
           email,
-          externalId: userId || email,
+          externalId: email,
           completedSteps: [],
           createdAt: new Date(),
           lastSeenAt: new Date(),
         })
         .returning();
 
-      // Fire webhook for new user — non-blocking
       deliverWebhookEvent(tenant.id, "user.identified", {
         email,
-        userId: userId || email,
+        userId: email,
       }).catch((err) => console.error("Webhook delivery error:", err));
     }
 
-    if (userId && user && user.externalId !== userId) {
-      await db
-        .update(endUsers)
-        .set({ externalId: userId, lastSeenAt: new Date() })
-        .where(eq(endUsers.id, user.id));
+    // Send welcome email immediately for new users only
+    if (isNewUser && user) {
+      const userName = email.split("@")[0];
+      const welcomeBody = tenant.emailSubject
+        ? tenant.emailBody || `Hey ${userName}, welcome! Complete your first step to get started.`
+        : `Hey ${userName}, welcome! Complete your first step to get started.`;
+
+      resend.emails.send({
+        from: "OnboardFlow <onboarding@resend.dev>",
+        to: email,
+        subject: tenant.emailSubject || "Welcome — let's get you started",
+        html: buildEmailHtml({ body: welcomeBody }),
+      }).catch((err) => console.error("Welcome email error:", err));
     }
 
-    if (stepCode && user) {
+    if (event && user) {
       const currentSteps = (user.completedSteps as string[]) || [];
-      if (!currentSteps.includes(stepCode)) {
+      if (!currentSteps.includes(event)) {
         await db
           .update(endUsers)
           .set({
-            completedSteps: [...currentSteps, stepCode],
+            completedSteps: [...currentSteps, event],
             lastSeenAt: new Date(),
           })
           .where(eq(endUsers.id, user.id));
