@@ -24,7 +24,7 @@ export default function AnalyticsPage() {
     fetchData();
   }, []);
 
-  if (loading) return <div className="h-screen flex items-center justify-center"><Loader2 className="animate-spin text-blue-600" /></div>;
+  if (loading) return <div className="h-screen flex items-center justify-center"><Loader2 className="animate-spin text-primary" /></div>;
   if (!data) return <div>Error loading data</div>;
 
   const { funnelData, activeUsers, userMatrix, totalUsers } = data;
@@ -36,7 +36,7 @@ export default function AnalyticsPage() {
   const stuckAtStep3 = (funnelData[2]?.count || 0) - (funnelData[3]?.count || 0);
 
   return (
-    <div className="min-h-screen bg-gray-50 p-8">
+    <div className="theme-deep min-h-screen bg-background p-8">
       <div className="max-w-6xl mx-auto space-y-8">
         
         {/* Header */}
@@ -55,7 +55,7 @@ export default function AnalyticsPage() {
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-7">
             
             {/* FUNNEL & NUDGE CARD */}
-            <Card className="col-span-4 border-l-4 border-l-blue-600 shadow-sm">
+            <Card className="col-span-4 border-l-4 border-l-primary shadow-sm">
                 <CardHeader>
                     <CardTitle>Conversion Funnel</CardTitle>
                     <CardDescription>Visualize onboarding drop-offs in real time.</CardDescription>
@@ -80,30 +80,30 @@ export default function AnalyticsPage() {
                     </div>
 
                     {/* DROP-OFF COUNTS */}
-                    <div className="grid grid-cols-3 gap-4 pt-4 border-t bg-slate-50/50 p-4 rounded-b-lg">
+                    <div className="grid grid-cols-3 gap-4 pt-4 border-t bg-secondary/30 p-4 rounded-b-lg">
                         
                         {/* Step 1 Control */}
                         <div className="space-y-2 text-center">
-                           <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Step 1 Drop-off</div>
-                           <div className="text-2xl font-bold text-slate-800">{stuckAtStep1}</div>
-                           <div className="text-xs text-slate-400 mb-2">users stuck</div>
-                           <div className="text-xs text-slate-500">Auto-email handled by cron</div>
+                           <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Step 1 Drop-off</div>
+                           <div className="text-2xl font-bold text-foreground">{stuckAtStep1}</div>
+                           <div className="text-xs text-muted-foreground mb-2">users stuck</div>
+                           <div className="text-xs text-muted-foreground">Auto-email handled by cron</div>
                         </div>
 
                         {/* Step 2 Control */}
-                        <div className="space-y-2 text-center border-l border-slate-200">
-                           <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Step 2 Drop-off</div>
-                           <div className="text-2xl font-bold text-slate-800">{stuckAtStep2}</div>
-                           <div className="text-xs text-slate-400 mb-2">users stuck</div>
-                           <div className="text-xs text-slate-500">Auto-email handled by cron</div>
+                        <div className="space-y-2 text-center border-l border-border">
+                           <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Step 2 Drop-off</div>
+                           <div className="text-2xl font-bold text-foreground">{stuckAtStep2}</div>
+                           <div className="text-xs text-muted-foreground mb-2">users stuck</div>
+                           <div className="text-xs text-muted-foreground">Auto-email handled by cron</div>
                         </div>
                         
                         {/* Step 3 Control */}
-                        <div className="space-y-2 text-center border-l border-slate-200">
-                           <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Step 3 Drop-off</div>
-                           <div className="text-2xl font-bold text-slate-800">{stuckAtStep3}</div>
-                           <div className="text-xs text-slate-400 mb-2">users stuck</div>
-                           <div className="text-xs text-slate-500">Auto-email handled by cron</div>
+                        <div className="space-y-2 text-center border-l border-border">
+                           <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Step 3 Drop-off</div>
+                           <div className="text-2xl font-bold text-foreground">{stuckAtStep3}</div>
+                           <div className="text-xs text-muted-foreground mb-2">users stuck</div>
+                           <div className="text-xs text-muted-foreground">Auto-email handled by cron</div>
                         </div>
 
                     </div>
@@ -132,13 +132,13 @@ export default function AnalyticsPage() {
                                 <TableRow key={i}>
                                     <TableCell className="font-medium text-xs truncate max-w-[120px]" title={u.email}>{u.email}</TableCell>
                                     <TableCell className="text-center">
-                                        {u.step1 ? <CheckCircle2 className="mx-auto h-4 w-4 text-green-500" /> : <Circle className="mx-auto h-4 w-4 text-slate-200" />}
+                                        {u.step1 ? <CheckCircle2 className="mx-auto h-4 w-4 text-emerald-600" /> : <Circle className="mx-auto h-4 w-4 text-muted-foreground/40" />}
                                     </TableCell>
                                     <TableCell className="text-center">
-                                        {u.step2 === null ? <span className="text-slate-300">-</span> : (u.step2 ? <CheckCircle2 className="mx-auto h-4 w-4 text-purple-500" /> : <Circle className="mx-auto h-4 w-4 text-slate-200" />)}
+                                        {u.step2 === null ? <span className="text-muted-foreground/60">-</span> : (u.step2 ? <CheckCircle2 className="mx-auto h-4 w-4 text-primary" /> : <Circle className="mx-auto h-4 w-4 text-muted-foreground/40" />)}
                                     </TableCell>
                                     <TableCell className="text-center">
-                                        {u.step3 === null ? <span className="text-slate-300">-</span> : (u.step3 ? <CheckCircle2 className="mx-auto h-4 w-4 text-blue-500" /> : <Circle className="mx-auto h-4 w-4 text-slate-200" />)}
+                                        {u.step3 === null ? <span className="text-muted-foreground/60">-</span> : (u.step3 ? <CheckCircle2 className="mx-auto h-4 w-4 text-primary" /> : <Circle className="mx-auto h-4 w-4 text-muted-foreground/40" />)}
                                     </TableCell>
                                 </TableRow>
                             ))}

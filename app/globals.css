@@ -52,6 +52,69 @@
     --chart-3: 291 64% 42%;
     --chart-4: 316 72% 50%;
     --chart-5: 158 64% 52%;
+
+    /* App chrome tokens */
+    --nav-bg: 243 35% 19%;
+    --nav-fg: 0 0% 93%;
+    --nav-muted: 220 17% 70%;
+    --nav-active-bg: 0 0% 100% / 0.09;
+  }
+
+  /* Dusk & Sage Deep dashboard theme (kept opt-in so auth pages are untouched). */
+  .theme-deep {
+    --background: 96 12% 93%;
+    --foreground: 213 34% 19%;
+
+    --card: 96 29% 98%;
+    --card-foreground: 213 34% 19%;
+
+    --popover: 96 29% 98%;
+    --popover-foreground: 213 34% 19%;
+
+    --primary: 143 27% 33%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 109 26% 90%;
+    --secondary-foreground: 213 34% 19%;
+
+    --muted: 106 16% 88%;
+    --muted-foreground: 143 12% 42%;
+
+    --accent: 109 26% 90%;
+    --accent-foreground: 143 41% 15%;
+
+    --border: 0 0% 0% / 0.07;
+    --input: 0 0% 0% / 0.07;
+    --ring: 143 27% 33%;
+
+    --chart-1: 143 27% 33%;
+    --chart-2: 199 33% 35%;
+    --chart-3: 168 24% 40%;
+    --chart-4: 109 22% 46%;
+    --chart-5: 213 22% 28%;
+
+    --nav-bg: 213 34% 19%;
+    --nav-fg: 96 25% 93%;
+    --nav-muted: 0 0% 100% / 0.42;
+    --nav-active-bg: 0 0% 100% / 0.09;
+  }
+
+  .theme-deep .app-shell-nav {
+    background: hsl(var(--nav-bg));
+    color: hsl(var(--nav-fg));
+    border-color: rgb(255 255 255 / 0.07);
+  }
+
+  .theme-deep .app-shell-nav a,
+  .theme-deep .app-shell-nav button,
+  .theme-deep .app-shell-nav .nav-link {
+    color: hsl(var(--nav-muted));
+  }
+
+  .theme-deep .app-shell-nav .nav-link.active {
+    color: hsl(var(--nav-fg));
+    background: hsl(var(--nav-active-bg));
+    font-weight: 500;
   }
 
   .dark {

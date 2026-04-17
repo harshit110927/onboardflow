@@ -99,11 +99,11 @@ export default function SettingsPage() {
   };
 
   if (fetching) {
-      return <div className="h-screen flex items-center justify-center"><Loader2 className="animate-spin text-blue-600" /></div>
+      return <div className="h-screen flex items-center justify-center"><Loader2 className="animate-spin text-primary" /></div>
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-8">
+    <div className="theme-deep min-h-screen bg-background p-8">
       <div className="max-w-4xl mx-auto space-y-8">
         
         {/* Header */}
@@ -120,11 +120,11 @@ export default function SettingsPage() {
         <div className="grid gap-8">
 
             {/* AUTOMATION MASTER SWITCH & RUN BUTTON */}
-            <Card className="border-blue-200 bg-blue-50/50">
+            <Card className="border-border bg-card">
                 <CardHeader className="pb-4">
                     <div className="flex items-center justify-between">
                         <div className="space-y-1">
-                            <CardTitle className="text-blue-900 flex items-center gap-2">
+                            <CardTitle className="text-foreground flex items-center gap-2">
                                 Auto-Pilot Mode
                                 {automationEnabled && (
                                     <span className="text-xs font-normal bg-green-100 text-green-700 px-2 py-0.5 rounded-full border border-green-200">
@@ -132,7 +132,7 @@ export default function SettingsPage() {
                                     </span>
                                 )}
                             </CardTitle>
-                            <CardDescription className="text-blue-700">
+                            <CardDescription className="text-muted-foreground">
                                 Automatically nudge users after 1 hour and 24 hours of inactivity.
                             </CardDescription>
                         </div>
@@ -142,7 +142,7 @@ export default function SettingsPage() {
                             <Button 
                                 variant="outline" 
                                 size="sm" 
-                                className="bg-white border-blue-200 text-blue-700 hover:bg-blue-100"
+                                className="bg-white border-border text-muted-foreground hover:bg-secondary"
                                 onClick={handleRunCron}
                                 disabled={runningCron}
                             >
@@ -156,13 +156,13 @@ export default function SettingsPage() {
                             </Button>
 
                             {/* The Toggle */}
-                            <div className="flex items-center space-x-2 border-l pl-4 border-blue-200">
+                            <div className="flex items-center space-x-2 border-l pl-4 border-border">
                                 <Switch 
                                     id="automation-mode" 
                                     checked={automationEnabled}
                                     onCheckedChange={setAutomationEnabled}
                                 />
-                                <Label htmlFor="automation-mode" className="font-bold text-blue-900">
+                                <Label htmlFor="automation-mode" className="font-bold text-foreground">
                                     {automationEnabled ? "ON" : "OFF"}
                                 </Label>
                             </div>
@@ -172,28 +172,28 @@ export default function SettingsPage() {
             </Card>
             
             {/* STEP 1: ACTIVATION */}
-            <Card className="border-l-4 border-l-blue-500 shadow-md">
+            <Card className="border-l-4 border-l-primary shadow-md">
                 <CardHeader>
                     <div className="flex items-center gap-2">
-                        <Zap className="h-5 w-5 text-blue-600" />
+                        <Zap className="h-5 w-5 text-primary" />
                         <CardTitle>Step 1: The Activation Goal</CardTitle>
                     </div>
                     <CardDescription>If a user signs up but fails to do this event, send this email.</CardDescription>
                 </CardHeader>
                 <CardContent className="grid md:grid-cols-2 gap-6">
                     <div className="space-y-4">
-                        <label className="text-sm font-bold text-gray-700">Event Name (Code)</label>
+                        <label className="text-sm font-bold text-foreground">Event Name (Code)</label>
                         <Input 
                             placeholder="e.g. connected_repo"
                             value={formData.activationStep}
                             onChange={(e) => handleChange("activationStep", e.target.value)}
                         />
-                         <div className="bg-blue-50 p-3 rounded text-xs text-blue-800">
+                         <div className="bg-secondary p-3 rounded text-xs text-foreground">
                             <b>Trigger:</b> Sent 1h after signup if event is missing.
                         </div>
                     </div>
-                    <div className="space-y-3 p-4 bg-gray-50 rounded-lg border">
-                        <div className="flex items-center gap-2 text-sm font-semibold text-gray-600"><Mail className="w-4 h-4"/> Email Content</div>
+                    <div className="space-y-3 p-4 bg-secondary/40 rounded-lg border">
+                        <div className="flex items-center gap-2 text-sm font-semibold text-muted-foreground"><Mail className="w-4 h-4"/> Email Content</div>
                         <Input 
                             placeholder="Subject Line"
                             value={formData.emailSubject}
@@ -210,25 +210,25 @@ export default function SettingsPage() {
             </Card>
 
             {/* STEP 2: ENGAGEMENT */}
-            <Card className="border-l-4 border-l-purple-500 shadow-md">
+            <Card className="border-l-4 border-l-primary shadow-md">
                 <CardHeader>
                     <div className="flex items-center gap-2">
-                        <GitCommit className="h-5 w-5 text-purple-600" />
+                        <GitCommit className="h-5 w-5 text-primary" />
                         <CardTitle>Step 2: Engagement (Optional)</CardTitle>
                     </div>
                     <CardDescription>If they complete Step 1 but stop here, nudge them forward.</CardDescription>
                 </CardHeader>
                 <CardContent className="grid md:grid-cols-2 gap-6">
                     <div className="space-y-4">
-                        <label className="text-sm font-bold text-gray-700">Event Name (Code)</label>
+                        <label className="text-sm font-bold text-foreground">Event Name (Code)</label>
                         <Input 
                             placeholder="e.g. created_project"
                             value={formData.step2}
                             onChange={(e) => handleChange("step2", e.target.value)}
                         />
                     </div>
-                    <div className="space-y-3 p-4 bg-gray-50 rounded-lg border">
-                        <div className="flex items-center gap-2 text-sm font-semibold text-gray-600"><Mail className="w-4 h-4"/> Email Content</div>
+                    <div className="space-y-3 p-4 bg-secondary/40 rounded-lg border">
+                        <div className="flex items-center gap-2 text-sm font-semibold text-muted-foreground"><Mail className="w-4 h-4"/> Email Content</div>
                         <Input 
                             placeholder="Subject: Don't stop now!"
                             value={formData.emailSubject2}
@@ -245,25 +245,25 @@ export default function SettingsPage() {
             </Card>
 
             {/* STEP 3: CONVERSION */}
-            <Card className="border-l-4 border-l-green-500 shadow-md">
+            <Card className="border-l-4 border-l-primary shadow-md">
                 <CardHeader>
                     <div className="flex items-center gap-2">
-                        <CheckCircle className="h-5 w-5 text-green-600" />
+                        <CheckCircle className="h-5 w-5 text-primary" />
                         <CardTitle>Step 3: Conversion (Optional)</CardTitle>
                     </div>
                     <CardDescription>The final push (e.g., asking them to upgrade).</CardDescription>
                 </CardHeader>
                 <CardContent className="grid md:grid-cols-2 gap-6">
                     <div className="space-y-4">
-                        <label className="text-sm font-bold text-gray-700">Event Name (Code)</label>
+                        <label className="text-sm font-bold text-foreground">Event Name (Code)</label>
                         <Input 
                             placeholder="e.g. upgraded_to_pro"
                             value={formData.step3}
                             onChange={(e) => handleChange("step3", e.target.value)}
                         />
                     </div>
-                    <div className="space-y-3 p-4 bg-gray-50 rounded-lg border">
-                        <div className="flex items-center gap-2 text-sm font-semibold text-gray-600"><Mail className="w-4 h-4"/> Email Content</div>
+                    <div className="space-y-3 p-4 bg-secondary/40 rounded-lg border">
+                        <div className="flex items-center gap-2 text-sm font-semibold text-muted-foreground"><Mail className="w-4 h-4"/> Email Content</div>
                         <Input 
                             placeholder="Subject: Unlock Pro Features"
                             value={formData.emailSubject3}

@@ -45,14 +45,12 @@ export default async function ListsPage() {
 
   const [lists, contactCounts, campaignCounts] = await Promise.all([
     db.select().from(individualLists).where(eq(individualLists.userId, tenant.id)).orderBy(individualLists.createdAt),
-    // FIX — scope contact aggregates to this tenant's lists to avoid full-table scans and pool pressure
     db
       .select({ listId: individualContacts.listId, total: count() })
       .from(individualContacts)
       .innerJoin(individualLists, eq(individualContacts.listId, individualLists.id))
       .where(eq(individualLists.userId, tenant.id))
       .groupBy(individualContacts.listId),
-    // FIX — scope campaign aggregates to this tenant's lists to avoid full-table scans and pool pressure
     db
       .select({ listId: individualCampaigns.listId, total: count() })
       .from(individualCampaigns)
@@ -65,24 +63,20 @@ export default async function ListsPage() {
   const campaignMap = Object.fromEntries(campaignCounts.map((r) => [r.listId, r.total]));
   const atLimit = lists.length >= MAX_LISTS;
 
+  const totalContacts = contactCounts.reduce((sum, row) => sum + row.total, 0);
+  const totalCampaigns = campaignCounts.reduce((sum, row) => sum + row.total, 0);
+
   return (
     <div className="min-h-screen bg-background">
-      <div className="max-w-5xl mx-auto px-4 py-10 flex flex-col gap-8">
-
-        {/* Header */}
+      <div className="max-w-6xl mx-auto px-4 py-10 flex flex-col gap-8">
         <div className="flex items-center justify-between gap-4 flex-wrap">
           <div>
-            <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
-              <Link href="/dashboard/individual" className="hover:text-foreground transition-colors">Dashboard</Link>
-              <span>/</span>
-              <span className="text-foreground">Email Lists</span>
-            </div>
-            <h1 className="text-2xl font-bold text-foreground">Email Lists</h1>
-            <p className="text-sm text-muted-foreground mt-1">{lists.length} of {MAX_LISTS} lists used</p>
+            <h1 className="text-3xl font-semibold text-foreground">Email lists</h1>
+            <p className="text-sm text-muted-foreground mt-1">Manage your contact lists and send targeted campaigns.</p>
           </div>
           {!atLimit ? (
-            <Link href="/dashboard/individual/lists/new" className="text-sm rounded-md bg-primary text-primary-foreground px-4 py-2 hover:opacity-90 transition-opacity">
-              + New List
+            <Link href="/dashboard/individual/lists/new" className="text-sm rounded-lg bg-primary text-primary-foreground px-4 py-2 hover:opacity-90 transition-opacity">
+              + New list
             </Link>
           ) : (
             <span className="text-xs px-3 py-2 rounded-md border border-border text-muted-foreground">
@@ -91,71 +85,86 @@ export default async function ListsPage() {
           )}
         </div>
 
-        {/* Lists */}
-        {lists.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20 text-center rounded-lg border border-dashed border-border">
-            <svg className="h-10 w-10 text-muted-foreground mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25H4.5a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5H4.5a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
-            </svg>
-            <p className="font-semibold text-foreground">No lists yet</p>
-            <p className="text-sm text-muted-foreground mt-1">Create your first email list to get started.</p>
-            <Link href="/dashboard/individual/lists/new" className="mt-4 text-sm rounded-md bg-primary text-primary-foreground px-4 py-2 hover:opacity-90 transition-opacity">
-              Create your first list
-            </Link>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="rounded-xl border border-border bg-card p-5">
+            <p className="text-xs uppercase tracking-wide text-muted-foreground">Total lists</p>
+            <div className="flex items-baseline justify-between mt-2">
+              <p className="text-3xl font-semibold text-foreground">{lists.length}</p>
+              <p className="text-sm text-muted-foreground">/ {MAX_LISTS} lists</p>
+            </div>
+            <div className="mt-3 h-1.5 rounded-full bg-secondary overflow-hidden">
+              <div className="h-full rounded-full bg-primary" style={{ width: `${Math.min((lists.length / MAX_LISTS) * 100, 100)}%` }} />
+            </div>
           </div>
-        ) : (
-          <div className="flex flex-col gap-3">
-            {lists.map((list) => {
-              const contacts = contactMap[list.id] ?? 0;
-              const campaigns = campaignMap[list.id] ?? 0;
-              const full = contacts >= MAX_CONTACTS;
-              const created = list.createdAt?.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-
-              return (
-                <div key={list.id} className="rounded-lg border border-border bg-card p-5 flex flex-col md:flex-row md:items-center gap-4">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <h3 className="font-semibold text-foreground">{list.name}</h3>
-                      {full && (
-                        <span className="text-xs px-2 py-0.5 rounded-full bg-destructive/10 text-destructive font-medium">List full</span>
-                      )}
-                    </div>
-                    {list.description && (
-                      <p className="text-sm text-muted-foreground truncate mt-0.5">{list.description}</p>
-                    )}
-                    <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
-                      <span>{contacts} / {MAX_CONTACTS} contacts</span>
-                      <span>{campaigns} {campaigns === 1 ? "campaign" : "campaigns"}</span>
-                      <span>Created {created}</span>
-                    </div>
-                    <div className="mt-2 h-1.5 w-full max-w-xs rounded-full bg-secondary overflow-hidden">
-                      <div
-                        className={`h-1.5 rounded-full ${full ? "bg-destructive" : "bg-primary"}`}
-                        style={{ width: `${Math.min((contacts / MAX_CONTACTS) * 100, 100)}%` }}
-                      />
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <Link href={`/dashboard/individual/lists/${list.id}`} className="text-sm rounded-md border border-border px-3 py-1.5 hover:bg-secondary transition-colors">
-                      Manage Contacts
-                    </Link>
-                    <Link href={`/dashboard/individual/lists/${list.id}/campaigns`} className="text-sm rounded-md bg-primary text-primary-foreground px-3 py-1.5 hover:opacity-90 transition-opacity">
-                      Campaigns
-                    </Link>
-                    <DeleteListButton listId={list.id} listName={list.name} deleteAction={deleteList} />
-                  </div>
-                </div>
-              );
-            })}
+          <div className="rounded-xl border border-border bg-card p-5">
+            <p className="text-xs uppercase tracking-wide text-muted-foreground">Total contacts</p>
+            <p className="text-3xl font-semibold text-foreground mt-2">{totalContacts}</p>
+            <p className="text-sm text-muted-foreground mt-1">across all lists</p>
           </div>
-        )}
-
-        <div>
-          <Link href="/dashboard/individual" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-            ← Back to Dashboard
-          </Link>
+          <div className="rounded-xl border border-border bg-card p-5">
+            <p className="text-xs uppercase tracking-wide text-muted-foreground">Campaigns sent</p>
+            <p className="text-3xl font-semibold text-foreground mt-2">{totalCampaigns}</p>
+            <p className="text-sm text-muted-foreground mt-1">all time</p>
+          </div>
         </div>
 
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {lists.map((list) => {
+            const contacts = contactMap[list.id] ?? 0;
+            const campaigns = campaignMap[list.id] ?? 0;
+            const full = contacts >= MAX_CONTACTS;
+            const created = list.createdAt?.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+            return (
+              <div key={list.id} className="rounded-xl border border-border bg-card p-5 flex flex-col gap-4">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <h3 className="text-xl font-semibold text-foreground">{list.name}</h3>
+                    {list.description && <p className="text-sm text-muted-foreground mt-1">{list.description}</p>}
+                  </div>
+                  <span className={`text-xs px-3 py-1 rounded-full ${full ? "bg-secondary text-muted-foreground" : "bg-emerald-100 text-emerald-700"}`}>
+                    {full ? "Full" : "Active"}
+                  </span>
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between text-sm text-muted-foreground mb-2">
+                    <span>Contacts</span>
+                    <span>{contacts} / {MAX_CONTACTS}</span>
+                  </div>
+                  <div className="h-1.5 rounded-full bg-secondary overflow-hidden">
+                    <div className={`h-full rounded-full ${full ? "bg-destructive" : "bg-primary"}`} style={{ width: `${Math.min((contacts / MAX_CONTACTS) * 100, 100)}%` }} />
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between text-xs text-muted-foreground">
+                  <span>{campaigns} campaigns sent</span>
+                  <span>Created {created}</span>
+                </div>
+
+                <div className="grid grid-cols-[1fr_1fr_auto] gap-2">
+                  <Link href={`/dashboard/individual/lists/${list.id}`} className="text-center rounded-lg border border-border px-3 py-2 text-sm hover:bg-secondary transition-colors">
+                    View contacts
+                  </Link>
+                  <Link href="/dashboard/individual/campaigns" className="text-center rounded-lg bg-primary text-primary-foreground px-3 py-2 text-sm hover:opacity-90 transition-opacity">
+                    Send campaign
+                  </Link>
+                  <DeleteListButton listId={list.id} listName={list.name} deleteAction={deleteList} />
+                </div>
+              </div>
+            );
+          })}
+
+          {!atLimit && (
+            <Link
+              href="/dashboard/individual/lists/new"
+              className="rounded-xl border-2 border-dashed border-border bg-transparent min-h-[230px] flex flex-col items-center justify-center text-center px-6 hover:bg-secondary/20 transition-colors"
+            >
+              <div className="h-10 w-10 rounded-full bg-secondary flex items-center justify-center text-xl text-primary mb-3">+</div>
+              <p className="text-xl font-medium text-foreground">New email list</p>
+              <p className="text-sm text-muted-foreground mt-1">{MAX_LISTS - lists.length} of {MAX_LISTS} lists remaining</p>
+            </Link>
+          )}
+        </div>
       </div>
     </div>
   );
