@@ -23,10 +23,10 @@ export default async function IndividualLayout({
   const initials = user.email.slice(0, 2).toUpperCase();
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="theme-deep min-h-screen bg-background flex flex-col">
 
       {/* Top Nav */}
-      <header className="border-b border-border bg-card sticky top-0 z-50">
+      <header className="app-shell-nav border-b sticky top-0 z-50">
         <div className="max-w-5xl mx-auto px-4 h-14 flex items-center justify-between gap-4">
 
           {/* Logo */}
@@ -34,7 +34,7 @@ export default async function IndividualLayout({
             href="/dashboard/individual"
             // FIX — avoid eager prefetch storm from persistent dashboard header links
             prefetch={false}
-            className="font-bold text-foreground tracking-tight text-base shrink-0"
+            className="font-medium tracking-tight text-base shrink-0"
           >
             OnboardFlow
           </Link>
@@ -44,10 +44,10 @@ export default async function IndividualLayout({
 
           {/* Right side */}
           <div className="flex items-center gap-3 shrink-0">
-            <span className={`text-xs px-2.5 py-1 rounded-full font-medium hidden sm:block ${effectivePlan !== "free" ? "bg-emerald-100 text-emerald-700" : "bg-secondary text-muted-foreground"}`}>
+            <span className={`text-xs px-2.5 py-1 rounded-full font-medium hidden sm:block ${effectivePlan !== "free" ? "bg-emerald-950/40 text-emerald-300" : "bg-white/10 text-white/70"}`}>
               {effectivePlan === "free" ? "Free" : String(effectivePlan).charAt(0).toUpperCase() + String(effectivePlan).slice(1)}
             </span>
-            <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-xs font-semibold">
+            <div className="h-8 w-8 rounded-full bg-emerald-800/90 flex items-center justify-center text-white text-xs font-semibold">
               {initials}
             </div>
           </div>
@@ -55,7 +55,7 @@ export default async function IndividualLayout({
         </div>
 
         {/* Mobile nav */}
-        <div className="sm:hidden border-t border-border">
+        <div className="sm:hidden border-t border-white/10">
           <div className="flex">
             {[
               { href: "/dashboard/individual", label: "Dashboard" },
@@ -67,7 +67,7 @@ export default async function IndividualLayout({
                 href={item.href}
                 // FIX — disable mobile nav prefetch for the same DB-connection protection as desktop links
                 prefetch={false}
-                className="flex-1 text-center text-xs py-2.5 text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+                className="nav-link flex-1 text-center text-xs py-2.5 hover:text-white hover:bg-white/10 transition-colors"
               >
                 {item.label}
               </Link>
