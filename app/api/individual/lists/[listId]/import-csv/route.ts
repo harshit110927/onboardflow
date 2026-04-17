@@ -57,9 +57,16 @@ export async function POST(req: Request, { params }: { params: Promise<{ listId:
 
   if (!listRows[0]) return respond({ error: "List not found" }, 404);
 
-  const { plan } = await getTenantPlan(tenant.id);
-  const limits = INDIVIDUAL_LIMITS[plan as PlanTier];
-  if (!limits.csvImportEnabled) {
+  let plan: PlanTier;
+  try {
+    const result = await getTenantPlan(tenant.id);
+    plan = result.plan as PlanTier;
+  } catch {
+    return respond({ error: "CSV import is available on Growth and Pro." }, 403);
+  }
+
+  const limits = INDIVIDUAL_LIMITS[plan];
+  if (!limits?.csvImportEnabled) {
     return respond({ error: "CSV import is available on Growth and Pro." }, 403);
   }
 
