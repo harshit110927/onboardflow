@@ -1,4 +1,4 @@
-import { and, count, desc, eq, inArray } from "drizzle-orm";
+import { and, count, desc, eq, inArray, sql } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { revalidatePath } from "next/cache";
@@ -158,25 +158,21 @@ export default async function CampaignsPage() {
     ? await db
       .select({
         campaignId: campaignEvents.campaignId,
-        eventType: campaignEvents.eventType,
-        total: count(),
+        total: sql<number>`count(distinct ${campaignEvents.contactEmail})`,
       })
       .from(campaignEvents)
       .where(
         and(
           inArray(campaignEvents.campaignId, campaignIds),
-          inArray(campaignEvents.eventType, ["open", "click"]),
+          eq(campaignEvents.eventType, "open"),
         ),
       )
-      .groupBy(campaignEvents.campaignId, campaignEvents.eventType)
+      .groupBy(campaignEvents.campaignId)
     : [];
 
-  const analyticsMap = new Map<number, { opens: number; clicks: number }>();
+  const analyticsMap = new Map<number, { opens: number }>();
   for (const row of analyticsRows) {
-    const current = analyticsMap.get(row.campaignId) ?? { opens: 0, clicks: 0 };
-    if (row.eventType === "open") current.opens = row.total;
-    if (row.eventType === "click") current.clicks = row.total;
-    analyticsMap.set(row.campaignId, current);
+    analyticsMap.set(row.campaignId, { opens: Number(row.total) });
   }
 
   const contactCountByList = new Map<number, number>();
@@ -226,7 +222,6 @@ export default async function CampaignsPage() {
                     <th className="text-left px-4 py-3 font-medium text-muted-foreground uppercase tracking-wide text-xs">List</th>
                     <th className="text-left px-4 py-3 font-medium text-muted-foreground uppercase tracking-wide text-xs">Status</th>
                     <th className="text-left px-4 py-3 font-medium text-muted-foreground uppercase tracking-wide text-xs">Opens</th>
-                    <th className="text-left px-4 py-3 font-medium text-muted-foreground uppercase tracking-wide text-xs">Clicks</th>
                     <th className="text-left px-4 py-3 font-medium text-muted-foreground uppercase tracking-wide text-xs">Date</th>
                     <th className="text-right px-4 py-3 font-medium text-muted-foreground uppercase tracking-wide text-xs">Actions</th>
                   </tr>
@@ -235,9 +230,10 @@ export default async function CampaignsPage() {
                   {campaigns.map((c) => {
                     const date = (c.sentAt ?? c.createdAt)?.toLocaleDateString("en-US", { month: "short", day: "numeric" });
                     const contactsInList = contactCountByList.get(c.listId) ?? 0;
-                    const metrics = analyticsMap.get(c.id) ?? { opens: 0, clicks: 0 };
-                    const openPct = contactsInList > 0 ? Math.round((metrics.opens / contactsInList) * 100) : 0;
-                    const clickPct = contactsInList > 0 ? Math.round((metrics.clicks / contactsInList) * 100) : 0;
+                    const metrics = analyticsMap.get(c.id) ?? { opens: 0 };
+                    const openPct = contactsInList > 0
+                      ? Math.min(100, Math.round((metrics.opens / contactsInList) * 100))
+                      : 0;
 
                     return (
                       <tr key={c.id} className="border-b border-border last:border-b-0 hover:bg-secondary/20">
@@ -246,9 +242,6 @@ export default async function CampaignsPage() {
                         <td className="px-4 py-3"><StatusBadge status={c.status} /></td>
                         <td className="px-4 py-3 text-foreground">
                           {c.status === "sent" && trackingEnabled ? `${openPct}%` : "—"}
-                        </td>
-                        <td className="px-4 py-3 text-foreground">
-                          {c.status === "sent" && trackingEnabled ? `${clickPct}%` : "—"}
                         </td>
                         <td className="px-4 py-3 text-muted-foreground">{date}</td>
                         <td className="px-4 py-3">

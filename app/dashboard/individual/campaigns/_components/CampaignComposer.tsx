@@ -145,7 +145,7 @@ export function CampaignComposer({
           </div>
 
           <div className="rounded-lg border border-border p-4 bg-secondary/30">
-            <div className="text-sm font-medium text-foreground mb-1">Open & click tracking</div>
+            <div className="text-sm font-medium text-foreground mb-1">Open tracking</div>
             <p className="text-xs text-muted-foreground">Rates will appear once campaign is sent (plan permitting).</p>
           </div>
         </div>

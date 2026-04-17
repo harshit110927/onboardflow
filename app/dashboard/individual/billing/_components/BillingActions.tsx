@@ -92,7 +92,7 @@ export function BillingActions({ plan, isCurrent }: Props) {
 
       <ul className="text-sm text-muted-foreground space-y-1">
         {plan.highlights.map((highlight) => (
-          <li key={highlight}>• {highlight}</li>
+          <li key={highlight}>• {highlight.replace(/open\/?click\s*tracking/i, "Open tracking")}</li>
         ))}
       </ul>
 
