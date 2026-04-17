@@ -29,8 +29,9 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
   const { userId, event, stepId } = body;
+  const stepCode = stepId ?? event;
 
-  if (!userId || !stepId)
+  if (!userId || !stepCode)
     return NextResponse.json({ error: "Missing data" }, { status: 400 });
 
   const user = await db.query.endUsers.findFirst({
@@ -61,8 +62,8 @@ export async function POST(req: Request) {
 
   const currentSteps = (user.completedSteps as string[]) || [];
 
-  if (!currentSteps.includes(stepId)) {
-    const newSteps = [...currentSteps, stepId];
+  if (!currentSteps.includes(stepCode)) {
+    const newSteps = [...currentSteps, stepCode];
 
     await db
       .update(endUsers)
@@ -72,10 +73,10 @@ export async function POST(req: Request) {
     // Fire webhook — non-blocking, never fail the request
     deliverWebhookEvent(tenant.id, "user.activated", {
       userId,
-      stepId,
+      stepId: stepCode,
       completedSteps: newSteps,
     }).catch((err) => console.error("Webhook delivery error:", err));
   }
 
-  return NextResponse.json({ success: true, step: stepId });
+  return NextResponse.json({ success: true, step: stepCode });
 }

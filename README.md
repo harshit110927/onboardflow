@@ -67,45 +67,33 @@ Install the package via your preferred package manager:
 
 Create a shared utility file at lib/onboardflow.ts:
 
-    import { OnboardFlow } from '@onboardflow/sdk';
+    import { OnboardFlow } from 'onboardflow';
     
-    export const onboard = new OnboardFlow({
-      apiKey: process.env.NEXT_PUBLIC_ONBOARDFLOW_KEY,
-    });
+    export const onboard = new OnboardFlow(
+      process.env.NEXT_PUBLIC_ONBOARDFLOW_KEY!
+    );
 
 ### Protect routes
 
 In your middleware.ts file:
 
-    import { onboardMiddleware } from '@onboardflow/sdk/next';
-    
-    export default onboardMiddleware({
-      publicRoutes: ['/', '/login', '/pricing', '/api/webhook'],
-      redirectTo: '/login',
-    });
-    
-    export const config = {
-      matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
-    };
+    // Middleware helper is not available yet.
+    // Use your existing app auth middleware and call onboard.identify/track from your app code.
 
 ### Access user sessions
 
     import { onboard } from '@/lib/onboardflow';
-    
-    export default async function Dashboard() {
-      const session = await onboard.getSession();
-      if (!session) return ;
-    
-      return (
-        
-      );
-    }
+
+    await onboard.identify({
+      userId: "user_123",
+      email: "alice@example.com"
+    });
 
 ### Track onboarding events
 
-    await onboard.events.track('feature_used', {
-      featureName: 'AI Generator',
-      userId: session.user.id
+    await onboard.track({
+      userId: "user_123",
+      eventName: "feature_used",
     });
 
 ---

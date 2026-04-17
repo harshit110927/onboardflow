@@ -7,8 +7,8 @@ export class OnboardFlow {
   
     constructor(apiKey: string, options?: { baseUrl?: string }) {
       this.apiKey = apiKey;
-      // Default to production, but allow localhost for testing
-      this.baseUrl = options?.baseUrl || "http://localhost:3000/api/v1";
+      // Default to production, but allow overrides for local testing.
+      this.baseUrl = options?.baseUrl || "https://onboardflow-three.vercel.app/api/v1";
     }
   
     /**
@@ -22,10 +22,10 @@ export class OnboardFlow {
      * Track a specific event/step
      */
     async track(event: { userId: string; eventName: string }) {
-      // We haven't built the specific 'track' endpoint yet, 
-      // but typically it would look like this:
-      // return this._request('/track', 'POST', event);
-      console.log(`[SDK] Tracking ${event.eventName} for ${event.userId}`);
+      return this._request('/track', 'POST', {
+        userId: event.userId,
+        stepId: event.eventName,
+      });
     }
   
     /**

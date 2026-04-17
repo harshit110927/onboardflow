@@ -31,14 +31,15 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Empty body" }, { status: 400 });
     }
 
-    let body: { email?: string; event?: string };
+    let body: { userId?: string; email?: string; event?: string; stepId?: string };
     try {
       body = JSON.parse(rawBody);
     } catch {
       return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
     }
 
-    const { email, event } = body;
+    const { userId, email, event, stepId } = body;
+    const stepCode = stepId ?? event;
 
     if (!email) {
       return NextResponse.json({ error: "email is required" }, { status: 400 });
@@ -54,7 +55,7 @@ export async function POST(req: Request) {
         .values({
           tenantId: tenant.id,
           email,
-          externalId: email,
+          externalId: userId || email,
           completedSteps: [],
           createdAt: new Date(),
           lastSeenAt: new Date(),
@@ -64,17 +65,24 @@ export async function POST(req: Request) {
       // Fire webhook for new user — non-blocking
       deliverWebhookEvent(tenant.id, "user.identified", {
         email,
-        userId: email,
+        userId: userId || email,
       }).catch((err) => console.error("Webhook delivery error:", err));
     }
 
-    if (event && user) {
+    if (userId && user && user.externalId !== userId) {
+      await db
+        .update(endUsers)
+        .set({ externalId: userId, lastSeenAt: new Date() })
+        .where(eq(endUsers.id, user.id));
+    }
+
+    if (stepCode && user) {
       const currentSteps = (user.completedSteps as string[]) || [];
-      if (!currentSteps.includes(event)) {
+      if (!currentSteps.includes(stepCode)) {
         await db
           .update(endUsers)
           .set({
-            completedSteps: [...currentSteps, event],
+            completedSteps: [...currentSteps, stepCode],
             lastSeenAt: new Date(),
           })
           .where(eq(endUsers.id, user.id));
