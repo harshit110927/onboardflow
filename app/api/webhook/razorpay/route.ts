@@ -23,52 +23,29 @@ export async function POST(req: Request) {
     return new NextResponse("Invalid signature", { status: 400 });
   }
 
-  // FIX 2: wrap JSON.parse — malformed body must return 400, not 500
-  let event: Record<string, unknown>;
-  try {
-    event = JSON.parse(body);
-  } catch {
-    return new NextResponse("Invalid JSON", { status: 400 });
-  }
-
-  const eventType = event.event as string;
+  const event = JSON.parse(body);
+  const eventType = event.event;
 
   const eventId =
     razorpayEventIdHeader ??
-    `rz_${eventType}_${
-      (event.payload as any)?.subscription?.entity?.id ??
-      (event.payload as any)?.payment?.entity?.id ??
-      event.created_at ??
-      Date.now()
-    }`;
+    `rz_${eventType}_${event.payload?.subscription?.entity?.id ?? event.payload?.payment?.entity?.id ?? event.created_at ?? Date.now()}`;
+  const processed = await db
+    .select({ id: processedWebhookEvents.id })
+    .from(processedWebhookEvents)
+    .where(eq(processedWebhookEvents.stripeEventId, eventId))
+    .limit(1);
 
-  // FIX 1: atomic "claim" insert before any business logic.
-  // ON CONFLICT DO NOTHING means the second concurrent request inserts
-  // nothing and gets an empty array back → we return 200 immediately,
-  // so business logic never runs twice and no constraint error escapes.
-  const claimed = await db
-    .insert(processedWebhookEvents)
-    .values({ stripeEventId: eventId })
-    .onConflictDoNothing()
-    .returning({ id: processedWebhookEvents.id });
-
-  if (claimed.length === 0) {
-    return new NextResponse("OK", { status: 200 }); // already processed
-  }
+  if (processed.length > 0) return new NextResponse("OK", { status: 200 });
 
   const allPlans = [...INDIVIDUAL_PLANS, ...ENTERPRISE_PLANS];
 
-  if (
-    eventType === "subscription.activated" ||
-    eventType === "subscription.charged"
-  ) {
-    const sub = (event.payload as any).subscription.entity;
+  if (eventType === "subscription.activated" || eventType === "subscription.charged") {
+    const sub = event.payload.subscription.entity;
     const notes = sub.notes;
     const tenantId = notes?.tenant_id;
     const planIdFromNotes = notes?.plan_id;
 
-    if (!tenantId)
-      return new NextResponse("Missing tenant note", { status: 400 });
+    if (!tenantId) return new NextResponse("Missing tenant note", { status: 400 });
 
     const razorpayPlanIdMap: Record<string, string | undefined> = {
       ind_starter: process.env.RAZORPAY_PLAN_IND_STARTER,
@@ -81,22 +58,19 @@ export async function POST(req: Request) {
     let resolvedPlanId = planIdFromNotes;
     if (!resolvedPlanId) {
       const byRazorpayPlanId = Object.entries(razorpayPlanIdMap).find(
-        ([, razorpayPlanId]) =>
-          razorpayPlanId && razorpayPlanId === sub.plan_id,
+        ([, razorpayPlanId]) => razorpayPlanId && razorpayPlanId === sub.plan_id,
       );
       resolvedPlanId = byRazorpayPlanId?.[0];
     }
 
-    if (!resolvedPlanId)
-      return new NextResponse("Missing plan mapping", { status: 400 });
+    if (!resolvedPlanId) return new NextResponse("Missing plan mapping", { status: 400 });
 
     const plan = allPlans.find((p) => p.id === resolvedPlanId);
     if (!plan) return new NextResponse("Unknown plan", { status: 400 });
 
-    const renewalFromWebhook =
-      typeof sub.current_end === "number"
-        ? new Date(sub.current_end * 1000)
-        : null;
+    const renewalFromWebhook = typeof sub.current_end === "number"
+      ? new Date(sub.current_end * 1000)
+      : null;
     const expiresAt = renewalFromWebhook ?? new Date();
     if (!renewalFromWebhook) {
       expiresAt.setDate(expiresAt.getDate() + 35);
@@ -113,11 +87,8 @@ export async function POST(req: Request) {
       .where(eq(tenants.id, tenantId));
   }
 
-  if (
-    eventType === "subscription.cancelled" ||
-    eventType === "subscription.expired"
-  ) {
-    const sub = (event.payload as any).subscription.entity;
+  if (eventType === "subscription.cancelled" || eventType === "subscription.expired") {
+    const sub = event.payload.subscription.entity;
     const notes = sub.notes;
     const tenantId = notes?.tenant_id;
     if (!tenantId) return new NextResponse("Missing notes", { status: 400 });
@@ -128,5 +99,6 @@ export async function POST(req: Request) {
       .where(eq(tenants.id, tenantId));
   }
 
+  await db.insert(processedWebhookEvents).values({ stripeEventId: eventId });
   return new NextResponse("OK", { status: 200 });
 }

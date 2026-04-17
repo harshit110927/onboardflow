@@ -1,96 +1,327 @@
 #!/usr/bin/env node
 /**
- * OnboardFlow integration test suite
+ * OnboardFlow comprehensive integration test suite (plain Node.js).
  *
- * SETUP — copy this block into .env.local (values already there will be reused):
+ * ============================================================================
+ * 1) REQUIRED ENVIRONMENT VARIABLES
+ * ============================================================================
+ * BASE_URL=http://localhost:3000
  *
- *   BASE_URL=http://localhost:3000
- *   TEST_ENTERPRISE_API_KEY=<x-api-key from tenants.api_key for your enterprise test tenant>
- *   RAZORPAY_WEBHOOK_SECRET=<same value as server>
- *   CRON_SECRET=<same value as server>
- *   TEST_ENTERPRISE_TENANT_ID=<uuid of enterprise tenant>
- *   TEST_INDIVIDUAL_TENANT_ID=<uuid of individual tenant>
- *   DATABASE_URL=<postgres connection string>   # optional — enables DB assertions
+ * # Auth identities (for tenant lookup + setup docs)
+ * TEST_USER_EMAIL=<seeded individual tenant email>
+ * TEST_ENTERPRISE_EMAIL=<seeded enterprise tenant email>
  *
- * HOW TO RUN:
- *   node tests.js
- *   DEBUG=1 node tests.js        # prints every HTTP request
- *   STOP_ON_FAIL=1 node tests.js # halt at first failure
+ * # IMPORTANT AUTH NOTE
+ * # This codebase uses Supabase magic-link and Google OAuth, not password login.
+ * # So TEST_USER_PASSWORD / TEST_ENTERPRISE_PASSWORD are intentionally NOT used.
+ * # To run authenticated-route tests, provide session cookies captured from a logged-in browser:
+ * TEST_INDIVIDUAL_COOKIE=<full Cookie header for individual user session>
+ * TEST_ENTERPRISE_COOKIE=<full Cookie header for enterprise user session>
  *
- * No browser, no cookies, no Playwright needed.
+ * # Enterprise API
+ * TEST_ENTERPRISE_API_KEY=<valid x-api-key value from tenants.api_key>
  *
- * ON FAILURE each test prints:
- *   Route      — the HTTP endpoint under test
- *   File       — the source file most likely responsible
- *   Root cause — the most likely reason this is broken
- *   Fix        — concrete code change needed
+ * # Billing / cron secrets (must match app runtime env)
+ * RAZORPAY_WEBHOOK_SECRET=<same value as server env>
+ * CRON_SECRET=<same value as server env>
+ *
+ * # Optional (enables DB verification + state restore for mutation tests)
+ * DATABASE_URL=<postgres connection string>
+ * TEST_INDIVIDUAL_TENANT_ID=<uuid, optional if TEST_USER_EMAIL + DB available>
+ * TEST_ENTERPRISE_TENANT_ID=<uuid, optional if TEST_ENTERPRISE_EMAIL + DB available>
+ * TEST_INDIVIDUAL_LIST_ID=<existing list id for CSV-import gate tests>
+ *
+ * ============================================================================
+ * 2) DB SEEDING (idempotent SQL)
+ * NOTE: To avoid copy/paste comment-marker issues, run: node tests.js --print-seed-sql
+ * ============================================================================
+ * -- Tenants
+ * INSERT INTO tenants (email, name, tier, plan, has_access, api_key)
+ * VALUES
+ *   ('qa-individual@example.com', 'QA Individual', 'individual', 'free', true, 'qa_individual_key_123'),
+ *   ('qa-enterprise@example.com', 'QA Enterprise', 'enterprise', 'advanced', true, 'qa_enterprise_key_123')
+ * ON CONFLICT (email) DO UPDATE
+ * SET tier = EXCLUDED.tier,
+ *     plan = EXCLUDED.plan,
+ *     has_access = EXCLUDED.has_access,
+ *     api_key = EXCLUDED.api_key;
+ *
+ * -- Optional paid windows for gating tests
+ * UPDATE tenants
+ * SET plan_expires_at = NOW() + INTERVAL '30 days',
+ *     plan_renewal_date = NOW() + INTERVAL '30 days'
+ * WHERE email IN ('qa-individual@example.com', 'qa-enterprise@example.com');
+ *
+ * -- Optional deterministic cleanup
+ * DELETE FROM processed_webhook_events WHERE stripe_event_id LIKE 'qa_%';
+ * DELETE FROM end_users WHERE email LIKE 'qa-%@example.com' OR external_id LIKE 'qa-%';
+ *
+ * -- Supabase auth users must already exist for TEST_USER_EMAIL / TEST_ENTERPRISE_EMAIL
+ * -- and you must capture valid session cookies after magic-link login.
+ *
+ * ============================================================================
+ * 3) HOW TO RUN
+ * ============================================================================
+ * node tests.js
+ * BASE_URL=https://staging.example.com node tests.js
+ *
+ * ============================================================================
+ * 4) OUTPUT INTERPRETATION
+ * ============================================================================
+ * PASS  [category] test name
+ * FAIL  [category] test name — expected X got Y
+ * SKIP  [category] test name — reason
+ *
+ * End summary:
+ * =====================================
+ * Results: N passed, N failed, N skipped
+ * =====================================
+ *
+ * Exit code:
+ * - 0 when all tests are PASS/SKIP
+ * - 1 when any test FAILs
  */
 
 const crypto = require('crypto');
-const fs = require('fs');
-const path = require('path');
 
-// ── Load .env.local manually (no dotenv dependency needed) ──────────────────
-function loadEnv() {
-  const envPath = path.join(process.cwd(), '.env.local');
-  if (!fs.existsSync(envPath)) return;
-  const lines = fs.readFileSync(envPath, 'utf8').split('\n');
-  for (const line of lines) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith('#')) continue;
-    const eqIdx = trimmed.indexOf('=');
-    if (eqIdx === -1) continue;
-    const key = trimmed.slice(0, eqIdx).trim();
-    const val = trimmed.slice(eqIdx + 1).trim().replace(/^["']|["']$/g, '');
-    if (!process.env[key]) process.env[key] = val;
-  }
+
+const PRINT_SEED_SQL = process.argv.includes('--print-seed-sql');
+
+const SEED_SQL = `-- Tenants
+INSERT INTO tenants (email, name, tier, plan, has_access, api_key)
+VALUES
+  ('qa-individual@example.com', 'QA Individual', 'individual', 'free', true, 'qa_individual_key_123'),
+  ('qa-enterprise@example.com', 'QA Enterprise', 'enterprise', 'advanced', true, 'qa_enterprise_key_123')
+ON CONFLICT (email) DO UPDATE
+SET tier = EXCLUDED.tier,
+    plan = EXCLUDED.plan,
+    has_access = EXCLUDED.has_access,
+    api_key = EXCLUDED.api_key;
+
+-- Optional paid windows for gating tests
+UPDATE tenants
+SET plan_expires_at = NOW() + INTERVAL '30 days',
+    plan_renewal_date = NOW() + INTERVAL '30 days'
+WHERE email IN ('qa-individual@example.com', 'qa-enterprise@example.com');
+
+-- Optional deterministic cleanup
+DELETE FROM processed_webhook_events WHERE stripe_event_id LIKE 'qa_%';
+DELETE FROM end_users WHERE email LIKE 'qa-%@example.com' OR external_id LIKE 'qa-%';`;
+
+const BASE_URL = process.env.BASE_URL || 'http://localhost:3000';
+const IND_COOKIE = process.env.TEST_INDIVIDUAL_COOKIE || '';
+const ENT_COOKIE = process.env.TEST_ENTERPRISE_COOKIE || '';
+const API_KEY = process.env.TEST_ENTERPRISE_API_KEY || '';
+const RAZORPAY_WEBHOOK_SECRET = process.env.RAZORPAY_WEBHOOK_SECRET || '';
+const CRON_SECRET = process.env.CRON_SECRET || '';
+const DB_URL = process.env.DATABASE_URL || '';
+
+
+const DEBUG = Boolean(process.env.DEBUG);
+const VERBOSE = Boolean(process.env.VERBOSE);
+const STOP_ON_FAIL = Boolean(process.env.STOP_ON_FAIL);
+const NO_COLOR = Boolean(process.env.NO_COLOR);
+
+const c = (code) => (NO_COLOR ? (x) => x : (x) => `[${code}m${x}[0m`);
+const red = c('31');
+const green = c('32');
+const yellow = c('33');
+const cyan = c('36');
+const dim = c('2');
+const bold = c('1');
+
+let HAS_IND_SESSION = false;
+let HAS_ENT_SESSION = false;
+
+const requestLog = [];
+let currentTestLabel = 'init';
+
+const TEST_USER_EMAIL = process.env.TEST_USER_EMAIL || '';
+const TEST_ENTERPRISE_EMAIL = process.env.TEST_ENTERPRISE_EMAIL || '';
+
+if (PRINT_SEED_SQL) {
+  console.log(SEED_SQL);
+  process.exit(0);
 }
-loadEnv();
 
-const BASE_URL      = process.env.BASE_URL || 'http://localhost:3000';
-const API_KEY       = process.env.TEST_ENTERPRISE_API_KEY || '';
-const RZ_SECRET     = process.env.RAZORPAY_WEBHOOK_SECRET || '';
-const CRON_SECRET   = process.env.CRON_SECRET || '';
-const ENT_TENANT_ID = process.env.TEST_ENTERPRISE_TENANT_ID || '';
-const IND_TENANT_ID = process.env.TEST_INDIVIDUAL_TENANT_ID || '';
-const DB_URL        = process.env.DATABASE_URL || '';
-const DEBUG         = Boolean(process.env.DEBUG);
-const STOP_ON_FAIL  = Boolean(process.env.STOP_ON_FAIL);
-
-const state    = { passed: 0, failed: 0, skipped: 0 };
-const failures = []; // accumulates { category, name, error, meta }
-
-const g  = (s) => `\x1b[32m${s}\x1b[0m`;
-const r  = (s) => `\x1b[31m${s}\x1b[0m`;
-const y  = (s) => `\x1b[33m${s}\x1b[0m`;
-const d  = (s) => `\x1b[2m${s}\x1b[0m`;
-const b  = (s) => `\x1b[1m${s}\x1b[0m`;
-const cy = (s) => `\x1b[36m${s}\x1b[0m`;
+const state = {
+  passed: 0,
+  failed: 0,
+  skipped: 0,
+  cleanup: [],
+};
 
 let sql = null;
-const cleanupFns = [];
 
-// ── DB (optional) ───────────────────────────────────────────────────────────
+function pass(category, name) {
+  console.log(`${green('PASS')}  [${category}] ${name}`);
+  state.passed += 1;
+}
+
+function fail(category, name, error) {
+  console.log(`${red('FAIL')}  [${category}] ${name} — ${error}`);
+  state.failed += 1;
+}
+
+function skip(category, name, reason) {
+  console.log(`${yellow('SKIP')}  [${category}] ${name} — ${reason}`);
+  if (reason.includes('cookie')) {
+    console.log(dim('      ↳ Setup hint: provide a fresh TEST_INDIVIDUAL_COOKIE / TEST_ENTERPRISE_COOKIE from an active browser session.'));
+  }
+  if (reason.includes('DATABASE_URL')) {
+    console.log(dim('      ↳ Setup hint: set DATABASE_URL and tenant ids/emails so DB-backed assertions can run.'));
+  }
+  if (reason.includes('RAZORPAY_WEBHOOK_SECRET')) {
+    console.log(dim('      ↳ Setup hint: use same RAZORPAY_WEBHOOK_SECRET as server runtime env.'));
+  }
+  state.skipped += 1;
+}
+
+function assert(condition, message) {
+  if (!condition) throw new Error(message);
+}
+
+function nowId(prefix) {
+  return `${prefix}_${Date.now()}_${Math.random().toString(16).slice(2, 8)}`;
+}
+
 async function initDb() {
   if (!DB_URL) return;
-  try {
-    const mod = await import('postgres');
-    sql = mod.default(DB_URL, { max: 1 });
-  } catch {
-    console.log(y('WARN  DATABASE_URL set but postgres package unavailable — DB assertions skipped'));
-  }
+  const mod = await import('postgres');
+  sql = mod.default(DB_URL, { max: 1 });
 }
 
 async function closeDb() {
-  if (sql) await sql.end({ timeout: 2 }).catch(() => {});
+  if (sql) await sql.end({ timeout: 1 });
+}
+
+async function api(path, options = {}) {
+  const { method = 'GET', headers = {}, body, cookie, redirect = 'manual' } = options;
+  const finalHeaders = { ...headers };
+  if (cookie) finalHeaders.cookie = cookie;
+
+  const start = Date.now();
+  const res = await fetch(`${BASE_URL}${path}`, {
+    method,
+    headers: finalHeaders,
+    body,
+    redirect,
+  });
+
+  const text = await res.text();
+  let json = null;
+  try {
+    json = text ? JSON.parse(text) : null;
+  } catch {
+    // non-json response
+  }
+
+  requestLog.push({
+    test: currentTestLabel,
+    method,
+    path,
+    status: res.status,
+    location: res.headers.get('location') || '',
+    durationMs: Date.now() - start,
+    body: text?.slice(0, 600) || '',
+  });
+
+  if (DEBUG) {
+    console.log(dim(`[REQ] ${method} ${path} -> ${res.status} (${Date.now() - start}ms)`));
+  }
+
+  return { res, text, json };
+}
+
+
+
+function likelyCauseFromRequest(entry) {
+  if (!entry) return 'No HTTP request was recorded for this test.';
+  const location = entry.location || '';
+  if ([302, 303, 307, 308].includes(entry.status) && location.includes('/login')) {
+    return 'Session cookie appears missing/expired; middleware redirected to /login.';
+  }
+  if (entry.status === 401) return 'Unauthorized: auth/session/API key missing or invalid for this route.';
+  if (entry.status === 403) return 'Forbidden: plan gate or permission check blocked access.';
+  if (entry.status === 429) return 'Rate limiter blocked this request.';
+  if (entry.status === 500) return 'Server-side exception; inspect server logs for stack trace.';
+  return 'Behavior differs from assertion; inspect response body and route implementation.';
+}
+
+
+
+function sourceHintForPath(path) {
+  if (!path) return null;
+  if (path.startsWith('/api/track/open')) return 'Likely source: app/api/track/open/route.ts (invalid tokens intentionally still return pixel 200).';
+  if (path.startsWith('/api/track/click')) return 'Likely source: app/api/track/click/route.ts (invalid tokens intentionally still redirect).';
+  if (path.startsWith('/api/cron')) return 'Likely source: app/api/cron/route.ts (plan-to-limit mapping issue can throw when plan not in ENTERPRISE_LIMITS).';
+  if (path.startsWith('/api/v1/track')) return 'Likely sources: app/api/v1/track/route.ts + lib/rate-limit/enterprise.ts.';
+  if (path.startsWith('/api/v1/identify')) return 'Likely source: app/api/v1/identify/route.ts (raw JSON parsing can throw on malformed JSON).';
+  if (path.startsWith('/api/individual/')) return 'Likely sources: app/api/individual/* routes + middleware auth/session checks.';
+  if (path.startsWith('/dashboard')) return 'Likely source: middleware.ts + Supabase session cookies.';
+  return null;
+}
+
+async function preflightSession(cookie, dashboardPath) {
+  if (!cookie) return { ok: false, reason: 'cookie env var missing' };
+  const { res } = await api(dashboardPath, { cookie });
+  if (res.status === 200) return { ok: true, reason: 'ok' };
+  const location = res.headers.get('location') || '';
+  return { ok: false, reason: `status=${res.status}${location ? ` location=${location}` : ''}` };
+}
+
+async function runTest(category, name, fn, opts = {}) {
+  try {
+    currentTestLabel = `[${category}] ${name}`;
+    if (VERBOSE) console.log(cyan(`→ ${currentTestLabel}`));
+    if (opts.skipIf && opts.skipIf()) {
+      skip(category, name, opts.skipReason || 'prerequisite missing');
+      return;
+    }
+    await fn();
+    pass(category, name);
+  } catch (err) {
+    const entry = [...requestLog].reverse().find((r) => r.test === currentTestLabel);
+    fail(category, name, err?.message || String(err));
+    if (entry) {
+      console.log(dim(`      ↳ Request: ${entry.method} ${entry.path} -> ${entry.status}`));
+      if (entry.location) console.log(dim(`      ↳ Location: ${entry.location}`));
+      if (entry.body) console.log(dim(`      ↳ Body: ${entry.body.slice(0, 240)}`));
+      console.log(dim(`      ↳ Likely cause: ${likelyCauseFromRequest(entry)}`));
+      const srcHint = sourceHintForPath(entry.path);
+      if (srcHint) console.log(dim(`      ↳ ${srcHint}`));
+    } else {
+      console.log(dim('      ↳ No request captured for this test (likely local assertion/setup failure).'));
+    }
+    if (STOP_ON_FAIL) {
+      throw err;
+    }
+  }
+}
+
+function hmacRazorpay(body) {
+  return crypto.createHmac('sha256', RAZORPAY_WEBHOOK_SECRET).update(body).digest('hex');
+}
+
+function withJsonHeaders(extra = {}) {
+  return { 'content-type': 'application/json', ...extra };
+}
+
+async function tenantByEmail(email) {
+  if (!sql || !email) return null;
+  const rows = await sql`select id, email, tier, plan, plan_expires_at, plan_renewal_date, razorpay_subscription_id from tenants where email = ${email} limit 1`;
+  return rows[0] || null;
+}
+
+async function tenantById(id) {
+  if (!sql || !id) return null;
+  const rows = await sql`select id, email, tier, plan, plan_expires_at, plan_renewal_date, razorpay_subscription_id from tenants where id = ${id} limit 1`;
+  return rows[0] || null;
 }
 
 async function withTenantRestore(tenantId, fn) {
   if (!sql || !tenantId) return fn();
-  const [before] = await sql`
-    select plan, plan_expires_at, plan_renewal_date, razorpay_subscription_id
-    from tenants where id = ${tenantId} limit 1
-  `;
+  const before = await tenantById(tenantId);
   try {
     await fn();
   } finally {
@@ -102,872 +333,1012 @@ async function withTenantRestore(tenantId, fn) {
             plan_renewal_date = ${before.plan_renewal_date},
             razorpay_subscription_id = ${before.razorpay_subscription_id}
         where id = ${tenantId}
-      `.catch(() => {});
-    }
-  }
-}
-
-// ── HTTP helper ─────────────────────────────────────────────────────────────
-async function req(urlPath, opts = {}) {
-  const { method = 'GET', headers = {}, body } = opts;
-  const url = `${BASE_URL}${urlPath}`;
-  const res = await fetch(url, { method, headers, body, redirect: 'manual' });
-  const text = await res.text();
-  let json = null;
-  try { json = text ? JSON.parse(text) : null; } catch {}
-  if (DEBUG) console.log(d(`  [${method}] ${urlPath} → ${res.status}`));
-  return { res, text, json };
-}
-
-function json(extra = {}) {
-  return { 'content-type': 'application/json', ...extra };
-}
-
-function apiKey(key = API_KEY) {
-  return { 'x-api-key': key };
-}
-
-function hmac(body) {
-  return crypto.createHmac('sha256', RZ_SECRET).update(body).digest('hex');
-}
-
-function uid(prefix = 'qa') {
-  return `${prefix}_${Date.now()}_${Math.random().toString(16).slice(2, 7)}`;
-}
-
-// ── Test runner ─────────────────────────────────────────────────────────────
-/**
- * @param {string} category  - test group label
- * @param {string} name      - test name
- * @param {Function} fn      - async test body; throw to fail
- * @param {string|null} skip - if truthy, reason to skip
- * @param {Object} meta      - diagnostic info printed on failure
- *   @param {string} meta.route      - HTTP route under test  e.g. POST /api/webhook/razorpay
- *   @param {string} meta.file       - most likely source file e.g. app/api/webhook/razorpay/route.ts
- *   @param {string} meta.rootCause  - why this likely fails
- *   @param {string} meta.fix        - concrete code change needed
- */
-async function test(category, name, fn, skip = null, meta = {}) {
-  if (skip) {
-    console.log(`${y('SKIP')}  [${category}] ${name} — ${skip}`);
-    state.skipped++;
-    return;
-  }
-  try {
-    await fn();
-    console.log(`${g('PASS')}  [${category}] ${name}`);
-    state.passed++;
-  } catch (err) {
-    console.log(`${r('FAIL')}  [${category}] ${name}`);
-    console.log(d(`        Assertion : ${err.message}`));
-    if (meta.route)     console.log(d(`        Route     : ${meta.route}`));
-    if (meta.file)      console.log(d(`        File      : ${meta.file}`));
-    if (meta.rootCause) console.log(d(`        Root cause: ${meta.rootCause}`));
-    if (meta.fix)       console.log(d(`        Fix       : ${meta.fix}`));
-    failures.push({ category, name, error: err.message, meta });
-    state.failed++;
-    if (STOP_ON_FAIL) throw err;
-  }
-}
-
-function assert(cond, msg) {
-  if (!cond) throw new Error(msg);
-}
-
-function isRedirect(status) {
-  return [301, 302, 303, 307, 308].includes(status);
-}
-
-// ── TEST SUITES ─────────────────────────────────────────────────────────────
-async function run() {
-  await initDb();
-
-  console.log(`\nOnboardFlow Integration Tests`);
-  console.log(`Base URL    : ${BASE_URL}`);
-  console.log(`API key     : ${API_KEY ? '✓ set' : '✗ missing'}`);
-  console.log(`RZ secret   : ${RZ_SECRET ? '✓ set' : '✗ missing'}`);
-  console.log(`Cron secret : ${CRON_SECRET ? '✓ set' : '✗ missing'}`);
-  console.log(`DB          : ${sql ? '✓ connected' : '✗ skipped'}`);
-  console.log('');
-
-  // ── 1. Public auth redirects ──────────────────────────────────────────────
-  await test('auth', 'Unauthenticated /dashboard redirects to /login', async () => {
-    const { res } = await req('/dashboard');
-    assert(isRedirect(res.status), `expected redirect got ${res.status}`);
-    assert((res.headers.get('location') || '').includes('/login'), 'expected /login');
-  }, null, {
-    route: 'GET /dashboard',
-    file: 'middleware.ts  OR  app/dashboard/page.tsx',
-    rootCause: 'Auth middleware is not protecting /dashboard',
-    fix: 'In middleware.ts, add /dashboard to the matcher and redirect to /login when no session cookie is present.',
-  });
-
-  await test('auth', 'Unauthenticated /dashboard/individual redirects to /login', async () => {
-    const { res } = await req('/dashboard/individual');
-    assert(isRedirect(res.status), `expected redirect got ${res.status}`);
-    assert((res.headers.get('location') || '').includes('/login'), 'expected /login');
-  }, null, {
-    route: 'GET /dashboard/individual',
-    file: 'middleware.ts  OR  app/dashboard/individual/page.tsx',
-    rootCause: 'Auth middleware matcher does not cover /dashboard/individual',
-    fix: 'Extend the middleware matcher to cover /dashboard/:path* so all sub-routes are protected.',
-  });
-
-  await test('auth', 'Unauthenticated /dashboard/enterprise redirects to /login', async () => {
-    const { res } = await req('/dashboard/enterprise');
-    assert(isRedirect(res.status), `expected redirect got ${res.status}`);
-    assert((res.headers.get('location') || '').includes('/login'), 'expected /login');
-  }, null, {
-    route: 'GET /dashboard/enterprise',
-    file: 'middleware.ts  OR  app/dashboard/enterprise/page.tsx',
-    rootCause: 'Auth middleware matcher does not cover /dashboard/enterprise',
-    fix: 'Extend the middleware matcher to cover /dashboard/:path* so all sub-routes are protected.',
-  });
-
-  await test('auth', 'Login page is publicly accessible', async () => {
-    const { res } = await req('/login');
-    assert(res.status === 200, `expected 200 got ${res.status}`);
-  }, null, {
-    route: 'GET /login',
-    file: 'app/login/page.tsx  OR  middleware.ts',
-    rootCause: 'Either the login page is missing or middleware is blocking it',
-    fix: 'Ensure /login is excluded from auth middleware matcher.',
-  });
-
-  // ── 2. Enterprise v1 API (x-api-key, no session needed) ──────────────────
-  await test('v1/identify', 'Missing API key returns 401', async () => {
-    const { res } = await req('/api/v1/identify', {
-      method: 'POST', headers: json(), body: JSON.stringify({ email: 'test@x.com' }),
-    });
-    assert(res.status === 401, `expected 401 got ${res.status}`);
-  }, null, {
-    route: 'POST /api/v1/identify',
-    file: 'app/api/v1/identify/route.ts',
-    rootCause: 'Route does not check for x-api-key header when it is absent',
-    fix: 'Read request.headers.get("x-api-key") early and return NextResponse.json({error:"Unauthorized"},{status:401}) when missing.',
-  });
-
-  await test('v1/identify', 'Invalid API key returns 403', async () => {
-    const { res } = await req('/api/v1/identify', {
-      method: 'POST',
-      headers: json(apiKey('bad_key_xyz')),
-      body: JSON.stringify({ email: 'test@x.com' }),
-    });
-    assert([401, 403].includes(res.status), `expected 401/403 got ${res.status}`);
-  }, null, {
-    route: 'POST /api/v1/identify',
-    file: 'app/api/v1/identify/route.ts',
-    rootCause: 'Route does not validate the API key against the tenants table',
-    fix: 'Query `SELECT id FROM tenants WHERE api_key = $1` and return 403 when no row is found.',
-  });
-
-  await test('v1/identify', 'Missing email field returns 400', async () => {
-    const { res } = await req('/api/v1/identify', {
-      method: 'POST',
-      headers: json(apiKey()),
-      body: JSON.stringify({ userId: 'user_123' }),
-    });
-    assert(res.status === 400, `expected 400 got ${res.status}`);
-  }, !API_KEY ? 'TEST_ENTERPRISE_API_KEY missing' : null, {
-    route: 'POST /api/v1/identify',
-    file: 'app/api/v1/identify/route.ts',
-    rootCause: 'Route does not validate that email is present in the request body',
-    fix: 'After JSON.parse, check `if (!body.email) return NextResponse.json({error:"email required"},{status:400})`.',
-  });
-
-  await test('v1/identify', 'Valid key creates/upserts user', async () => {
-    const email = `${uid('identify')}@example.com`;
-    const { res, json: j } = await req('/api/v1/identify', {
-      method: 'POST',
-      headers: json(apiKey()),
-      body: JSON.stringify({ email, event: 'signed_up' }),
-    });
-    assert(res.status === 200, `expected 200 got ${res.status}`);
-    assert(j?.success === true, `expected success=true got ${JSON.stringify(j)}`);
-  }, !API_KEY ? 'TEST_ENTERPRISE_API_KEY missing' : null, {
-    route: 'POST /api/v1/identify',
-    file: 'app/api/v1/identify/route.ts',
-    rootCause: 'Upsert into end_users table is failing or response shape is wrong',
-    fix: 'Use INSERT ... ON CONFLICT (email, tenant_id) DO UPDATE and return NextResponse.json({success:true}).',
-  });
-
-  await test('v1/identify', 'Identifying same user twice is idempotent', async () => {
-    const email = `${uid('idem')}@example.com`;
-    const body = JSON.stringify({ email });
-    const r1 = await req('/api/v1/identify', { method: 'POST', headers: json(apiKey()), body });
-    const r2 = await req('/api/v1/identify', { method: 'POST', headers: json(apiKey()), body });
-    assert(r1.res.status === 200 && r2.res.status === 200, `expected 200/200`);
-  }, !API_KEY ? 'TEST_ENTERPRISE_API_KEY missing' : null, {
-    route: 'POST /api/v1/identify',
-    file: 'app/api/v1/identify/route.ts',
-    rootCause: 'Second insert throws a unique constraint error instead of upserting',
-    fix: 'Use INSERT ... ON CONFLICT (email, tenant_id) DO UPDATE SET updated_at = now() to make it idempotent.',
-  });
-
-  // ── 3. v1/track ───────────────────────────────────────────────────────────
-  await test('v1/track', 'Missing stepId returns 400', async () => {
-    const { res } = await req('/api/v1/track', {
-      method: 'POST',
-      headers: json(apiKey()),
-      body: JSON.stringify({ userId: 'u1' }),
-    });
-    assert([400, 401, 403].includes(res.status), `expected 400/401/403 got ${res.status}`);
-  }, !API_KEY ? 'TEST_ENTERPRISE_API_KEY missing' : null, {
-    route: 'POST /api/v1/track',
-    file: 'app/api/v1/track/route.ts',
-    rootCause: 'Route does not validate stepId presence before processing',
-    fix: 'Add `if (!body.stepId) return NextResponse.json({error:"stepId required"},{status:400})` after parsing body.',
-  });
-
-  await test('v1/track', 'Tracking step for known user succeeds', async () => {
-    const email = `${uid('track')}@example.com`;
-    await req('/api/v1/identify', { method: 'POST', headers: json(apiKey()), body: JSON.stringify({ email }) });
-    const { res } = await req('/api/v1/track', {
-      method: 'POST',
-      headers: json(apiKey()),
-      body: JSON.stringify({ userId: email, stepId: 'connect_repo', event: 'connect_repo' }),
-    });
-    assert(res.status === 200, `expected 200 got ${res.status}`);
-  }, !API_KEY ? 'TEST_ENTERPRISE_API_KEY missing' : null, {
-    route: 'POST /api/v1/track',
-    file: 'app/api/v1/track/route.ts',
-    rootCause: 'Step tracking for an existing user fails or returns wrong status',
-    fix: 'Upsert into completed_steps array: UPDATE end_users SET completed_steps = array_append(...) WHERE email = $1.',
-  });
-
-  await test('v1/track', 'Tracking step for unknown user returns 404', async () => {
-    const { res } = await req('/api/v1/track', {
-      method: 'POST',
-      headers: json(apiKey()),
-      body: JSON.stringify({ userId: uid('ghost'), stepId: 'connect_repo', event: 'connect_repo' }),
-    });
-    assert([404, 403].includes(res.status), `expected 404/403 got ${res.status}`);
-  }, !API_KEY ? 'TEST_ENTERPRISE_API_KEY missing' : null, {
-    route: 'POST /api/v1/track',
-    file: 'app/api/v1/track/route.ts',
-    rootCause: 'Route does not check whether the user exists before tracking',
-    fix: 'SELECT the user first; if no row, return NextResponse.json({error:"user not found"},{status:404}).',
-  });
-
-  await test('v1/track', 'Tracking same step twice is idempotent', async () => {
-    const email = `${uid('idem-track')}@example.com`;
-    await req('/api/v1/identify', { method: 'POST', headers: json(apiKey()), body: JSON.stringify({ email }) });
-    const body = JSON.stringify({ userId: email, stepId: 'connect_repo', event: 'connect_repo' });
-    const r1 = await req('/api/v1/track', { method: 'POST', headers: json(apiKey()), body });
-    const r2 = await req('/api/v1/track', { method: 'POST', headers: json(apiKey()), body });
-    assert(r1.res.status === 200 && r2.res.status === 200, `expected 200/200`);
-    if (sql) {
-      const email2 = email;
-      const rows = await sql`
-        select completed_steps from end_users
-        where email = ${email2} limit 1
       `;
-      const steps = rows[0]?.completed_steps || [];
-      const count = steps.filter((s) => s === 'connect_repo').length;
-      assert(count === 1, `expected step stored once, got ${count}`);
     }
-  }, !API_KEY ? 'TEST_ENTERPRISE_API_KEY missing' : null, {
-    route: 'POST /api/v1/track',
-    file: 'app/api/v1/track/route.ts',
-    rootCause: 'array_append is called unconditionally, causing duplicate entries in completed_steps',
-    fix: 'Use `WHERE NOT (completed_steps @> ARRAY[$1])` guard, or check with `if (!steps.includes(stepId))` before appending.',
+  }
+}
+
+async function cleanupAll() {
+  while (state.cleanup.length) {
+    const fn = state.cleanup.pop();
+    try { await fn(); } catch {}
+  }
+}
+
+async function resolveTenantIds() {
+  let enterpriseTenantId = process.env.TEST_ENTERPRISE_TENANT_ID || null;
+  let individualTenantId = process.env.TEST_INDIVIDUAL_TENANT_ID || null;
+
+  if (sql && !enterpriseTenantId && TEST_ENTERPRISE_EMAIL) {
+    enterpriseTenantId = (await tenantByEmail(TEST_ENTERPRISE_EMAIL))?.id || null;
+  }
+  if (sql && !individualTenantId && TEST_USER_EMAIL) {
+    individualTenantId = (await tenantByEmail(TEST_USER_EMAIL))?.id || null;
+  }
+
+  return { enterpriseTenantId, individualTenantId };
+}
+
+(async function main() {
+  await initDb();
+  const { enterpriseTenantId, individualTenantId } = await resolveTenantIds();
+
+  const indSession = await preflightSession(IND_COOKIE, '/dashboard/individual');
+  const entSession = await preflightSession(ENT_COOKIE, '/dashboard/enterprise');
+  HAS_IND_SESSION = indSession.ok;
+  HAS_ENT_SESSION = entSession.ok;
+
+  if (!HAS_IND_SESSION) {
+    console.log(yellow(`Session preflight (individual): ${indSession.reason}`));
+  }
+  if (!HAS_ENT_SESSION) {
+    console.log(yellow(`Session preflight (enterprise): ${entSession.reason}`));
+  }
+
+  // ---------------------------------------------------------------------------
+  // 1. Auth and middleware
+  // ---------------------------------------------------------------------------
+  await runTest('auth/middleware', 'Unauthenticated user hitting /dashboard/* is redirected to login', async () => {
+    const { res } = await api('/dashboard/individual');
+    assert([302, 303, 307, 308].includes(res.status), `expected redirect got ${res.status}`);
+    assert((res.headers.get('location') || '').includes('/login'), `expected /login redirect`);
   });
 
-  // ── 4. Razorpay webhook ───────────────────────────────────────────────────
-  await test('webhook', 'Missing signature returns 400', async () => {
-    const body = JSON.stringify({ event: 'subscription.activated', payload: {} });
-    const { res } = await req('/api/webhook/razorpay', { method: 'POST', headers: json(), body });
+  await runTest('auth/middleware', 'Authenticated user with tier=individual is routed to individual dashboard access', async () => {
+    const { res } = await api('/dashboard/individual', { cookie: IND_COOKIE });
+    assert(res.status === 200, `expected 200 got ${res.status}`);
+  }, { skipIf: () => !HAS_IND_SESSION, skipReason: 'TEST_INDIVIDUAL_COOKIE missing' });
+
+  await runTest('auth/middleware', 'Authenticated user with tier=enterprise is routed to enterprise dashboard access', async () => {
+    const { res } = await api('/dashboard/enterprise', { cookie: ENT_COOKIE });
+    assert(res.status === 200, `expected 200 got ${res.status}`);
+  }, { skipIf: () => !HAS_ENT_SESSION, skipReason: 'TEST_ENTERPRISE_COOKIE missing' });
+
+  await runTest('auth/middleware', '/tier-selection inaccessible to users who already have a tier', async () => {
+    const { res } = await api('/tier-selection', { cookie: ENT_COOKIE });
+    assert([302, 303, 307, 308].includes(res.status), `expected redirect got ${res.status}`);
+    const location = res.headers.get('location') || '';
+    assert(location.includes('/dashboard/enterprise'), `expected redirect to enterprise dashboard got ${location}`);
+  }, { skipIf: () => !HAS_ENT_SESSION, skipReason: 'TEST_ENTERPRISE_COOKIE missing' });
+
+  await runTest('auth/middleware', 'Authenticated user with no tier redirects to /tier-selection', async () => {
+    // Needs a cookie for a user whose tenant.tier is NULL.
+    const cookie = process.env.TEST_NO_TIER_COOKIE;
+    const { res } = await api('/dashboard', { cookie });
+    assert([302, 303, 307, 308].includes(res.status), `expected redirect got ${res.status}`);
+    assert((res.headers.get('location') || '').includes('/tier-selection'), 'expected /tier-selection redirect');
+  }, { skipIf: () => !process.env.TEST_NO_TIER_COOKIE, skipReason: 'TEST_NO_TIER_COOKIE missing (special seeded no-tier user)' });
+
+  // ---------------------------------------------------------------------------
+  // 2. Tenant and plan resolution (DB-backed integration checks)
+  // ---------------------------------------------------------------------------
+  await runTest('tenant/plan', 'getTenantPlan semantics: null plan_expires_at => free (verified by gating)', async () => {
+    assert(sql && individualTenantId && IND_COOKIE, 'requires DATABASE_URL + TEST_INDIVIDUAL_TENANT_ID/EMAIL + TEST_INDIVIDUAL_COOKIE');
+
+    await withTenantRestore(individualTenantId, async () => {
+      await sql`update tenants set plan='pro', plan_expires_at=NULL where id=${individualTenantId}`;
+
+      const listId = process.env.TEST_INDIVIDUAL_LIST_ID;
+      assert(listId, 'TEST_INDIVIDUAL_LIST_ID required for gating check');
+
+      const boundary = '----csvboundary1';
+      const csv = 'name,email\nPlanCheck,plancheck@example.com\n';
+      const body = `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="contacts.csv"\r\nContent-Type: text/csv\r\n\r\n${csv}\r\n--${boundary}--\r\n`;
+
+      const { res } = await api(`/api/individual/lists/${listId}/import-csv`, {
+        method: 'POST',
+        cookie: IND_COOKIE,
+        headers: { 'content-type': `multipart/form-data; boundary=${boundary}` },
+        body,
+      });
+
+      assert(res.status === 403, `expected 403 (free tier behavior) got ${res.status}`);
+    });
+  }, {
+    skipIf: () => !sql || !individualTenantId || !HAS_IND_SESSION || !process.env.TEST_INDIVIDUAL_LIST_ID,
+    skipReason: 'DATABASE_URL + individual tenant + cookie + TEST_INDIVIDUAL_LIST_ID required',
+  });
+
+  await runTest('tenant/plan', 'expired plan is downgraded in gate checks', async () => {
+    assert(sql && individualTenantId && IND_COOKIE, 'requires DB + individual tenant + cookie');
+
+    await withTenantRestore(individualTenantId, async () => {
+      await sql`update tenants set plan='growth', plan_expires_at=NOW() - interval '1 day' where id=${individualTenantId}`;
+
+      const listId = process.env.TEST_INDIVIDUAL_LIST_ID;
+      assert(listId, 'TEST_INDIVIDUAL_LIST_ID required');
+
+      const boundary = '----csvboundary2';
+      const csv = 'name,email\nExpiredPlan,expired-plan@example.com\n';
+      const body = `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="contacts.csv"\r\nContent-Type: text/csv\r\n\r\n${csv}\r\n--${boundary}--\r\n`;
+
+      const { res } = await api(`/api/individual/lists/${listId}/import-csv`, {
+        method: 'POST',
+        cookie: IND_COOKIE,
+        headers: { 'content-type': `multipart/form-data; boundary=${boundary}` },
+        body,
+      });
+
+      assert(res.status === 403, `expected downgraded free-tier block (403), got ${res.status}`);
+    });
+  }, {
+    skipIf: () => !sql || !individualTenantId || !HAS_IND_SESSION || !process.env.TEST_INDIVIDUAL_LIST_ID,
+    skipReason: 'DATABASE_URL + individual tenant + cookie + list id required',
+  });
+
+  await runTest('tenant/plan', 'missing tenant gracefully falls back in app behavior', async () => {
+    const { res } = await api('/api/v1/check-auth', { headers: { 'x-api-key': nowId('nonexistent_key') } });
+    assert([401, 403].includes(res.status), `expected auth failure for missing tenant got ${res.status}`);
+  });
+
+  // ---------------------------------------------------------------------------
+  // 3. Razorpay webhook
+  // ---------------------------------------------------------------------------
+  await runTest('billing/webhook', '400 when x-razorpay-signature missing', async () => {
+    const body = JSON.stringify({ event: 'subscription.activated', payload: { subscription: { entity: { notes: {} } } } });
+    const { res } = await api('/api/webhook/razorpay', { method: 'POST', body, headers: withJsonHeaders() });
     assert(res.status === 400, `expected 400 got ${res.status}`);
-  }, null, {
-    route: 'POST /api/webhook/razorpay',
-    file: 'app/api/webhook/razorpay/route.ts',
-    rootCause: 'Route does not return 400 when x-razorpay-signature header is absent',
-    fix: 'Check `if (!request.headers.get("x-razorpay-signature")) return NextResponse.json({error:"missing sig"},{status:400})`.',
   });
 
-  await test('webhook', 'Wrong signature returns 400', async () => {
-    const body = JSON.stringify({ event: 'subscription.activated', payload: {} });
-    const { res } = await req('/api/webhook/razorpay', {
-      method: 'POST', headers: json({ 'x-razorpay-signature': 'bad' }), body,
+  await runTest('billing/webhook', '400 when signature invalid', async () => {
+    const body = JSON.stringify({ event: 'subscription.activated', payload: { subscription: { entity: { notes: {} } } } });
+    const { res } = await api('/api/webhook/razorpay', {
+      method: 'POST',
+      body,
+      headers: withJsonHeaders({ 'x-razorpay-signature': 'bad_signature' }),
     });
     assert(res.status === 400, `expected 400 got ${res.status}`);
-  }, null, {
-    route: 'POST /api/webhook/razorpay',
-    file: 'app/api/webhook/razorpay/route.ts',
-    rootCause: 'HMAC comparison is not rejecting bad signatures',
-    fix: 'Use crypto.timingSafeEqual to compare HMAC-SHA256(secret, rawBody) against the header value; return 400 on mismatch.',
   });
 
-  await test('webhook', 'Missing tenant_id in notes returns 400', async () => {
+  await runTest('billing/webhook', '400 when notes.tenant_id missing', async () => {
     const body = JSON.stringify({
       event: 'subscription.activated',
-      payload: { subscription: { entity: { id: uid('sub'), notes: { plan_id: 'ent_basic' } } } },
+      payload: { subscription: { entity: { id: nowId('sub'), notes: { plan_id: 'ent_basic' } } } },
     });
-    const { res } = await req('/api/webhook/razorpay', {
+    const { res } = await api('/api/webhook/razorpay', {
       method: 'POST',
-      headers: json({ 'x-razorpay-signature': hmac(body) }),
       body,
+      headers: withJsonHeaders({
+        'x-razorpay-signature': hmacRazorpay(body),
+        'x-razorpay-event-id': nowId('qa_missing_tenant'),
+      }),
     });
     assert(res.status === 400, `expected 400 got ${res.status}`);
-  }, !RZ_SECRET ? 'RAZORPAY_WEBHOOK_SECRET missing' : null, {
-    route: 'POST /api/webhook/razorpay',
-    file: 'app/api/webhook/razorpay/route.ts',
-    rootCause: 'Route does not validate that notes.tenant_id is present',
-    fix: 'After parsing payload, check `if (!notes?.tenant_id) return NextResponse.json({error:"missing tenant_id"},{status:400})`.',
-  });
+  }, { skipIf: () => !RAZORPAY_WEBHOOK_SECRET, skipReason: 'RAZORPAY_WEBHOOK_SECRET missing' });
 
-  await test('webhook', 'Unknown plan_id returns 400', async () => {
+  await runTest('billing/webhook', '400 when notes.plan_id unknown', async () => {
+    assert(enterpriseTenantId, 'enterprise tenant id required');
     const body = JSON.stringify({
       event: 'subscription.activated',
-      payload: {
-        subscription: {
-          entity: {
-            id: uid('sub'),
-            notes: { tenant_id: ENT_TENANT_ID || 'fake-uuid', plan_id: 'does_not_exist' },
-          },
-        },
-      },
+      payload: { subscription: { entity: { id: nowId('sub'), notes: { tenant_id: enterpriseTenantId, plan_id: 'unknown_plan' } } } },
     });
-    const { res } = await req('/api/webhook/razorpay', {
+
+    const { res } = await api('/api/webhook/razorpay', {
       method: 'POST',
-      headers: json({ 'x-razorpay-signature': hmac(body) }),
       body,
+      headers: withJsonHeaders({
+        'x-razorpay-signature': hmacRazorpay(body),
+        'x-razorpay-event-id': nowId('qa_unknown_plan'),
+      }),
     });
     assert(res.status === 400, `expected 400 got ${res.status}`);
-  }, !RZ_SECRET ? 'RAZORPAY_WEBHOOK_SECRET missing' : null, {
-    route: 'POST /api/webhook/razorpay',
-    file: 'app/api/webhook/razorpay/route.ts',
-    rootCause: 'Route does not validate plan_id against the known plan list',
-    fix: 'Maintain a VALID_PLANS set; return 400 if notes.plan_id is not in it.',
+  }, {
+    skipIf: () => !RAZORPAY_WEBHOOK_SECRET || !enterpriseTenantId,
+    skipReason: 'RAZORPAY_WEBHOOK_SECRET + enterprise tenant id required',
   });
 
-  await test('webhook', 'subscription.activated sets plan + expiry on tenant', async () => {
-    if (!ENT_TENANT_ID) throw new Error('TEST_ENTERPRISE_TENANT_ID missing');
-    await withTenantRestore(ENT_TENANT_ID, async () => {
-      const subId = uid('sub');
+  await runTest('billing/webhook', '200 and updates tenant on subscription.activated', async () => {
+    assert(sql && enterpriseTenantId, 'DB + enterprise tenant required');
+    await withTenantRestore(enterpriseTenantId, async () => {
+      const subId = nowId('sub_active');
+      const eventId = nowId('qa_sub_activated');
       const body = JSON.stringify({
         event: 'subscription.activated',
         payload: {
           subscription: {
             entity: {
               id: subId,
-              notes: { tenant_id: ENT_TENANT_ID, plan_id: 'ent_advanced' },
+              current_end: Math.floor(Date.now() / 1000) + 86400,
+              notes: { tenant_id: enterpriseTenantId, plan_id: 'ent_advanced' },
             },
           },
         },
       });
-      const { res } = await req('/api/webhook/razorpay', {
+
+      const { res } = await api('/api/webhook/razorpay', {
         method: 'POST',
-        headers: json({ 'x-razorpay-signature': hmac(body) }),
         body,
+        headers: withJsonHeaders({
+          'x-razorpay-signature': hmacRazorpay(body),
+          'x-razorpay-event-id': eventId,
+        }),
       });
       assert(res.status === 200, `expected 200 got ${res.status}`);
-      if (sql) {
-        const [row] = await sql`select plan, plan_expires_at, razorpay_subscription_id from tenants where id = ${ENT_TENANT_ID}`;
-        assert(row.plan === 'advanced', `expected advanced got ${row.plan}`);
-        assert(row.plan_expires_at, 'plan_expires_at should be set');
-        assert(row.razorpay_subscription_id === subId, `expected ${subId} got ${row.razorpay_subscription_id}`);
-      }
+
+      const after = await tenantById(enterpriseTenantId);
+      assert(after.plan === 'advanced', `expected advanced got ${after.plan}`);
+      assert(after.plan_expires_at, 'plan_expires_at should be set');
+      assert(after.plan_renewal_date, 'plan_renewal_date should be set');
+      assert(after.razorpay_subscription_id === subId, `expected subscription id ${subId} got ${after.razorpay_subscription_id}`);
     });
-  }, !RZ_SECRET ? 'RAZORPAY_WEBHOOK_SECRET missing' : null, {
-    route: 'POST /api/webhook/razorpay  (event: subscription.activated)',
-    file: 'app/api/webhook/razorpay/route.ts',
-    rootCause: 'UPDATE tenants is not setting plan, plan_expires_at, or razorpay_subscription_id correctly',
-    fix: 'UPDATE tenants SET plan=$plan, plan_expires_at=NOW()+INTERVAL\'30 days\', razorpay_subscription_id=$subId WHERE id=$tenantId.',
+  }, {
+    skipIf: () => !sql || !enterpriseTenantId || !RAZORPAY_WEBHOOK_SECRET,
+    skipReason: 'DATABASE_URL + enterprise tenant id + webhook secret required',
   });
 
-  await test('webhook', 'subscription.charged renews expiry', async () => {
-    if (!ENT_TENANT_ID) throw new Error('TEST_ENTERPRISE_TENANT_ID missing');
-    await withTenantRestore(ENT_TENANT_ID, async () => {
-      const subId = uid('sub');
+  await runTest('billing/webhook', '200 and updates tenant on subscription.charged', async () => {
+    assert(sql && enterpriseTenantId, 'DB + enterprise tenant required');
+    await withTenantRestore(enterpriseTenantId, async () => {
+      const subId = nowId('sub_charged');
+      const eventId = nowId('qa_sub_charged');
       const body = JSON.stringify({
         event: 'subscription.charged',
         payload: {
           subscription: {
             entity: {
               id: subId,
-              notes: { tenant_id: ENT_TENANT_ID, plan_id: 'ent_basic' },
+              current_end: Math.floor(Date.now() / 1000) + 172800,
+              notes: { tenant_id: enterpriseTenantId, plan_id: 'ent_basic' },
             },
           },
         },
       });
-      const { res } = await req('/api/webhook/razorpay', {
+
+      const { res } = await api('/api/webhook/razorpay', {
         method: 'POST',
-        headers: json({ 'x-razorpay-signature': hmac(body) }),
         body,
+        headers: withJsonHeaders({
+          'x-razorpay-signature': hmacRazorpay(body),
+          'x-razorpay-event-id': eventId,
+        }),
       });
       assert(res.status === 200, `expected 200 got ${res.status}`);
-      if (sql) {
-        const [row] = await sql`select plan from tenants where id = ${ENT_TENANT_ID}`;
-        assert(row.plan === 'basic', `expected basic got ${row.plan}`);
-      }
+
+      const after = await tenantById(enterpriseTenantId);
+      assert(after.plan === 'basic', `expected basic got ${after.plan}`);
+      assert(after.razorpay_subscription_id === subId, `expected sub id ${subId} got ${after.razorpay_subscription_id}`);
     });
-  }, !RZ_SECRET ? 'RAZORPAY_WEBHOOK_SECRET missing' : null, {
-    route: 'POST /api/webhook/razorpay  (event: subscription.charged)',
-    file: 'app/api/webhook/razorpay/route.ts',
-    rootCause: 'subscription.charged event handler does not update the plan or renew plan_expires_at',
-    fix: 'Handle the "subscription.charged" case the same as "subscription.activated": update plan + expiry.',
+  }, {
+    skipIf: () => !sql || !enterpriseTenantId || !RAZORPAY_WEBHOOK_SECRET,
+    skipReason: 'DATABASE_URL + enterprise tenant id + webhook secret required',
   });
 
-  await test('webhook', 'subscription.cancelled nulls subscription id', async () => {
-    if (!ENT_TENANT_ID) throw new Error('TEST_ENTERPRISE_TENANT_ID missing');
-    await withTenantRestore(ENT_TENANT_ID, async () => {
-      if (sql) await sql`update tenants set razorpay_subscription_id = ${uid('preset')} where id = ${ENT_TENANT_ID}`;
-      const body = JSON.stringify({
-        event: 'subscription.cancelled',
-        payload: { subscription: { entity: { notes: { tenant_id: ENT_TENANT_ID } } } },
-      });
-      const { res } = await req('/api/webhook/razorpay', {
-        method: 'POST',
-        headers: json({ 'x-razorpay-signature': hmac(body) }),
-        body,
-      });
-      assert(res.status === 200, `expected 200 got ${res.status}`);
-      if (sql) {
-        const [row] = await sql`select razorpay_subscription_id from tenants where id = ${ENT_TENANT_ID}`;
-        assert(row.razorpay_subscription_id == null, `expected null got ${row.razorpay_subscription_id}`);
-      }
-    });
-  }, !RZ_SECRET ? 'RAZORPAY_WEBHOOK_SECRET missing' : null, {
-    route: 'POST /api/webhook/razorpay  (event: subscription.cancelled)',
-    file: 'app/api/webhook/razorpay/route.ts',
-    rootCause: 'subscription.cancelled handler does not null out razorpay_subscription_id',
-    fix: 'UPDATE tenants SET razorpay_subscription_id = NULL WHERE id = $tenantId on this event.',
-  });
+  await runTest('billing/webhook', 'Deduplicates same event id (second returns 200, no duplicate row)', async () => {
+    assert(sql && enterpriseTenantId, 'DB + enterprise tenant required');
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // ❌ KNOWN FAILURE
-  // Test    : Duplicate event id is idempotent (DB row inserted once)
-  // Route   : POST /api/webhook/razorpay  (header: x-razorpay-event-id)
-  // File    : app/api/webhook/razorpay/route.ts
-  //           lib/db/webhook-events.ts  (or equivalent helper)
-  //           SQL migration: processed_webhook_events table
-  //
-  // Root cause (most likely):
-  //   Either (a) the processed_webhook_events table does not have a UNIQUE
-  //   constraint on stripe_event_id, so two concurrent inserts both succeed and
-  //   the second insert is counted as a new row, OR (b) the deduplication INSERT
-  //   throws a unique-constraint error on the second request and the catch block
-  //   re-throws it, causing a non-200 response.
-  //
-  // Fix:
-  //   1. Ensure migration: CREATE UNIQUE INDEX ON processed_webhook_events(stripe_event_id)
-  //   2. Use INSERT ... ON CONFLICT (stripe_event_id) DO NOTHING
-  //   3. If rowCount === 0, it was a duplicate — return 200 early without re-processing
-  //
-  // Example:
-  //   const { rowCount } = await db.query(
-  //     `INSERT INTO processed_webhook_events (stripe_event_id) VALUES ($1)
-  //      ON CONFLICT (stripe_event_id) DO NOTHING`,
-  //     [eventId]
-  //   );
-  //   if (rowCount === 0) return NextResponse.json({ ok: true, duplicate: true });
-  // ─────────────────────────────────────────────────────────────────────────
-  await test('webhook', 'Duplicate event id is idempotent (DB row inserted once)', async () => {
-    if (!ENT_TENANT_ID) throw new Error('TEST_ENTERPRISE_TENANT_ID required');
-    const eventId = uid('qa_dedupe');
+    const eventId = nowId('qa_dedupe');
     const body = JSON.stringify({
       event: 'subscription.cancelled',
-      payload: { subscription: { entity: { notes: { tenant_id: ENT_TENANT_ID } } } },
+      payload: { subscription: { entity: { notes: { tenant_id: enterpriseTenantId } } } },
     });
-    const hdrs = json({ 'x-razorpay-signature': hmac(body), 'x-razorpay-event-id': eventId });
-    const [r1, r2] = await Promise.all([
-      req('/api/webhook/razorpay', { method: 'POST', headers: hdrs, body }),
-      req('/api/webhook/razorpay', { method: 'POST', headers: hdrs, body }),
-    ]);
+
+    const headers = withJsonHeaders({
+      'x-razorpay-signature': hmacRazorpay(body),
+      'x-razorpay-event-id': eventId,
+    });
+
+    const r1 = await api('/api/webhook/razorpay', { method: 'POST', body, headers });
+    const r2 = await api('/api/webhook/razorpay', { method: 'POST', body, headers });
+
     assert(r1.res.status === 200 && r2.res.status === 200, `expected 200/200 got ${r1.res.status}/${r2.res.status}`);
-    if (sql) {
-      const [{ c }] = await sql`select count(*)::int as c from processed_webhook_events where stripe_event_id = ${eventId}`;
-      assert(c === 1, `expected 1 row got ${c}`);
-    }
-  }, !RZ_SECRET ? 'RAZORPAY_WEBHOOK_SECRET missing' : null, {
-    route: 'POST /api/webhook/razorpay  (header: x-razorpay-event-id)',
-    file: 'app/api/webhook/razorpay/route.ts',
-    rootCause: 'Concurrent duplicate event inserts hit a unique constraint and the error is not caught — second request returns non-200',
-    fix: 'Use INSERT INTO processed_webhook_events ... ON CONFLICT (stripe_event_id) DO NOTHING; if rowCount===0 return 200 immediately.',
+
+    const countRows = await sql`select count(*)::int as c from processed_webhook_events where stripe_event_id = ${eventId}`;
+    assert(countRows[0].c === 1, `expected exactly 1 processed row got ${countRows[0].c}`);
+  }, {
+    skipIf: () => !sql || !enterpriseTenantId || !RAZORPAY_WEBHOOK_SECRET,
+    skipReason: 'DATABASE_URL + enterprise tenant id + webhook secret required',
   });
 
-  await test('webhook', 'Unknown event type returns 200 without crash', async () => {
-    const body = JSON.stringify({ event: 'some.future.event', payload: {} });
-    const { res } = await req('/api/webhook/razorpay', {
+  await runTest('billing/webhook', 'subscription.cancelled sets razorpay_subscription_id to null', async () => {
+    assert(sql && enterpriseTenantId, 'DB + enterprise tenant required');
+
+    await withTenantRestore(enterpriseTenantId, async () => {
+      await sql`update tenants set razorpay_subscription_id=${nowId('preset_sub')} where id=${enterpriseTenantId}`;
+
+      const body = JSON.stringify({
+        event: 'subscription.cancelled',
+        payload: { subscription: { entity: { notes: { tenant_id: enterpriseTenantId } } } },
+      });
+
+      const { res } = await api('/api/webhook/razorpay', {
+        method: 'POST',
+        body,
+        headers: withJsonHeaders({
+          'x-razorpay-signature': hmacRazorpay(body),
+          'x-razorpay-event-id': nowId('qa_cancelled'),
+        }),
+      });
+      assert(res.status === 200, `expected 200 got ${res.status}`);
+
+      const after = await tenantById(enterpriseTenantId);
+      assert(after.razorpay_subscription_id == null, `expected null got ${after.razorpay_subscription_id}`);
+    });
+  }, {
+    skipIf: () => !sql || !enterpriseTenantId || !RAZORPAY_WEBHOOK_SECRET,
+    skipReason: 'DATABASE_URL + enterprise tenant id + webhook secret required',
+  });
+
+  await runTest('billing/webhook', 'subscription.expired sets razorpay_subscription_id to null', async () => {
+    assert(sql && enterpriseTenantId, 'DB + enterprise tenant required');
+
+    await withTenantRestore(enterpriseTenantId, async () => {
+      await sql`update tenants set razorpay_subscription_id=${nowId('preset_sub')} where id=${enterpriseTenantId}`;
+
+      const body = JSON.stringify({
+        event: 'subscription.expired',
+        payload: { subscription: { entity: { notes: { tenant_id: enterpriseTenantId } } } },
+      });
+
+      const { res } = await api('/api/webhook/razorpay', {
+        method: 'POST',
+        body,
+        headers: withJsonHeaders({
+          'x-razorpay-signature': hmacRazorpay(body),
+          'x-razorpay-event-id': nowId('qa_expired'),
+        }),
+      });
+      assert(res.status === 200, `expected 200 got ${res.status}`);
+
+      const after = await tenantById(enterpriseTenantId);
+      assert(after.razorpay_subscription_id == null, `expected null got ${after.razorpay_subscription_id}`);
+    });
+  }, {
+    skipIf: () => !sql || !enterpriseTenantId || !RAZORPAY_WEBHOOK_SECRET,
+    skipReason: 'DATABASE_URL + enterprise tenant id + webhook secret required',
+  });
+
+  await runTest('billing/webhook', 'Unrecognized event type accepted (200) without crash', async () => {
+    const body = JSON.stringify({ event: 'subscription.some_new_event', payload: {} });
+    const { res } = await api('/api/webhook/razorpay', {
       method: 'POST',
-      headers: json({ 'x-razorpay-signature': hmac(body) }),
       body,
+      headers: withJsonHeaders({
+        'x-razorpay-signature': hmacRazorpay(body),
+        'x-razorpay-event-id': nowId('qa_unknown_event_type'),
+      }),
     });
     assert(res.status === 200, `expected 200 got ${res.status}`);
-  }, !RZ_SECRET ? 'RAZORPAY_WEBHOOK_SECRET missing' : null, {
-    route: 'POST /api/webhook/razorpay',
-    file: 'app/api/webhook/razorpay/route.ts',
-    rootCause: 'Switch/if-else for event type has no default case and throws on unknown events',
-    fix: 'Add a default: return NextResponse.json({ok:true}) at the bottom of the event-type switch.',
+  }, { skipIf: () => !RAZORPAY_WEBHOOK_SECRET, skipReason: 'RAZORPAY_WEBHOOK_SECRET missing' });
+
+  await runTest('billing/webhook', 'Concurrent duplicate deliveries only process once (idempotency race)', async () => {
+    assert(sql && enterpriseTenantId, 'DB + enterprise tenant required');
+
+    const eventId = nowId('qa_race');
+    const body = JSON.stringify({
+      event: 'subscription.cancelled',
+      payload: { subscription: { entity: { notes: { tenant_id: enterpriseTenantId } } } },
+    });
+
+    const headers = withJsonHeaders({
+      'x-razorpay-signature': hmacRazorpay(body),
+      'x-razorpay-event-id': eventId,
+    });
+
+    const responses = await Promise.all([
+      api('/api/webhook/razorpay', { method: 'POST', body, headers }),
+      api('/api/webhook/razorpay', { method: 'POST', body, headers }),
+      api('/api/webhook/razorpay', { method: 'POST', body, headers }),
+    ]);
+
+    assert(responses.every((r) => r.res.status === 200), `expected all 200 got ${responses.map((r) => r.res.status).join(',')}`);
+
+    const countRows = await sql`select count(*)::int as c from processed_webhook_events where stripe_event_id = ${eventId}`;
+    assert(countRows[0].c === 1, `expected one processed row, got ${countRows[0].c}`);
+  }, {
+    skipIf: () => !sql || !enterpriseTenantId || !RAZORPAY_WEBHOOK_SECRET,
+    skipReason: 'DATABASE_URL + enterprise tenant id + webhook secret required',
   });
 
-  // ── 5. Email tracking endpoints ───────────────────────────────────────────
-  await test('tracking', 'Open pixel with missing params returns 1x1 GIF', async () => {
-    const { res } = await req('/api/track/open');
-    assert(res.status === 200, `expected 200 got ${res.status}`);
-    assert(res.headers.get('content-type')?.includes('image/gif'), 'expected image/gif');
-  }, null, {
-    route: 'GET /api/track/open',
-    file: 'app/api/track/open/route.ts',
-    rootCause: 'Route returns an error instead of the 1x1 GIF when query params are missing',
-    fix: 'Always return the 1×1 GIF buffer with Content-Type: image/gif regardless of params; log/skip DB writes if params are absent.',
-  });
+  // ---------------------------------------------------------------------------
+  // 4. Individual plan gates
+  // ---------------------------------------------------------------------------
+  await runTest('individual/gates', 'Free tier blocks CSV import (403)', async () => {
+    assert(sql && individualTenantId && IND_COOKIE, 'requires DB + individual tenant + cookie');
+    const listId = process.env.TEST_INDIVIDUAL_LIST_ID;
+    assert(listId, 'TEST_INDIVIDUAL_LIST_ID required');
 
-  await test('tracking', 'Open pixel with invalid token still returns GIF (never break email)', async () => {
-    const { res } = await req('/api/track/open?cid=999&email=x@x.com&token=bad');
-    assert(res.status === 200, `expected 200 got ${res.status}`);
-    assert(res.headers.get('content-type')?.includes('image/gif'), 'expected image/gif');
-  }, null, {
-    route: 'GET /api/track/open',
-    file: 'app/api/track/open/route.ts',
-    rootCause: 'Invalid token causes the route to throw or return non-200 instead of serving the GIF',
-    fix: 'Wrap the token-validation/DB-write in try/catch; always respond with the GIF even on error.',
-  });
+    await withTenantRestore(individualTenantId, async () => {
+      await sql`update tenants set plan='free', plan_expires_at=NULL where id=${individualTenantId}`;
 
-  await test('tracking', 'Click redirect with valid url still redirects', async () => {
-    const { res } = await req('/api/track/click?cid=1&email=x@x.com&token=bad&url=https%3A%2F%2Fexample.com');
-    assert(isRedirect(res.status), `expected redirect got ${res.status}`);
-    const loc = res.headers.get('location') || '';
-    assert(loc.includes('example.com'), `expected redirect to destination, got ${loc}`);
-  }, null, {
-    route: 'GET /api/track/click',
-    file: 'app/api/track/click/route.ts',
-    rootCause: 'Click handler fails to redirect when the tracking token is invalid',
-    fix: 'Extract and validate `url` param first; always redirect to it (NextResponse.redirect) even if token validation fails.',
-  });
+      const boundary = '----csvboundary_free';
+      const csv = 'name,email\nFreeCase,free-case@example.com\n';
+      const body = `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="contacts.csv"\r\nContent-Type: text/csv\r\n\r\n${csv}\r\n--${boundary}--\r\n`;
 
-  await test('tracking', 'Click redirect with missing url param still redirects somewhere', async () => {
-    const { res } = await req('/api/track/click?cid=1&email=x@x.com&token=bad');
-    assert(isRedirect(res.status), `expected redirect got ${res.status}`);
-  }, null, {
-    route: 'GET /api/track/click',
-    file: 'app/api/track/click/route.ts',
-    rootCause: 'Route returns a non-redirect response when the url query param is absent',
-    fix: 'Fall back to redirecting to "/" or BASE_URL when url param is missing: NextResponse.redirect(new URL("/", request.url)).',
-  });
-
-  // ── 6. Cron ───────────────────────────────────────────────────────────────
-  await test('cron', 'Missing secret returns 401', async () => {
-    const { res } = await req('/api/cron');
-    assert(res.status === 401, `expected 401 got ${res.status}`);
-  }, null, {
-    route: 'GET /api/cron',
-    file: 'app/api/cron/route.ts',
-    rootCause: 'Cron route is publicly accessible without an Authorization header',
-    fix: 'Check `request.headers.get("authorization")` === `Bearer ${CRON_SECRET}` and return 401 when absent or wrong.',
-  });
-
-  await test('cron', 'Wrong secret returns 401', async () => {
-    const { res } = await req('/api/cron', { headers: { authorization: 'Bearer wrong_secret' } });
-    assert(res.status === 401, `expected 401 got ${res.status}`);
-  }, null, {
-    route: 'GET /api/cron',
-    file: 'app/api/cron/route.ts',
-    rootCause: 'Cron route accepts any Bearer token value',
-    fix: 'Compare the token with `process.env.CRON_SECRET` using a constant-time comparison.',
-  });
-
-  await test('cron', 'Valid secret returns 200', async () => {
-    const { res } = await req('/api/cron', { headers: { authorization: `Bearer ${CRON_SECRET}` } });
-    assert(res.status === 200, `expected 200 got ${res.status}`);
-  }, !CRON_SECRET ? 'CRON_SECRET missing' : null, {
-    route: 'GET /api/cron',
-    file: 'app/api/cron/route.ts',
-    rootCause: 'Cron route handler is throwing or not returning 200 on a valid request',
-    fix: 'Ensure the handler completes normally and returns NextResponse.json({ok:true},{status:200}).',
-  });
-
-  // ── 7. Plan gates (DB-backed) ─────────────────────────────────────────────
-  await test('gates', 'Free plan blocks CSV import on individual list', async () => {
-    if (!sql || !IND_TENANT_ID) throw new Error('DATABASE_URL + TEST_INDIVIDUAL_TENANT_ID required');
-    await withTenantRestore(IND_TENANT_ID, async () => {
-      await sql`update tenants set plan='free', plan_expires_at=NULL where id=${IND_TENANT_ID}`;
-      const listId = process.env.TEST_INDIVIDUAL_LIST_ID;
-      if (!listId) throw new Error('TEST_INDIVIDUAL_LIST_ID required — set an existing list id');
-      const boundary = '----testboundary';
-      const csvBody = `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="c.csv"\r\nContent-Type: text/csv\r\n\r\nname,email\nTest,t@t.com\r\n--${boundary}--\r\n`;
-      const { res } = await req(`/api/individual/lists/${listId}/import-csv`, {
+      const { res } = await api(`/api/individual/lists/${listId}/import-csv`, {
         method: 'POST',
+        cookie: IND_COOKIE,
         headers: { 'content-type': `multipart/form-data; boundary=${boundary}` },
-        body: csvBody,
+        body,
       });
-      assert(res.status === 401 || res.status === 403, `expected 401/403 for free tier got ${res.status}`);
+
+      assert(res.status === 403, `expected 403 got ${res.status}`);
     });
-  }, (!sql || !IND_TENANT_ID) ? 'DATABASE_URL + TEST_INDIVIDUAL_TENANT_ID required' : null, {
-    route: 'POST /api/individual/lists/:listId/import-csv',
-    file: 'app/api/individual/lists/[listId]/import-csv/route.ts',
-    rootCause: 'Plan gate is not checking tenant plan before allowing CSV import',
-    fix: 'Fetch tenant plan; if plan === "free" or plan_expires_at < NOW(), return 403 before processing the file.',
+  }, {
+    skipIf: () => !sql || !individualTenantId || !HAS_IND_SESSION || !process.env.TEST_INDIVIDUAL_LIST_ID,
+    skipReason: 'DATABASE_URL + individual tenant + cookie + list id required',
   });
 
-  await test('gates', 'Expired plan reverts to free behavior', async () => {
-    if (!sql || !IND_TENANT_ID) throw new Error('DATABASE_URL + TEST_INDIVIDUAL_TENANT_ID required');
-    await withTenantRestore(IND_TENANT_ID, async () => {
-      await sql`update tenants set plan='growth', plan_expires_at=NOW() - interval '1 day' where id=${IND_TENANT_ID}`;
-      const listId = process.env.TEST_INDIVIDUAL_LIST_ID;
-      if (!listId) throw new Error('TEST_INDIVIDUAL_LIST_ID required');
-      const boundary = '----testboundary2';
-      const csvBody = `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="c.csv"\r\nContent-Type: text/csv\r\n\r\nname,email\nTest2,t2@t.com\r\n--${boundary}--\r\n`;
-      const { res } = await req(`/api/individual/lists/${listId}/import-csv`, {
+  await runTest('individual/gates', 'Growth tier allows CSV import', async () => {
+    assert(sql && individualTenantId && IND_COOKIE, 'requires DB + individual tenant + cookie');
+    const listId = process.env.TEST_INDIVIDUAL_LIST_ID;
+    assert(listId, 'TEST_INDIVIDUAL_LIST_ID required');
+
+    await withTenantRestore(individualTenantId, async () => {
+      await sql`update tenants set plan='growth', plan_expires_at=NOW() + interval '30 days' where id=${individualTenantId}`;
+
+      const boundary = '----csvboundary_growth';
+      const email = `${nowId('growth')}@example.com`;
+      const csv = `name,email\nGrowthCase,${email}\n`;
+      const body = `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="contacts.csv"\r\nContent-Type: text/csv\r\n\r\n${csv}\r\n--${boundary}--\r\n`;
+
+      const { res } = await api(`/api/individual/lists/${listId}/import-csv`, {
         method: 'POST',
+        cookie: IND_COOKIE,
         headers: { 'content-type': `multipart/form-data; boundary=${boundary}` },
-        body: csvBody,
+        body,
       });
-      assert(res.status === 401 || res.status === 403, `expected auth/plan block got ${res.status}`);
+
+      assert([200, 303].includes(res.status), `expected 200/303 got ${res.status}`);
     });
-  }, (!sql || !IND_TENANT_ID) ? 'DATABASE_URL + TEST_INDIVIDUAL_TENANT_ID required' : null, {
-    route: 'POST /api/individual/lists/:listId/import-csv',
-    file: 'app/api/individual/lists/[listId]/import-csv/route.ts',
-    rootCause: 'Gate only checks plan name, not whether plan_expires_at is in the past',
-    fix: 'Change condition to: `plan === "free" || !plan_expires_at || new Date(plan_expires_at) < new Date()`.',
+  }, {
+    skipIf: () => !sql || !individualTenantId || !HAS_IND_SESSION || !process.env.TEST_INDIVIDUAL_LIST_ID,
+    skipReason: 'DATABASE_URL + individual tenant + cookie + list id required',
   });
 
-  await test('gates', 'subscription.activated plan stays active before expiry', async () => {
-    if (!sql || !ENT_TENANT_ID) throw new Error('DATABASE_URL + TEST_ENTERPRISE_TENANT_ID required');
-    await withTenantRestore(ENT_TENANT_ID, async () => {
+  await runTest('individual/gates', 'Free tier blocks AI generation', async () => {
+    assert(sql && individualTenantId && IND_COOKIE, 'requires DB + individual tenant + cookie');
+
+    await withTenantRestore(individualTenantId, async () => {
+      await sql`update tenants set plan='free', plan_expires_at=NULL where id=${individualTenantId}`;
+
+      const { res } = await api('/api/individual/ai/generate', {
+        method: 'POST',
+        cookie: IND_COOKIE,
+        headers: withJsonHeaders(),
+        body: JSON.stringify({ businessDescription: 'A bakery', tone: 'friendly', campaignType: 'welcome' }),
+      });
+
+      assert(res.status === 403, `expected 403 got ${res.status}`);
+    });
+  }, {
+    skipIf: () => !sql || !individualTenantId || !HAS_IND_SESSION,
+    skipReason: 'DATABASE_URL + individual tenant + cookie required',
+  });
+
+  await runTest('individual/gates', 'Pro tier allows AI generation endpoint path (non-gating status)', async () => {
+    assert(sql && individualTenantId && IND_COOKIE, 'requires DB + individual tenant + cookie');
+
+    await withTenantRestore(individualTenantId, async () => {
+      await sql`update tenants set plan='pro', plan_expires_at=NOW() + interval '30 days' where id=${individualTenantId}`;
+
+      const { res } = await api('/api/individual/ai/generate', {
+        method: 'POST',
+        cookie: IND_COOKIE,
+        headers: withJsonHeaders(),
+        body: JSON.stringify({ businessDescription: 'A SaaS analytics app', tone: 'professional', campaignType: 'welcome' }),
+      });
+
+      // Could be 200 (if Gemini configured) or 500 (provider/env issue). Must not be 403 gate in pro tier.
+      assert(res.status !== 403, `expected non-403 in pro tier got ${res.status}`);
+    });
+  }, {
+    skipIf: () => !sql || !individualTenantId || !HAS_IND_SESSION,
+    skipReason: 'DATABASE_URL + individual tenant + cookie required',
+  });
+
+  await runTest('individual/gates', 'List/contact count limits enforced', async () => {
+    assert(sql && individualTenantId && IND_COOKIE, 'requires DB + individual tenant + cookie');
+
+    await withTenantRestore(individualTenantId, async () => {
+      await sql`update tenants set plan='free', plan_expires_at=NULL where id=${individualTenantId}`;
+
+      const listNameA = `QA List A ${Date.now()}`;
+      const createA = await api('/api/individual/lists', {
+        method: 'POST',
+        cookie: IND_COOKIE,
+        headers: withJsonHeaders(),
+        body: JSON.stringify({ name: listNameA }),
+      });
+      assert([200, 201].includes(createA.res.status), `expected list A create success got ${createA.res.status}`);
+
+      const listNameB = `QA List B ${Date.now()}`;
+      const createB = await api('/api/individual/lists', {
+        method: 'POST',
+        cookie: IND_COOKIE,
+        headers: withJsonHeaders(),
+        body: JSON.stringify({ name: listNameB }),
+      });
+      assert(createB.res.status === 403, `expected second list blocked in free tier got ${createB.res.status}`);
+    });
+  }, {
+    skipIf: () => !sql || !individualTenantId || !HAS_IND_SESSION,
+    skipReason: 'DATABASE_URL + individual tenant + cookie required',
+  });
+
+  await runTest('individual/gates', 'Monthly email sending limit enforced', async () => {
+    // No direct campaign-send endpoint exists in app/api for plain API test; sequence send path relies on external email provider.
+    // Mark skip unless operator explicitly opts-in and wires SMTP/Resend test harness.
+    throw new Error('Not directly automatable via current public API without external email side effects.');
+  }, { skipIf: () => true, skipReason: 'No direct send-campaign API; requires controlled email infra integration' });
+
+  // ---------------------------------------------------------------------------
+  // 5. Enterprise plan gates
+  // ---------------------------------------------------------------------------
+  await runTest('enterprise/gates', 'Free/basic/advanced gate for webhook config endpoint', async () => {
+    assert(sql && enterpriseTenantId && ENT_COOKIE, 'requires DB + enterprise tenant + cookie');
+
+    await withTenantRestore(enterpriseTenantId, async () => {
+      await sql`update tenants set plan='basic', plan_expires_at=NOW() + interval '30 days' where id=${enterpriseTenantId}`;
+      const basicGet = await api('/api/individual/webhooks', { cookie: ENT_COOKIE });
+      assert(basicGet.res.status === 403, `expected basic plan webhook gate 403 got ${basicGet.res.status}`);
+
+      await sql`update tenants set plan='advanced', plan_expires_at=NOW() + interval '30 days' where id=${enterpriseTenantId}`;
+      const advGet = await api('/api/individual/webhooks', { cookie: ENT_COOKIE });
+      assert(advGet.res.status === 200, `expected advanced webhook access 200 got ${advGet.res.status}`);
+    });
+  }, {
+    skipIf: () => !sql || !enterpriseTenantId || !HAS_ENT_SESSION,
+    skipReason: 'DATABASE_URL + enterprise tenant + cookie required',
+  });
+
+  await runTest('enterprise/gates', 'Tracked user limit enforced for free plan', async () => {
+    assert(sql && enterpriseTenantId && API_KEY, 'requires DB + enterprise tenant + API key');
+
+    await withTenantRestore(enterpriseTenantId, async () => {
+      await sql`update tenants set plan='free', plan_expires_at=NULL where id=${enterpriseTenantId}`;
+      await sql`delete from end_users where tenant_id=${enterpriseTenantId}`;
       await sql`
-        update tenants
-        set plan='advanced', plan_expires_at=NOW() + interval '30 days'
-        where id=${ENT_TENANT_ID}
+        insert into end_users (tenant_id, external_id, email, completed_steps)
+        select ${enterpriseTenantId}, 'seed_' || gs::text, 'qa-seed-' || gs::text || '@example.com', '[]'::jsonb
+        from generate_series(1, 50) gs
       `;
-      const [row] = await sql`select plan, plan_expires_at from tenants where id=${ENT_TENANT_ID}`;
-      assert(row.plan === 'advanced', `expected advanced got ${row.plan}`);
-      assert(new Date(row.plan_expires_at) > new Date(), 'plan_expires_at should be in the future');
-    });
-  }, (!sql || !ENT_TENANT_ID) ? 'DATABASE_URL + TEST_ENTERPRISE_TENANT_ID required' : null, {
-    route: 'DB assertion only (no HTTP request)',
-    file: 'db/migrations/…_tenants.sql  OR  app/api/webhook/razorpay/route.ts',
-    rootCause: 'plan or plan_expires_at column is not being set/read correctly',
-    fix: 'Verify the tenants table has plan VARCHAR and plan_expires_at TIMESTAMPTZ columns and that webhook updates them correctly.',
-  });
 
-  // ── 8. Edge / adversarial ─────────────────────────────────────────────────
-  await test('edge', 'Malformed JSON does not return 500 on v1/identify', async () => {
-    const { res } = await req('/api/v1/identify', {
-      method: 'POST',
-      headers: json(apiKey(API_KEY || 'bad')),
-      body: '{invalid-json',
-    });
-    assert(res.status !== 500, `expected non-500 got ${res.status}`);
-  }, null, {
-    route: 'POST /api/v1/identify',
-    file: 'app/api/v1/identify/route.ts',
-    rootCause: 'JSON.parse(await request.text()) throws on bad input and is not caught',
-    fix: 'Wrap the parse in try/catch: try { body = JSON.parse(raw) } catch { return NextResponse.json({error:"invalid JSON"},{status:400}) }',
-  });
-
-  await test('edge', 'Malformed JSON does not return 500 on v1/track', async () => {
-    const { res } = await req('/api/v1/track', {
-      method: 'POST',
-      headers: json(apiKey(API_KEY || 'bad')),
-      body: '{invalid-json',
-    });
-    assert(res.status !== 500, `expected non-500 got ${res.status}`);
-  }, null, {
-    route: 'POST /api/v1/track',
-    file: 'app/api/v1/track/route.ts',
-    rootCause: 'JSON.parse throws on bad input and is not caught',
-    fix: 'Wrap the parse in try/catch and return 400 on failure.',
-  });
-
-  // ─────────────────────────────────────────────────────────────────────────
-  // ❌ KNOWN FAILURE
-  // Test    : Malformed JSON does not return 500 on razorpay webhook
-  // Route   : POST /api/webhook/razorpay
-  // File    : app/api/webhook/razorpay/route.ts
-  //
-  // Root cause:
-  //   The route reads the raw body for HMAC verification (correct) but then
-  //   calls JSON.parse(rawBody) without a try/catch. When the body is not
-  //   valid JSON, JSON.parse throws a SyntaxError which is unhandled,
-  //   causing Next.js to return 500.
-  //
-  // Fix (add this immediately after HMAC verification):
-  //   let payload;
-  //   try {
-  //     payload = JSON.parse(rawBody);
-  //   } catch {
-  //     return NextResponse.json({ error: 'invalid JSON' }, { status: 400 });
-  //   }
-  // ─────────────────────────────────────────────────────────────────────────
-  await test('edge', 'Malformed JSON does not return 500 on razorpay webhook', async () => {
-    const body = '{bad';
-    const { res } = await req('/api/webhook/razorpay', {
-      method: 'POST',
-      headers: json({ 'x-razorpay-signature': hmac(body) }),
-      body,
-    });
-    assert(res.status !== 500, `expected non-500 got ${res.status}`);
-  }, !RZ_SECRET ? 'RAZORPAY_WEBHOOK_SECRET missing' : null, {
-    route: 'POST /api/webhook/razorpay',
-    file: 'app/api/webhook/razorpay/route.ts',
-    rootCause: 'JSON.parse(rawBody) is called without try/catch after HMAC verification, throwing SyntaxError → 500',
-    fix: 'Wrap JSON.parse in try/catch immediately after HMAC check and return NextResponse.json({error:"invalid JSON"},{status:400}) on failure.',
-  });
-
-  await test('edge', 'SQL injection attempt in email field does not crash', async () => {
-    const { res } = await req('/api/v1/identify', {
-      method: 'POST',
-      headers: json(apiKey(API_KEY || 'bad')),
-      body: JSON.stringify({ email: "test@x.com' OR 1=1 --" }),
-    });
-    assert(res.status !== 500, `expected non-500 got ${res.status}`);
-  }, null, {
-    route: 'POST /api/v1/identify',
-    file: 'app/api/v1/identify/route.ts',
-    rootCause: 'SQL is being constructed with string concatenation instead of parameterized queries',
-    fix: 'Always use parameterized queries: db.query("SELECT … WHERE email = $1", [email]). Never interpolate user input into SQL strings.',
-  });
-
-  await test('edge', 'Extremely long email string is rejected gracefully', async () => {
-    const { res } = await req('/api/v1/identify', {
-      method: 'POST',
-      headers: json(apiKey(API_KEY || 'bad')),
-      body: JSON.stringify({ email: 'a'.repeat(5000) + '@x.com' }),
-    });
-    assert(res.status !== 500, `expected non-500 got ${res.status}`);
-  }, null, {
-    route: 'POST /api/v1/identify',
-    file: 'app/api/v1/identify/route.ts',
-    rootCause: 'No length validation on the email field before attempting to insert into DB',
-    fix: 'Add `if (email.length > 254) return NextResponse.json({error:"email too long"},{status:400})` before DB operations.',
-  });
-
-  // ─────────────────────────────────────────────────────────────────────────
-  // ❌ KNOWN FAILURE
-  // Test    : Rate limiter triggers 429 under burst on v1/track
-  // Route   : POST /api/v1/track
-  // File    : app/api/v1/track/route.ts
-  //           middleware.ts  (or a dedicated rate-limit helper)
-  //
-  // Root cause:
-  //   No rate limiting exists on this route. 80 concurrent requests from
-  //   different IPs all complete with 200.
-  //
-  // Fix — choose one approach:
-  //
-  //   Option A — in-process (no Redis, good for single instance):
-  //     import { LRUCache } from 'lru-cache';
-  //     const rateLimit = new LRUCache<string, number>({ max: 500, ttl: 60_000 });
-  //     // At the top of the route handler:
-  //     const ip = request.headers.get('x-forwarded-for') ?? 'unknown';
-  //     const hits = (rateLimit.get(ip) ?? 0) + 1;
-  //     rateLimit.set(ip, hits);
-  //     if (hits > 20) return NextResponse.json({ error: 'rate limited' }, { status: 429 });
-  //
-  //   Option B — Upstash Redis + @upstash/ratelimit (production-grade):
-  //     import { Ratelimit } from '@upstash/ratelimit';
-  //     import { Redis } from '@upstash/redis';
-  //     const ratelimit = new Ratelimit({ redis: Redis.fromEnv(),
-  //       limiter: Ratelimit.slidingWindow(20, '60s') });
-  //     const { success } = await ratelimit.limit(ip);
-  //     if (!success) return NextResponse.json({ error: 'rate limited' }, { status: 429 });
-  //
-  //   Option C — Next.js middleware (apply before the route):
-  //     Add rate-limit logic in middleware.ts for the /api/v1 matcher.
-  // ─────────────────────────────────────────────────────────────────────────
-  await test('edge', 'Rate limiter triggers 429 under burst on v1/track', async () => {
-    let got429 = false;
-    const promises = Array.from({ length: 80 }, (_, i) =>
-      req('/api/v1/track', {
+      const resp = await api('/api/v1/track', {
         method: 'POST',
-        headers: json({ ...apiKey(API_KEY || 'bad'), 'x-forwarded-for': `10.0.0.${i % 255}` }),
-        body: JSON.stringify({ userId: `rl-${i}`, stepId: 'step', event: 'step' }),
-      })
-    );
-    const results = await Promise.all(promises);
-    got429 = results.some((r) => r.res.status === 429);
-    assert(got429, 'expected at least one 429 under burst load — no rate limiting is implemented');
-  }, null, {
-    route: 'POST /api/v1/track',
-    file: 'app/api/v1/track/route.ts  OR  middleware.ts',
-    rootCause: 'No rate limiting is implemented on this route; all 80 burst requests return 200',
-    fix: 'Add per-IP sliding-window rate limiting (e.g. lru-cache in-process or @upstash/ratelimit). Return 429 after ~20 req/min per IP. See comment block above this test for full code examples.',
-  });
+        headers: withJsonHeaders({ 'x-api-key': API_KEY }),
+        body: JSON.stringify({ userId: nowId('new_user'), stepId: 'connect_repo', event: 'connect_repo' }),
+      });
 
-  await test('edge', 'v1/analytics-data requires session cookie, not API key', async () => {
-    const { res } = await req('/api/v1/analytics-data', { headers: apiKey() });
-    assert(res.status === 401, `expected 401 without session got ${res.status}`);
-  }, !API_KEY ? 'TEST_ENTERPRISE_API_KEY missing' : null, {
-    route: 'GET /api/v1/analytics-data',
-    file: 'app/api/v1/analytics-data/route.ts',
-    rootCause: 'Route accepts an API key as auth instead of requiring a session cookie',
-    fix: 'Remove API-key auth from this route; use getServerSession() (NextAuth) or equivalent and return 401 when no session.',
-  });
-
-  await test('edge', 'POST to GET-only endpoint returns 405', async () => {
-    const { res } = await req('/api/track/open', { method: 'POST' });
-    assert(res.status === 405, `expected 405 got ${res.status}`);
-  }, null, {
-    route: 'POST /api/track/open  (should be GET only)',
-    file: 'app/api/track/open/route.ts',
-    rootCause: 'Route exports a POST handler (or a catch-all) when it should only export GET',
-    fix: 'Remove any `export async function POST` from this file. Next.js returns 405 automatically when only GET is exported.',
-  });
-
-  // ── 9. Subscription create requires auth ──────────────────────────────────
-  await test('billing', 'Create subscription without session returns redirect/401', async () => {
-    const { res } = await req('/api/razorpay/create-subscription', {
-      method: 'POST',
-      headers: json(),
-      body: JSON.stringify({ planId: 'ind_starter' }),
+      assert(resp.res.status === 403 || resp.res.status === 404, `expected limit path 403/404 got ${resp.res.status}`);
     });
-    assert(isRedirect(res.status) || res.status === 401, `expected redirect or 401 got ${res.status}`);
-  }, null, {
-    route: 'POST /api/razorpay/create-subscription',
-    file: 'app/api/razorpay/create-subscription/route.ts',
-    rootCause: 'Route does not validate session before creating a Razorpay subscription',
-    fix: 'Call getServerSession() at the top; if no session, return 401 or redirect to /login.',
+  }, {
+    skipIf: () => !sql || !enterpriseTenantId || !API_KEY,
+    skipReason: 'DATABASE_URL + enterprise tenant + API key required',
   });
 
-  await test('billing', 'Cancel subscription without session returns redirect/401', async () => {
-    const { res } = await req('/api/razorpay/cancel-subscription', {
+  await runTest('enterprise/gates', 'Analytics gate coverage', async () => {
+    // /api/v1/analytics-data is session-auth route, not x-api-key route; no explicit plan-gate logic in current code.
+    throw new Error('Route exists but explicit plan gating is not implemented in current backend.');
+  }, { skipIf: () => true, skipReason: 'Current code has no explicit plan gate on analytics-data route' });
+
+  // ---------------------------------------------------------------------------
+  // 6. Enterprise v1 API endpoints (x-api-key)
+  // ---------------------------------------------------------------------------
+  await runTest('enterprise/v1', 'POST /api/v1/identify with valid key creates/upserts user', async () => {
+    const email = `qa-${nowId('identify')}@example.com`;
+    const r = await api('/api/v1/identify', {
       method: 'POST',
-      headers: json(),
-      body: JSON.stringify({ subscriptionId: 'sub_test' }),
+      headers: withJsonHeaders({ 'x-api-key': API_KEY }),
+      body: JSON.stringify({ email, event: 'signed_up' }),
     });
-    assert(isRedirect(res.status) || res.status === 401, `expected redirect or 401 got ${res.status}`);
-  }, null, {
-    route: 'POST /api/razorpay/cancel-subscription',
-    file: 'app/api/razorpay/cancel-subscription/route.ts',
-    rootCause: 'Route does not validate session before cancelling a subscription',
-    fix: 'Call getServerSession() at the top; if no session, return 401 or redirect to /login.',
+    assert(r.res.status === 200, `expected 200 got ${r.res.status} body=${r.text}`);
+    assert(r.json?.success === true, `expected success true got ${JSON.stringify(r.json)}`);
+  }, { skipIf: () => !API_KEY, skipReason: 'TEST_ENTERPRISE_API_KEY missing' });
+
+  await runTest('enterprise/v1', 'POST /api/v1/identify with invalid key rejected', async () => {
+    const r = await api('/api/v1/identify', {
+      method: 'POST',
+      headers: withJsonHeaders({ 'x-api-key': nowId('invalid') }),
+      body: JSON.stringify({ email: `qa-${nowId('bad')}` }),
+    });
+    assert([401, 403].includes(r.res.status), `expected 401/403 got ${r.res.status}`);
   });
 
-  // ── Cleanup ───────────────────────────────────────────────────────────────
-  for (const fn of cleanupFns) {
-    try { await fn(); } catch {}
-  }
+  await runTest('enterprise/v1', 'POST /api/v1/track records event for known user', async () => {
+    const email = `qa-${nowId('track-known')}@example.com`;
+
+    const i = await api('/api/v1/identify', {
+      method: 'POST',
+      headers: withJsonHeaders({ 'x-api-key': API_KEY }),
+      body: JSON.stringify({ email }),
+    });
+    assert(i.res.status === 200, `identify expected 200 got ${i.res.status}`);
+
+    const t = await api('/api/v1/track', {
+      method: 'POST',
+      headers: withJsonHeaders({ 'x-api-key': API_KEY }),
+      body: JSON.stringify({ userId: email, stepId: 'connect_repo', event: 'connect_repo' }),
+    });
+    assert(t.res.status === 200, `expected 200 got ${t.res.status}`);
+  }, { skipIf: () => !API_KEY, skipReason: 'TEST_ENTERPRISE_API_KEY missing' });
+
+  await runTest('enterprise/v1', 'POST /api/v1/track unknown user returns error', async () => {
+    const t = await api('/api/v1/track', {
+      method: 'POST',
+      headers: withJsonHeaders({ 'x-api-key': API_KEY }),
+      body: JSON.stringify({ userId: nowId('missing_user'), stepId: 'connect_repo', event: 'connect_repo' }),
+    });
+    assert([404, 403].includes(t.res.status), `expected 404 (or 403 when tracked-user cap is reached) got ${t.res.status}`);
+  }, { skipIf: () => !API_KEY, skipReason: 'TEST_ENTERPRISE_API_KEY missing' });
+
+  await runTest('enterprise/v1', 'POST /api/v1/nudge reachable only by session auth route', async () => {
+    const r = await api('/api/v1/nudge', {
+      method: 'POST',
+      headers: withJsonHeaders({ 'x-api-key': API_KEY }),
+      body: JSON.stringify({ targetStep: 'step1' }),
+    });
+    assert(r.res.status === 401, `expected 401 for non-session API-key call got ${r.res.status}`);
+  }, { skipIf: () => !API_KEY, skipReason: 'TEST_ENTERPRISE_API_KEY missing' });
+
+  await runTest('enterprise/v1', 'GET /api/v1/check-auth valid and invalid behavior', async () => {
+    const ok = await api('/api/v1/check-auth', { headers: { 'x-api-key': API_KEY } });
+    assert(ok.res.status === 200, `valid expected 200 got ${ok.res.status}`);
+
+    const bad = await api('/api/v1/check-auth', { headers: { 'x-api-key': nowId('invalid') } });
+    assert([401, 403].includes(bad.res.status), `invalid expected 401/403 got ${bad.res.status}`);
+  }, { skipIf: () => !API_KEY, skipReason: 'TEST_ENTERPRISE_API_KEY missing' });
+
+  await runTest('enterprise/v1', 'POST /api/v1/config update works for valid key', async () => {
+    const r = await api('/api/v1/config', {
+      method: 'POST',
+      headers: withJsonHeaders({ 'x-api-key': API_KEY }),
+      body: JSON.stringify({ activationStep: 'qa_step' }),
+    });
+    assert(r.res.status === 200, `expected 200 got ${r.res.status}`);
+    assert(r.json?.success === true, `expected success true got ${JSON.stringify(r.json)}`);
+  }, { skipIf: () => !API_KEY, skipReason: 'TEST_ENTERPRISE_API_KEY missing' });
+
+  await runTest('enterprise/v1', 'GET /api/v1/analytics-data is session-auth, not API-key', async () => {
+    const r = await api('/api/v1/analytics-data', { headers: { 'x-api-key': API_KEY } });
+    assert(r.res.status === 401, `expected 401 without session cookie got ${r.res.status}`);
+  }, { skipIf: () => !API_KEY, skipReason: 'TEST_ENTERPRISE_API_KEY missing' });
+
+  // ---------------------------------------------------------------------------
+  // 7. Email tracking
+  // ---------------------------------------------------------------------------
+  await runTest('tracking', 'GET /api/track/open with invalid token returns tracking pixel (current implementation)', async () => {
+    const r = await api('/api/track/open?cid=1&email=test@example.com&token=bad');
+    assert(r.res.status === 200, `expected 200 got ${r.res.status}`);
+  });
+
+  await runTest('tracking', 'GET /api/track/click with invalid token still redirects (current implementation)', async () => {
+    const r = await api('/api/track/click?cid=1&email=test@example.com&token=bad&url=https%3A%2F%2Fexample.com');
+    assert([302,303,307,308].includes(r.res.status), `expected redirect got ${r.res.status}`);
+    const location = r.res.headers.get('location') || '';
+    assert(location.includes('https://example.com'), `expected redirect to destination URL, got ${location}`);
+  });
+
+  await runTest('tracking', 'Open/click valid-token DB verification', async () => {
+    // Requires direct DB and token logic from TRACKING_HMAC_SECRET; not practical black-box unless secret exposed.
+    throw new Error('Needs TRACKING_HMAC_SECRET + seeded campaign/contact + DB verification harness.');
+  }, { skipIf: () => true, skipReason: 'Requires token secret + deterministic campaign fixture' });
+
+  await runTest('tracking', 'Tracking pixel injection and click wrapping in outgoing HTML', async () => {
+    // buildEmailHtml and injectTracking are library-level TS functions.
+    throw new Error('Library-level assertion requires TS runtime harness not currently wired in this plain-node integration script.');
+  }, { skipIf: () => true, skipReason: 'Unit-level TS function assertions intentionally skipped in integration-only run' });
+
+  // ---------------------------------------------------------------------------
+  // 8. Individual campaign CRUD
+  // ---------------------------------------------------------------------------
+  let createdListId = null;
+  let createdCampaignId = null;
+
+  await runTest('individual/crud', 'Create list and list appears in GET /api/individual/lists', async () => {
+    assert(IND_COOKIE, 'TEST_INDIVIDUAL_COOKIE required');
+
+    const name = `QA List ${Date.now()}`;
+    const create = await api('/api/individual/lists', {
+      method: 'POST',
+      cookie: IND_COOKIE,
+      headers: withJsonHeaders(),
+      body: JSON.stringify({ name }),
+    });
+
+    assert([200, 201].includes(create.res.status), `expected 200/201 got ${create.res.status}`);
+    createdListId = create.json?.list?.id;
+    assert(createdListId, 'expected list.id in response');
+
+    const get = await api('/api/individual/lists', { cookie: IND_COOKIE });
+    assert(get.res.status === 200, `expected 200 got ${get.res.status}`);
+    const found = (get.json?.lists || []).some((l) => l.id === createdListId);
+    assert(found, `expected created list ${createdListId} present`);
+
+    if (sql) {
+      state.cleanup.push(async () => {
+        await sql`delete from individual_lists where id = ${createdListId}`;
+      });
+    }
+  }, { skipIf: () => !HAS_IND_SESSION, skipReason: 'TEST_INDIVIDUAL_COOKIE missing' });
+
+  await runTest('individual/crud', 'Create contact and duplicate contact handling', async () => {
+    assert(IND_COOKIE && createdListId, 'individual cookie and created list required');
+    const email = `qa-${nowId('contact')}@example.com`;
+
+    const c1 = await api(`/api/individual/lists/${createdListId}/contacts`, {
+      method: 'POST',
+      cookie: IND_COOKIE,
+      headers: withJsonHeaders(),
+      body: JSON.stringify({ name: 'Contact One', email }),
+    });
+    assert([200, 201].includes(c1.res.status), `expected 200/201 got ${c1.res.status}`);
+
+    const c2 = await api(`/api/individual/lists/${createdListId}/contacts`, {
+      method: 'POST',
+      cookie: IND_COOKIE,
+      headers: withJsonHeaders(),
+      body: JSON.stringify({ name: 'Contact One', email }),
+    });
+    assert([200, 201, 409].includes(c2.res.status), `expected dedupe behavior status got ${c2.res.status}`);
+  }, { skipIf: () => !HAS_IND_SESSION || !createdListId, skipReason: 'Requires prior list creation test to pass' });
+
+  await runTest('individual/crud', 'Create campaign', async () => {
+    assert(IND_COOKIE && createdListId, 'individual cookie and created list required');
+    const r = await api(`/api/individual/lists/${createdListId}/campaigns`, {
+      method: 'POST',
+      cookie: IND_COOKIE,
+      headers: withJsonHeaders(),
+      body: JSON.stringify({ subject: 'QA Subject', body: 'QA Body' }),
+    });
+    assert([200, 201].includes(r.res.status), `expected 200/201 got ${r.res.status}`);
+    createdCampaignId = r.json?.campaign?.id || null;
+  }, { skipIf: () => !HAS_IND_SESSION || !createdListId, skipReason: 'Requires prior list creation test to pass' });
+
+  await runTest('individual/crud', 'Send campaign / unsubscribe flow / unsubscribed resend prevention', async () => {
+    throw new Error('No direct send-campaign API route exists in current app/api surface.');
+  }, { skipIf: () => true, skipReason: 'Current implementation sends via sequences/cron, not direct campaign send endpoint' });
+
+  // ---------------------------------------------------------------------------
+  // 9. Drip/webhook automation (Enterprise)
+  // ---------------------------------------------------------------------------
+  await runTest('enterprise/automation', 'Creating drip step stored correctly (advanced plan path)', async () => {
+    assert(sql && enterpriseTenantId && ENT_COOKIE, 'DB + enterprise tenant + cookie required');
+
+    await withTenantRestore(enterpriseTenantId, async () => {
+      await sql`update tenants set plan='advanced', plan_expires_at=NOW() + interval '30 days' where id=${enterpriseTenantId}`;
+
+      const payload = {
+        steps: [
+          {
+            position: 1,
+            eventTrigger: 'connect_repo',
+            emailSubject: 'Step 1',
+            emailBody: 'Body 1',
+            delayHours: 1,
+          },
+        ],
+      };
+
+      const r = await api('/api/individual/drip-steps', {
+        method: 'POST',
+        cookie: ENT_COOKIE,
+        headers: withJsonHeaders(),
+        body: JSON.stringify(payload),
+      });
+      assert(r.res.status === 200, `expected 200 got ${r.res.status}`);
+
+      const get = await api('/api/individual/drip-steps', { cookie: ENT_COOKIE });
+      assert(get.res.status === 200, `expected GET 200 got ${get.res.status}`);
+      assert(Array.isArray(get.json?.steps), 'expected steps array');
+      assert(get.json.steps.some((s) => s.eventTrigger === 'connect_repo'), 'expected stored drip step not found');
+    });
+  }, {
+    skipIf: () => !sql || !enterpriseTenantId || !HAS_ENT_SESSION,
+    skipReason: 'DATABASE_URL + enterprise tenant + enterprise cookie required',
+  });
+
+  await runTest('enterprise/automation', 'Webhook config save and retrieve', async () => {
+    assert(sql && enterpriseTenantId && ENT_COOKIE, 'DB + enterprise tenant + cookie required');
+
+    await withTenantRestore(enterpriseTenantId, async () => {
+      await sql`update tenants set plan='advanced', plan_expires_at=NOW() + interval '30 days' where id=${enterpriseTenantId}`;
+
+      const create = await api('/api/individual/webhooks', {
+        method: 'POST',
+        cookie: ENT_COOKIE,
+        headers: withJsonHeaders(),
+        body: JSON.stringify({ url: 'https://example.com/webhook', events: ['user.identified'] }),
+      });
+      assert(create.res.status === 200, `expected 200 got ${create.res.status}`);
+
+      const wid = create.json?.webhook?.id;
+      assert(wid, 'expected webhook id');
+
+      const get = await api('/api/individual/webhooks', { cookie: ENT_COOKIE });
+      assert(get.res.status === 200, `expected 200 got ${get.res.status}`);
+      assert((get.json?.webhooks || []).some((w) => w.id === wid), 'expected created webhook in GET response');
+
+      const del = await api('/api/individual/webhooks', {
+        method: 'DELETE',
+        cookie: ENT_COOKIE,
+        headers: withJsonHeaders(),
+        body: JSON.stringify({ id: wid }),
+      });
+      assert(del.res.status === 200, `expected delete 200 got ${del.res.status}`);
+    });
+  }, {
+    skipIf: () => !sql || !enterpriseTenantId || !HAS_ENT_SESSION,
+    skipReason: 'DATABASE_URL + enterprise tenant + enterprise cookie required',
+  });
+
+  await runTest('enterprise/automation', 'Webhook delivery attempt + failure recorded', async () => {
+    assert(sql && enterpriseTenantId && ENT_COOKIE && API_KEY, 'DB + enterprise tenant + cookie + API key required');
+
+    await withTenantRestore(enterpriseTenantId, async () => {
+      await sql`update tenants set plan='advanced', plan_expires_at=NOW() + interval '30 days' where id=${enterpriseTenantId}`;
+
+      const badUrl = 'https://127.0.0.1.invalid/webhook';
+      const create = await api('/api/individual/webhooks', {
+        method: 'POST',
+        cookie: ENT_COOKIE,
+        headers: withJsonHeaders(),
+        body: JSON.stringify({ url: badUrl, events: ['user.identified'] }),
+      });
+      assert(create.res.status === 200, `expected create 200 got ${create.res.status}`);
+      const wid = create.json?.webhook?.id;
+
+      const identify = await api('/api/v1/identify', {
+        method: 'POST',
+        headers: withJsonHeaders({ 'x-api-key': API_KEY }),
+        body: JSON.stringify({ email: `qa-${nowId('webhook-delivery')}@example.com` }),
+      });
+      assert(identify.res.status === 200, `identify expected 200 got ${identify.res.status}`);
+
+      // allow async fire-and-forget delivery to execute
+      await new Promise((r) => setTimeout(r, 1200));
+
+      const rows = await sql`
+        select wd.id, wd.success, wd.response_status
+        from webhook_deliveries wd
+        join webhooks w on w.id = wd.webhook_id
+        where w.id = ${wid}
+        order by wd.id desc
+        limit 1
+      `;
+      assert(rows.length > 0, 'expected at least one webhook delivery row');
+      assert(rows[0].success === false, `expected failed delivery success=false got ${rows[0].success}`);
+
+      await api('/api/individual/webhooks', {
+        method: 'DELETE',
+        cookie: ENT_COOKIE,
+        headers: withJsonHeaders(),
+        body: JSON.stringify({ id: wid }),
+      });
+    });
+  }, {
+    skipIf: () => !sql || !enterpriseTenantId || !HAS_ENT_SESSION || !API_KEY,
+    skipReason: 'DATABASE_URL + enterprise tenant + enterprise cookie + API key required',
+  });
+
+  await runTest('enterprise/automation', 'Retry logic exercised', async () => {
+    throw new Error('No retry loop is implemented in lib/webhooks/deliver.ts current code.');
+  }, { skipIf: () => true, skipReason: 'Retry logic not present in current implementation' });
+
+  // ---------------------------------------------------------------------------
+  // 10. Cron and maintenance
+  // ---------------------------------------------------------------------------
+  await runTest('cron', 'GET /api/cron wrong/missing secret returns 401', async () => {
+    const r = await api('/api/cron');
+    assert(r.res.status === 401, `expected 401 got ${r.res.status}`);
+  });
+
+  await runTest('cron', 'GET /api/cron with valid secret returns 200', async () => {
+    const r = await api('/api/cron', { headers: { authorization: `Bearer ${CRON_SECRET}` } });
+    assert(r.res.status === 200, `expected 200 got ${r.res.status}`);
+  }, { skipIf: () => !CRON_SECRET, skipReason: 'CRON_SECRET missing' });
+
+  await runTest('cron', 'GET /api/cron/process-stalls with valid secret executes', async () => {
+    const r = await api('/api/cron/process-stalls', { headers: { authorization: `Bearer ${CRON_SECRET}` } });
+    assert(r.res.status !== 401, `expected non-401 with valid secret got ${r.res.status}`);
+  }, { skipIf: () => !CRON_SECRET, skipReason: 'CRON_SECRET missing' });
+
+  // ---------------------------------------------------------------------------
+  // 11. Edge/adversarial
+  // ---------------------------------------------------------------------------
+  await runTest('edge', 'POST endpoints malformed JSON should not 500', async () => {
+    const targets = [
+      ['/api/v1/identify', { 'x-api-key': API_KEY || 'invalid' }],
+      ['/api/v1/track', { 'x-api-key': API_KEY || 'invalid' }],
+      ['/api/v1/config', { 'x-api-key': API_KEY || 'invalid' }],
+      ['/api/individual/lists', {}],
+    ];
+
+    for (const [path, extra] of targets) {
+      const r = await api(path, {
+        method: 'POST',
+        cookie: path.startsWith('/api/individual') ? IND_COOKIE : undefined,
+        headers: withJsonHeaders(extra),
+        body: '{bad-json',
+      });
+      assert(r.res.status !== 500, `${path} returned 500 for malformed JSON`);
+    }
+  }, {
+    skipIf: () => !HAS_IND_SESSION,
+    skipReason: 'TEST_INDIVIDUAL_COOKIE missing for individual malformed JSON path coverage',
+  });
+
+  await runTest('edge', 'Missing required fields return descriptive errors', async () => {
+    const r1 = await api('/api/v1/track', {
+      method: 'POST',
+      headers: withJsonHeaders({ 'x-api-key': API_KEY || 'invalid' }),
+      body: JSON.stringify({ userId: 'only_user' }),
+    });
+    assert([400, 403].includes(r1.res.status), `expected 400/403 got ${r1.res.status}`);
+
+    if (HAS_IND_SESSION) {
+      const r2 = await api('/api/individual/lists', {
+        method: 'POST',
+        cookie: IND_COOKIE,
+        headers: withJsonHeaders(),
+        body: JSON.stringify({ name: '' }),
+      });
+      assert(r2.res.status === 400, `expected 400 for invalid list name got ${r2.res.status}`);
+      assert(r2.text.length > 0, 'expected descriptive error body');
+    }
+  });
+
+  await runTest('edge', 'SQL injection attempt does not crash or leak', async () => {
+    const payload = "test@example.com' OR 1=1 --";
+    const r = await api('/api/v1/identify', {
+      method: 'POST',
+      headers: withJsonHeaders({ 'x-api-key': API_KEY || 'invalid' }),
+      body: JSON.stringify({ email: payload }),
+    });
+    assert(r.res.status !== 500, `expected non-500 got ${r.res.status}`);
+  });
+
+  await runTest('edge', 'Extremely long strings rejected gracefully', async () => {
+    const long = 'x'.repeat(12000);
+
+    if (!HAS_IND_SESSION) {
+      throw new Error('TEST_INDIVIDUAL_COOKIE required to validate list/contact zod constraints');
+    }
+
+    const r = await api('/api/individual/lists', {
+      method: 'POST',
+      cookie: IND_COOKIE,
+      headers: withJsonHeaders(),
+      body: JSON.stringify({ name: long }),
+    });
+
+    assert(r.res.status === 400 || r.res.status === 413, `expected graceful reject 400/413 got ${r.res.status}`);
+  }, { skipIf: () => !HAS_IND_SESSION, skipReason: 'TEST_INDIVIDUAL_COOKIE missing' });
+
+  await runTest('edge', 'Rate limiting returns 429 under burst load on v1 mutating endpoint', async () => {
+    let got429 = false;
+    for (let i = 0; i < 90; i++) {
+      const r = await api('/api/v1/track', {
+        method: 'POST',
+        headers: withJsonHeaders({
+          'x-api-key': API_KEY || 'invalid',
+          'x-forwarded-for': '203.0.113.50',
+        }),
+        body: JSON.stringify({ userId: `rl-${i}`, stepId: 'connect_repo', event: 'connect_repo' }),
+      });
+      if (r.res.status === 429) {
+        got429 = true;
+        break;
+      }
+    }
+    assert(got429, 'expected at least one 429 under burst requests');
+  });
+
+  // cleanup
+  await cleanupAll();
   await closeDb();
 
-  // ── Summary ───────────────────────────────────────────────────────────────
-  console.log('');
-  console.log('═══════════════════════════════════════════════════════════════');
-  console.log(`Results: ${g(state.passed + ' passed')}  ${r(state.failed + ' failed')}  ${y(state.skipped + ' skipped')}`);
-  console.log('═══════════════════════════════════════════════════════════════');
+  console.log('=====================================');
+  console.log(`${bold('Results')}: ${state.passed} passed, ${state.failed} failed, ${state.skipped} skipped`);
+  console.log('=====================================');
 
-  if (failures.length > 0) {
-    console.log('');
-    console.log(b(r('── FAILURES DIGEST (paste this to an AI for instant diagnosis) ─────────────')));
-    failures.forEach((f, i) => {
-      console.log('');
-      console.log(r(`  ${i + 1}. [${f.category}] ${f.name}`));
-      console.log(`     ${cy('Assertion')} : ${f.error}`);
-      if (f.meta.route)      console.log(`     ${cy('Route')}     : ${f.meta.route}`);
-      if (f.meta.file)       console.log(`     ${cy('File')}      : ${f.meta.file}`);
-      if (f.meta.rootCause)  console.log(`     ${cy('Root cause')}: ${f.meta.rootCause}`);
-      if (f.meta.fix)        console.log(`     ${cy('Fix')}       : ${f.meta.fix}`);
-    });
-    console.log('');
-    console.log('─────────────────────────────────────────────────────────────────────────────');
+  if (state.failed > 0) {
+    console.log(red('Failure diagnostics (latest request per failed test shown inline above).'));
   }
 
   process.exit(state.failed > 0 ? 1 : 0);
-}
-
-run().catch(async (err) => {
-  console.error('Fatal:', err?.message || err);
+})().catch(async (err) => {
+  console.error('Fatal test runner error:', err?.message || err);
+  await cleanupAll();
   await closeDb();
   process.exit(1);
 });

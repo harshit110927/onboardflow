@@ -1,30 +1,24 @@
-import { LRUCache } from "lru-cache";
+// Simple in-memory rate limiter for /api/v1/ routes
+// Resets on server restart — sufficient for Vercel serverless with reasonable limits
 
-// Sliding-window rate limiter for /api/v1/ routes.
-// LRUCache bounds memory — evicts least-recently-seen IPs once max is reached.
-// Resets on server restart — sufficient for Vercel serverless deployments.
+const requestCounts = new Map<string, { count: number; resetAt: number }>();
 
-const WINDOW_MS = 60_000; // 1 minute
-const MAX_REQUESTS = 20;   // per IP per window
-
-// Stores an array of request timestamps per IP.
-// max: 10 000 unique IPs in memory at once.
-const cache = new LRUCache<string, number[]>({ max: 10_000 });
+const WINDOW_MS = 60 * 1000; // 1 minute
+const MAX_REQUESTS = 60;
 
 export function checkApiRateLimit(ip: string): { allowed: boolean } {
   const now = Date.now();
+  const existing = requestCounts.get(ip);
 
-  // Prune timestamps that have fallen outside the sliding window
-  const timestamps = (cache.get(ip) ?? []).filter(
-    (t) => now - t < WINDOW_MS,
-  );
+  if (!existing || now > existing.resetAt) {
+    requestCounts.set(ip, { count: 1, resetAt: now + WINDOW_MS });
+    return { allowed: true };
+  }
 
-  if (timestamps.length >= MAX_REQUESTS) {
-    cache.set(ip, timestamps); // persist pruned list so window stays accurate
+  if (existing.count >= MAX_REQUESTS) {
     return { allowed: false };
   }
 
-  timestamps.push(now);
-  cache.set(ip, timestamps);
+  existing.count++;
   return { allowed: true };
 }
