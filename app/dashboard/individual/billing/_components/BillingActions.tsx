@@ -12,6 +12,7 @@ type PlanCard = {
 
 type Props = {
   plan: PlanCard;
+  isCurrent: boolean;
 };
 
 declare global {
@@ -40,7 +41,7 @@ function loadRazorpayScript() {
   return razorpayScriptPromise;
 }
 
-export function BillingActions({ plan }: Props) {
+export function BillingActions({ plan, isCurrent }: Props) {
   const [loading, setLoading] = useState(false);
 
   async function handleSubscribe() {
@@ -63,7 +64,7 @@ export function BillingActions({ plan }: Props) {
         subscription_id: data.subscriptionId,
         name: "OnboardFlow",
         description: `${plan.label} subscription`,
-        theme: { color: "#6366f1" },
+        theme: { color: "#3d6b52" },
         handler: () => window.location.reload(),
         modal: { ondismiss: () => setLoading(false) },
       });
@@ -76,7 +77,12 @@ export function BillingActions({ plan }: Props) {
   }
 
   return (
-    <div className="rounded-lg border border-border bg-card p-4 flex flex-col gap-4">
+    <div className={`rounded-xl bg-card p-5 flex flex-col gap-4 relative ${isCurrent ? "border-2 border-primary" : "border border-border"}`}>
+      {isCurrent && (
+        <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 rounded-full bg-primary text-primary-foreground text-[10px] px-3 py-1">
+          Current plan
+        </span>
+      )}
       <div>
         <h3 className="text-lg font-semibold text-foreground">{plan.label}</h3>
         <p className="text-sm text-muted-foreground mt-1">
@@ -86,17 +92,17 @@ export function BillingActions({ plan }: Props) {
 
       <ul className="text-sm text-muted-foreground space-y-1">
         {plan.highlights.map((highlight) => (
-          <li key={highlight}>• {highlight}</li>
+          <li key={highlight}>• {highlight.replace(/open\/?click\s*tracking/i, "Open tracking")}</li>
         ))}
       </ul>
 
       <button
         type="button"
         onClick={handleSubscribe}
-        disabled={loading}
-        className="mt-auto rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+        disabled={loading || isCurrent}
+        className={`mt-auto rounded-md px-4 py-2 text-sm font-medium disabled:cursor-not-allowed ${isCurrent ? "bg-secondary text-muted-foreground" : "bg-primary text-primary-foreground hover:opacity-90"}`}
       >
-        {loading ? "Loading..." : "Subscribe"}
+        {isCurrent ? "Active plan" : loading ? "Loading..." : "Subscribe"}
       </button>
     </div>
   );

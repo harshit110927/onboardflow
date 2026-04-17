@@ -1,19 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect } from "react";
 
 const links = [
-  { href: "/dashboard/individual", label: "Dashboard" },
-  { href: "/dashboard/individual/lists", label: "Lists" },
-  { href: "/dashboard/individual/campaigns", label: "Campaigns" },
-  { href: "/dashboard/individual/billing", label: "Billing" },
-  { href: "/dashboard/individual/settings", label: "Settings" },
+  { href: "/dashboard/enterprise", label: "Dashboard" },
+  { href: "/dashboard/enterprise/billing", label: "Billing" },
+  { href: "/dashboard/settings", label: "Settings" },
+  { href: "/dashboard/analytics", label: "Analytics" },
 ];
 
-export function NavLinks() {
+export function EnterpriseNavLinks() {
   const pathname = usePathname();
   const router = useRouter();
 
@@ -26,18 +24,17 @@ export function NavLinks() {
   return (
     <nav className="hidden sm:flex items-center gap-1">
       {links.map((item) => {
-        const isActive = item.href === "/dashboard/individual"
+        const isActive = item.href === "/dashboard/enterprise"
           ? pathname === item.href
           : pathname.startsWith(item.href);
+
         return (
           <Link
             key={item.href}
             href={item.href}
             prefetch
             className={`nav-link text-sm px-3 py-1.5 rounded-md transition-colors ${
-              isActive
-                ? "active"
-                : "hover:text-white hover:bg-white/10"
+              isActive ? "active" : "hover:text-white hover:bg-white/10"
             }`}
           >
             {item.label}
