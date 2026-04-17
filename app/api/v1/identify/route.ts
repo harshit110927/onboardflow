@@ -60,7 +60,7 @@ export async function POST(req: Request) {
         .values({
           tenantId: tenant.id,
           email,
-          externalId: email,
+          externalId: body.userId || email,
           completedSteps: [],
           createdAt: new Date(),
           lastSeenAt: new Date(),
