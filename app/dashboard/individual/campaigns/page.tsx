@@ -1,12 +1,15 @@
-import { and, eq, count } from "drizzle-orm";
+import { and, count, desc, eq, inArray, sql } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { revalidatePath } from "next/cache";
 import { db } from "@/db";
-import { individualCampaigns, individualLists } from "@/db/schema";
+import { campaignEvents, individualCampaigns, individualContacts, individualLists } from "@/db/schema";
 import { getSession } from "@/lib/auth/get-session";
 import { getTenant } from "@/lib/auth/get-tenant";
 import { DeleteCampaignButton } from "./_components/DeleteCampaignButton";
+import { CampaignComposer } from "./_components/CampaignComposer";
+import { getTenantPlan } from "@/lib/plans/get-tenant-plan";
+import { INDIVIDUAL_LIMITS, type PlanTier } from "@/lib/plans/limits";
 
 async function deleteCampaign(formData: FormData) {
   "use server";
@@ -19,7 +22,6 @@ async function deleteCampaign(formData: FormData) {
   const tenant = await getTenant(user.email);
   if (!tenant) return;
 
-  // Verify ownership via list
   const owned = await db
     .select({ id: individualCampaigns.id })
     .from(individualCampaigns)
@@ -30,6 +32,54 @@ async function deleteCampaign(formData: FormData) {
 
   await db.delete(individualCampaigns).where(eq(individualCampaigns.id, campaignId));
   revalidatePath("/dashboard/individual/campaigns");
+}
+
+async function createCampaign(formData: FormData) {
+  "use server";
+
+  const listId = Number(formData.get("listId"));
+  const subject = (formData.get("subject") as string)?.trim();
+  const body = (formData.get("body") as string)?.trim();
+  const scheduledAtRaw = (formData.get("scheduledAt") as string)?.trim();
+  const intent = (formData.get("intent") as string) ?? "draft";
+
+  if (!listId || !subject || !body) return;
+
+  const { user } = await getSession();
+  if (!user?.email) redirect("/login");
+
+  const tenant = await getTenant(user.email);
+  if (!tenant || tenant.tier !== "individual") redirect("/dashboard");
+
+  const ownedList = await db
+    .select({ id: individualLists.id })
+    .from(individualLists)
+    .where(and(eq(individualLists.id, listId), eq(individualLists.userId, tenant.id)))
+    .limit(1);
+
+  if (!ownedList[0]) return;
+
+  const shouldSchedule = intent === "schedule" && !!scheduledAtRaw;
+
+  const inserted = await db
+    .insert(individualCampaigns)
+    .values({
+      listId,
+      subject,
+      body,
+      status: shouldSchedule ? "scheduled" : "draft",
+      scheduledAt: shouldSchedule ? new Date(scheduledAtRaw) : null,
+    })
+    .returning({ id: individualCampaigns.id });
+
+  const createdId = inserted[0]?.id;
+  revalidatePath("/dashboard/individual/campaigns");
+
+  if (intent === "send_now" && createdId) {
+    redirect(`/dashboard/individual/campaigns/${createdId}`);
+  }
+
+  redirect("/dashboard/individual/campaigns");
 }
 
 function StatusBadge({ status }: { status: string }) {
@@ -52,60 +102,95 @@ export default async function CampaignsPage() {
   const tenant = await getTenant(user.email);
   if (!tenant || tenant.tier !== "individual") redirect("/dashboard");
 
-  const [campaigns, lists] = await Promise.all([
+  const { plan } = await getTenantPlan(tenant.id);
+  const trackingEnabled = INDIVIDUAL_LIMITS[plan as PlanTier].trackingEnabled;
+
+  const [campaigns, lists, listContacts] = await Promise.all([
     db
       .select({
         id: individualCampaigns.id,
         subject: individualCampaigns.subject,
         status: individualCampaigns.status,
-        scheduledAt: individualCampaigns.scheduledAt,
-        sentAt: individualCampaigns.sentAt,
         createdAt: individualCampaigns.createdAt,
+        sentAt: individualCampaigns.sentAt,
         listId: individualCampaigns.listId,
         listName: individualLists.name,
       })
       .from(individualCampaigns)
       .innerJoin(individualLists, eq(individualCampaigns.listId, individualLists.id))
       .where(eq(individualLists.userId, tenant.id))
-      .orderBy(individualCampaigns.createdAt),
+      .orderBy(desc(individualCampaigns.createdAt)),
 
     db
       .select({ id: individualLists.id, name: individualLists.name })
       .from(individualLists)
       .where(eq(individualLists.userId, tenant.id)),
+
+    db
+      .select({
+        listId: individualContacts.listId,
+        name: individualContacts.name,
+        email: individualContacts.email,
+      })
+      .from(individualContacts)
+      .innerJoin(individualLists, eq(individualContacts.listId, individualLists.id))
+      .where(eq(individualLists.userId, tenant.id)),
   ]);
+
+  const listContactsMap = new Map<number, Array<{ name: string; email: string }>>();
+  for (const c of listContacts) {
+    if (!listContactsMap.has(c.listId)) listContactsMap.set(c.listId, []);
+    listContactsMap.get(c.listId)!.push({ name: c.name, email: c.email });
+  }
+
+  const composerLists = lists.map((list) => {
+    const contacts = listContactsMap.get(list.id) ?? [];
+    return {
+      id: list.id,
+      name: list.name,
+      totalContacts: contacts.length,
+      previewContacts: contacts.slice(0, 3),
+    };
+  });
+
+  const campaignIds = campaigns.map((c) => c.id);
+  const analyticsRows = trackingEnabled && campaignIds.length > 0
+    ? await db
+      .select({
+        campaignId: campaignEvents.campaignId,
+        total: sql<number>`count(distinct ${campaignEvents.contactEmail})`,
+      })
+      .from(campaignEvents)
+      .where(
+        and(
+          inArray(campaignEvents.campaignId, campaignIds),
+          eq(campaignEvents.eventType, "open"),
+        ),
+      )
+      .groupBy(campaignEvents.campaignId)
+    : [];
+
+  const analyticsMap = new Map<number, { opens: number }>();
+  for (const row of analyticsRows) {
+    analyticsMap.set(row.campaignId, { opens: Number(row.total) });
+  }
+
+  const contactCountByList = new Map<number, number>();
+  for (const [listId, entries] of listContactsMap.entries()) {
+    contactCountByList.set(listId, entries.length);
+  }
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="max-w-5xl mx-auto px-4 py-10 flex flex-col gap-8">
-
-        {/* Header */}
+      <div className="max-w-6xl mx-auto px-4 py-10 flex flex-col gap-8">
         <div className="flex items-center justify-between gap-4 flex-wrap">
           <div>
-            <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
-              <Link href="/dashboard/individual" className="hover:text-foreground transition-colors">
-                Dashboard
-              </Link>
-              <span>/</span>
-              <span className="text-foreground">Campaigns</span>
-            </div>
-            <h1 className="text-2xl font-bold text-foreground">Campaigns</h1>
-            <p className="text-sm text-muted-foreground mt-1">
-              {campaigns.length} campaign{campaigns.length !== 1 ? "s" : ""} total
-            </p>
+            <h1 className="text-3xl font-semibold text-foreground">Campaigns</h1>
+            <p className="text-sm text-muted-foreground mt-1">Write, schedule and track your email campaigns.</p>
           </div>
-          {lists.length > 0 && (
-            <Link
-              href="/dashboard/individual/campaigns/create"
-              className="text-sm rounded-md bg-primary text-primary-foreground px-4 py-2 hover:opacity-90 transition-opacity"
-            >
-              + New Campaign
-            </Link>
-          )}
         </div>
 
-        {/* No lists warning */}
-        {lists.length === 0 && (
+        {lists.length === 0 ? (
           <div className="rounded-lg border border-border bg-card p-8 text-center">
             <p className="font-semibold text-foreground">No email lists yet</p>
             <p className="text-sm text-muted-foreground mt-1">
@@ -118,81 +203,72 @@ export default async function CampaignsPage() {
               Create a List First
             </Link>
           </div>
-        )}
-
-        {/* Campaigns list */}
-        {lists.length > 0 && campaigns.length === 0 && (
-          <div className="flex flex-col items-center justify-center py-20 text-center rounded-lg border border-dashed border-border">
-            <svg className="h-10 w-10 text-muted-foreground mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" />
-            </svg>
-            <p className="font-semibold text-foreground">No campaigns yet</p>
-            <p className="text-sm text-muted-foreground mt-1">
-              Create your first campaign to start emailing your list.
-            </p>
-            <Link
-              href="/dashboard/individual/campaigns/create"
-              className="mt-4 text-sm rounded-md bg-primary text-primary-foreground px-4 py-2 hover:opacity-90 transition-opacity"
-            >
-              Create Campaign
-            </Link>
-          </div>
-        )}
-
-        {campaigns.length > 0 && (
-          <div className="flex flex-col gap-3">
-            {campaigns.map((c) => {
-              const date = (c.sentAt ?? c.scheduledAt ?? c.createdAt)?.toLocaleDateString("en-US", {
-                month: "short", day: "numeric", year: "numeric",
-              });
-              return (
-                <div
-                  key={c.id}
-                  className="rounded-lg border border-border bg-card p-5 flex flex-col md:flex-row md:items-center gap-4"
-                >
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <h3 className="font-semibold text-foreground truncate">{c.subject}</h3>
-                      <StatusBadge status={c.status} />
-                    </div>
-                    <div className="flex items-center gap-4 mt-1 text-xs text-muted-foreground">
-                      <span>List: {c.listName}</span>
-                      <span>
-                        {c.status === "sent"
-                          ? `Sent ${date}`
-                          : c.status === "scheduled"
-                          ? `Scheduled ${date}`
-                          : `Created ${date}`}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <Link
-                      href={`/dashboard/individual/campaigns/${c.id}`}
-                      className="text-sm rounded-md border border-border px-3 py-1.5 hover:bg-secondary transition-colors"
-                    >
-                      View
-                    </Link>
-                    {c.status === "draft" && (
-                    <DeleteCampaignButton
-                        campaignId={c.id}
-                        campaignSubject={c.subject}
-                        deleteAction={deleteCampaign}
-                    />
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+        ) : (
+          <CampaignComposer lists={composerLists} aiEnabled={INDIVIDUAL_LIMITS[plan as PlanTier].aiEnabled} createAction={createCampaign} />
         )}
 
         <div>
-          <Link href="/dashboard/individual" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-            ← Back to Dashboard
-          </Link>
-        </div>
+          <h2 className="text-lg font-semibold text-foreground mb-3">All campaigns</h2>
+          {campaigns.length === 0 ? (
+            <div className="rounded-lg border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
+              No campaigns yet.
+            </div>
+          ) : (
+            <div className="rounded-xl border border-border bg-card overflow-hidden">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-secondary/70 border-b border-border">
+                    <th className="text-left px-4 py-3 font-medium text-muted-foreground uppercase tracking-wide text-xs">Subject</th>
+                    <th className="text-left px-4 py-3 font-medium text-muted-foreground uppercase tracking-wide text-xs">List</th>
+                    <th className="text-left px-4 py-3 font-medium text-muted-foreground uppercase tracking-wide text-xs">Status</th>
+                    <th className="text-left px-4 py-3 font-medium text-muted-foreground uppercase tracking-wide text-xs">Opens</th>
+                    <th className="text-left px-4 py-3 font-medium text-muted-foreground uppercase tracking-wide text-xs">Date</th>
+                    <th className="text-right px-4 py-3 font-medium text-muted-foreground uppercase tracking-wide text-xs">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {campaigns.map((c) => {
+                    const date = (c.sentAt ?? c.createdAt)?.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+                    const contactsInList = contactCountByList.get(c.listId) ?? 0;
+                    const metrics = analyticsMap.get(c.id) ?? { opens: 0 };
+                    const openPct = contactsInList > 0
+                      ? Math.min(100, Math.round((metrics.opens / contactsInList) * 100))
+                      : 0;
 
+                    return (
+                      <tr key={c.id} className="border-b border-border last:border-b-0 hover:bg-secondary/20">
+                        <td className="px-4 py-3 text-foreground font-medium">{c.subject}</td>
+                        <td className="px-4 py-3 text-muted-foreground">{c.listName}</td>
+                        <td className="px-4 py-3"><StatusBadge status={c.status} /></td>
+                        <td className="px-4 py-3 text-foreground">
+                          {c.status === "sent" && trackingEnabled ? `${openPct}%` : "—"}
+                        </td>
+                        <td className="px-4 py-3 text-muted-foreground">{date}</td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center justify-end gap-2">
+                            <Link
+                              href={`/dashboard/individual/campaigns/${c.id}`}
+                              className="text-xs rounded-md border border-border px-2.5 py-1.5 hover:bg-secondary transition-colors"
+                            >
+                              View
+                            </Link>
+                            {c.status === "draft" && (
+                              <DeleteCampaignButton
+                                campaignId={c.id}
+                                campaignSubject={c.subject}
+                                deleteAction={deleteCampaign}
+                              />
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

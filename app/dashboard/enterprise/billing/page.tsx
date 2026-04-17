@@ -40,7 +40,7 @@ export default async function EnterpriseBillingPage() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {ENTERPRISE_PLANS.map((plan) => (
-            <BillingActions key={plan.id} plan={plan} />
+            <BillingActions key={plan.id} plan={plan} isCurrent={planInfo.plan === plan.planTier} />
           ))}
         </div>
 

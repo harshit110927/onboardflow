@@ -1,5 +1,5 @@
 // MODIFIED — razorpay credits migration — updated individual campaign overage deductions to credits-only cost constants
-import { eq, and, count } from "drizzle-orm";
+import { eq, and, count, sql } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import Link from "next/link";
@@ -224,17 +224,12 @@ export default async function CampaignDetailPage({
   const { plan } = await getTenantPlan(tenant.id);
 
   let openCount = 0;
-  let clickCount = 0;
-
   if (INDIVIDUAL_LIMITS[plan as PlanTier].trackingEnabled && campaign.status === "sent") {
-    const [opens, clicks] = await Promise.all([
-      db.select({ total: count() }).from(campaignEvents)
-        .where(and(eq(campaignEvents.campaignId, campaign.id), eq(campaignEvents.eventType, "open"))),
-      db.select({ total: count() }).from(campaignEvents)
-        .where(and(eq(campaignEvents.campaignId, campaign.id), eq(campaignEvents.eventType, "click"))),
-    ]);
-    openCount = opens[0]?.total ?? 0;
-    clickCount = clicks[0]?.total ?? 0;
+    const opens = await db
+      .select({ total: sql<number>`count(distinct ${campaignEvents.contactEmail})` })
+      .from(campaignEvents)
+      .where(and(eq(campaignEvents.campaignId, campaign.id), eq(campaignEvents.eventType, "open")));
+    openCount = Number(opens[0]?.total ?? 0);
   }
 
   const created = campaign.createdAt?.toLocaleDateString("en-US", {
@@ -340,25 +335,18 @@ export default async function CampaignDetailPage({
           <div className="rounded-lg border border-border bg-card p-6">
             <h2 className="text-base font-semibold text-foreground mb-4">Campaign Analytics</h2>
             {INDIVIDUAL_LIMITS[plan as PlanTier].trackingEnabled ? (
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4">
                 <div className="rounded-lg bg-secondary/40 p-4 text-center">
                   <p className="text-2xl font-bold text-foreground">
-                    {contacts.length > 0 ? Math.round((openCount / contacts.length) * 100) : 0}%
+                    {contacts.length > 0 ? Math.min(100, Math.round((openCount / contacts.length) * 100)) : 0}%
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">Open Rate</p>
                   <p className="text-xs text-muted-foreground">{openCount} of {contacts.length}</p>
                 </div>
-                <div className="rounded-lg bg-secondary/40 p-4 text-center">
-                  <p className="text-2xl font-bold text-foreground">
-                    {contacts.length > 0 ? Math.round((clickCount / contacts.length) * 100) : 0}%
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">Click Rate</p>
-                  <p className="text-xs text-muted-foreground">{clickCount} of {contacts.length}</p>
-                </div>
               </div>
             ) : (
               <div className="text-center py-4">
-                <p className="text-sm text-muted-foreground">Upgrade to a plan with tracking to see open and click rates.</p>
+                <p className="text-sm text-muted-foreground">Upgrade to a plan with tracking to see open rates.</p>
                 <Link href="/dashboard/individual/billing" className="mt-2 inline-block text-sm text-primary underline">
                   Upgrade now
                 </Link>
