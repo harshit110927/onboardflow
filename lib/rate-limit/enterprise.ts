@@ -10,7 +10,8 @@ export type RateLimitResult =
 export async function checkEmailRateLimit(tenantId: string): Promise<RateLimitResult> {
   try {
     const { plan } = await getTenantPlan(tenantId);
-    const limits = ENTERPRISE_LIMITS[plan as EnterprisePlanTier];
+    const tier = (plan === "basic" || plan === "advanced" || plan === "free") ? plan : "free";
+    const limits = ENTERPRISE_LIMITS[tier as EnterprisePlanTier];
 
     const today = new Date().toISOString().slice(0, 10);
     const month = today.slice(0, 7);
@@ -39,14 +40,15 @@ export async function checkEmailRateLimit(tenantId: string): Promise<RateLimitRe
     if (Number(row.monthly_count) >= limits.maxEmailsPerMonth) {
       return {
         allowed: false,
-        reason: `Monthly email limit reached (${limits.maxEmailsPerMonth}/month on ${plan} plan).`,
+        reason: `Monthly email limit reached (${limits.maxEmailsPerMonth}/month on ${tier} plan).`,
         isOverage: false,
       };
     }
 
     return { allowed: true };
-  } catch {
-    return { allowed: false, reason: "Server error. Please try again." };
+  } catch (err) {
+    console.error("checkEmailRateLimit error:", err);
+    return { allowed: true }; // fail open — never block emails on infra errors
   }
 }
 
@@ -80,16 +82,18 @@ export async function checkEndUserLimit(
 ): Promise<RateLimitResult> {
   try {
     const { plan } = await getTenantPlan(tenantId);
-    const limits = ENTERPRISE_LIMITS[plan as EnterprisePlanTier];
+    const tier = (plan === "basic" || plan === "advanced" || plan === "free") ? plan : "free";
+    const limits = ENTERPRISE_LIMITS[tier as EnterprisePlanTier];
 
     if (currentCount >= limits.maxTrackedUsers) {
       return {
         allowed: false,
-        reason: `End user tracking limit reached (${limits.maxTrackedUsers} users on ${plan} plan).`,
+        reason: `End user tracking limit reached (${limits.maxTrackedUsers} users on ${tier} plan).`,
       };
     }
     return { allowed: true };
-  } catch {
-    return { allowed: false, reason: "Server error. Please try again." };
+  } catch (err) {
+    console.error("checkEndUserLimit error:", err);
+    return { allowed: true }; // fail open — never block tracking on infra errors
   }
 }
