@@ -19,6 +19,8 @@ export const tenants = pgTable('tenants', {
   hasAccess: boolean('has_access').default(false).notNull(),
   apiKey: text("api_key").unique(),
   stripeCustomerId: text('stripe_customer_id'),
+  resendApiKey: text("resend_api_key"),
+  resendFromEmail: text("resend_from_email"),
 
   automationEnabled: boolean("automation_enabled").default(false),
 

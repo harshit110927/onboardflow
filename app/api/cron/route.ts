@@ -1,4 +1,4 @@
-// MODIFIED — razorpay credits migration — switched enterprise drip overage deduction to shared credit cost constant
+// MODIFIED — added per-tenant email sender resolution (Resend key > SMTP > shared fallback)
 import { db } from "@/db";
 import { tenants, endUsers, individualCampaigns, individualLists, individualContacts, dripSteps, unsubscribedContacts } from "@/db/schema";
 import { NextResponse } from "next/server";
@@ -19,12 +19,56 @@ const hasReceived = (user: { automationsReceived?: string[] | null }, tag: strin
 };
 
 function resolveEnterprisePlan(plan: string): EnterprisePlanTier {
-  if (plan === "basic" || plan === "advanced" || plan === "free") {
-    return plan;
-  }
-  // Safety fallback: if an unexpected/individual plan gets stored on an enterprise tenant,
-  // do not crash cron execution.
+  if (plan === "basic" || plan === "advanced" || plan === "free") return plan;
   return "free";
+}
+
+// Resolve which email sender to use for a tenant.
+// Priority: tenant Resend key → tenant SMTP → shared fallback
+type EmailSender = (args: { to: string; subject: string; html: string }) => Promise<void>;
+
+function resolveEmailSender(tenant: {
+  resendApiKey?: string | null;
+  resendFromEmail?: string | null;
+  smtpVerified?: boolean | null;
+  smtpEmail?: string | null;
+  smtpPassword?: string | null;
+}): EmailSender {
+  if (tenant.resendApiKey && tenant.resendFromEmail) {
+    try {
+      const tenantResend = new Resend(decryptPassword(tenant.resendApiKey));
+      const fromEmail = tenant.resendFromEmail;
+      return async ({ to, subject, html }) => {
+        await tenantResend.emails.send({ from: fromEmail, to: [to], subject, html });
+      };
+    } catch (err) {
+      console.error("Failed to initialize tenant Resend client, falling back:", err);
+    }
+  }
+
+  if (tenant.smtpVerified && tenant.smtpEmail && tenant.smtpPassword) {
+    try {
+      const transporter = createGmailTransporter(
+        tenant.smtpEmail,
+        decryptPassword(tenant.smtpPassword)
+      );
+      return async ({ to, subject, html }) => {
+        await transporter.sendMail({ from: tenant.smtpEmail!, to, subject, html });
+      };
+    } catch (err) {
+      console.error("Failed to initialize SMTP transporter, falling back:", err);
+    }
+  }
+
+  // Shared fallback — only works for Resend account owner's email
+  return async ({ to, subject, html }) => {
+    await resend.emails.send({
+      from: "OnboardFlow <onboarding@resend.dev>",
+      to: [to],
+      subject,
+      html,
+    });
+  };
 }
 
 export async function GET(req: Request) {
@@ -52,6 +96,11 @@ export async function GET(req: Request) {
       });
 
       const { plan } = await getTenantPlan(tenant.id);
+      const enterprisePlan = resolveEnterprisePlan(String(plan));
+      const limits = ENTERPRISE_LIMITS[enterprisePlan];
+
+      // Resolve this tenant's email sender once — reused for all their users
+      const emailSender = resolveEmailSender(tenant);
 
       let automationSteps: {
         eventTrigger: string;
@@ -59,9 +108,6 @@ export async function GET(req: Request) {
         emailBody: string;
         delayHours: number;
       }[];
-
-      const enterprisePlan = resolveEnterprisePlan(String(plan));
-      const limits = ENTERPRISE_LIMITS[enterprisePlan];
 
       if (enterprisePlan === "advanced") {
         const dbSteps = await db
@@ -99,7 +145,6 @@ export async function GET(req: Request) {
       for (const user of users) {
         if (!user.email) continue;
 
-        // Check unsubscribe
         const unsubCheck = await db
           .select({ email: unsubscribedContacts.email })
           .from(unsubscribedContacts)
@@ -125,18 +170,13 @@ export async function GET(req: Request) {
             !stepsCompleted.includes(step.eventTrigger) &&
             !hasReceived(user, tag)
           ) {
-            emailToSend = {
-              subject: step.emailSubject,
-              body: step.emailBody,
-              tag,
-            };
+            emailToSend = { subject: step.emailSubject, body: step.emailBody, tag };
             break;
           }
         }
 
         if (emailToSend) {
           const limit = await checkEmailRateLimit(tenant.id);
-
           if (!limit.allowed) {
             console.warn(`🚫 Rate limit hit for tenant ${tenant.email}: ${limit.reason}`);
             emailsBlocked++;
@@ -147,9 +187,9 @@ export async function GET(req: Request) {
             console.log(`🚀 Sending [${emailToSend.tag}] to ${user.email}`);
 
             const emailBody = emailToSend.body.replace("{{name}}", user.email.split("@")[0]);
-            await resend.emails.send({
-              from: "OnboardFlow <onboarding@resend.dev>",
-              to: [user.email],
+
+            await emailSender({
+              to: user.email,
               subject: emailToSend.subject,
               html: buildEmailHtml({ body: emailBody }),
             });
@@ -157,7 +197,6 @@ export async function GET(req: Request) {
             await incrementEmailCount(tenant.id);
 
             const newTags = [...(user.automationsReceived || []), emailToSend.tag];
-
             await db
               .update(endUsers)
               .set({ automationsReceived: newTags, lastEmailedAt: new Date() })
@@ -222,7 +261,12 @@ export async function GET(req: Request) {
         if (!list) continue;
 
         const tenantRows = await db
-          .select({ id: tenants.id, smtpEmail: tenants.smtpEmail, smtpPassword: tenants.smtpPassword, smtpVerified: tenants.smtpVerified })
+          .select({
+            id: tenants.id,
+            smtpEmail: tenants.smtpEmail,
+            smtpPassword: tenants.smtpPassword,
+            smtpVerified: tenants.smtpVerified,
+          })
           .from(tenants)
           .where(eq(tenants.id, list.userId))
           .limit(1);

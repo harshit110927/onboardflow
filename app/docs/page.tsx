@@ -127,6 +127,60 @@ User completes a step via track()
           </ul>
         </section>
 
+        {/* SENDING DOMAIN */}
+<section id="sending" className="space-y-6">
+  <div className="flex items-center gap-2 pb-2 border-b">
+    <Mail className="h-6 w-6 text-blue-600" />
+    <h2 className="text-2xl font-bold">Setting Up Your Sending Domain</h2>
+  </div>
+  <p className="text-slate-600">
+    By default OnboardFlow uses a shared sending domain which only works for your own inbox during testing.
+    For production, connect your own Resend account so emails arrive from your domain.
+  </p>
+
+  <Card className="bg-amber-50 border-amber-100">
+    <CardContent className="pt-4">
+      <p className="text-sm text-amber-800">
+        <b>Required for production.</b> Without a connected sending account, drip emails will not
+        deliver to your users' inboxes reliably.
+      </p>
+    </CardContent>
+  </Card>
+
+  <div className="space-y-4">
+    <h3 className="text-lg font-semibold">Setup steps</h3>
+    <div className="bg-slate-900 rounded-md p-4 overflow-x-auto">
+<pre className="text-sm font-mono text-slate-300">{`1. Create a free account at resend.com
+
+2. Go to Domains → Add Domain → enter yourdomain.com
+   Resend will give you DNS records to add (TXT + MX).
+   Add them in Cloudflare, Namecheap, or wherever your domain lives.
+   Verification takes ~10 minutes.
+
+3. Go to API Keys → Create API Key → Full Access
+   Copy the key (starts with re_live_...)
+
+4. In OnboardFlow → Automation Settings → Email Sending:
+   - Paste your Resend API key
+   - Enter your from address (e.g. hello@yourdomain.com)
+   - Click Save Email Settings
+
+Your users will now receive emails from your domain.`}</pre>
+    </div>
+  </div>
+
+  <Card className="bg-blue-50 border-blue-100">
+    <CardContent className="pt-4 space-y-1">
+      <p className="text-sm text-blue-800 font-semibold">From address format</p>
+      <p className="text-sm text-blue-800">
+        Use a recognizable address your users will trust — <code>hello@yourapp.com</code>,
+        <code> noreply@yourapp.com</code>, or <code>team@yourapp.com</code>.
+        The domain must be verified in your Resend account or emails will be rejected.
+      </p>
+    </CardContent>
+  </Card>
+</section>
+
         {/* ANALYTICS & STEP NAMING WARNING */}
         <section id="analytics" className="space-y-6">
           <div className="flex items-center gap-2 pb-2 border-b">
