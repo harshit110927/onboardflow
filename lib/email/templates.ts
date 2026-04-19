@@ -44,7 +44,7 @@ export function buildEmailHtml(options: {
           <!-- Header -->
           <tr>
             <td style="background:#1e1b4b;padding:24px 32px;border-radius:12px 12px 0 0;">
-              <span style="font-size:16px;font-weight:600;color:#e0e7ff;letter-spacing:-0.3px;">OnboardFlow</span>
+              <span style="font-size:16px;font-weight:600;color:#e0e7ff;letter-spacing:-0.3px;">${fromLabel}</span>
             </td>
           </tr>
 
