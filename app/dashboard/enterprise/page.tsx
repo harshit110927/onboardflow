@@ -103,41 +103,6 @@ export default async function EnterpriseDashboardPage() {
               Monitor funnel performance, automate nudges, and manage your integration.
             </p>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <span
-              className={`rounded-full px-2.5 py-1 text-xs font-medium ${
-                planInfo.plan !== "free"
-                  ? "bg-emerald-100 text-emerald-700"
-                  : "bg-secondary text-muted-foreground"
-              }`}
-            >
-              {planLabel} Plan
-            </span>
-            <Link
-              href="/dashboard/analytics"
-              className="rounded-md border border-border px-3 py-1.5 text-sm transition-colors hover:bg-secondary"
-            >
-              Analytics
-            </Link>
-            <Link
-              href="/dashboard/settings"
-              className="rounded-md border border-border px-3 py-1.5 text-sm transition-colors hover:bg-secondary"
-            >
-              Automation Settings
-            </Link>
-            <Link
-              href="/docs"
-              className="rounded-md border border-border px-3 py-1.5 text-sm transition-colors hover:bg-secondary"
-            >
-              Docs
-            </Link>
-            <Link
-              href="/dashboard/enterprise/billing"
-              className="rounded-md bg-primary px-3 py-1.5 text-sm text-primary-foreground transition-opacity hover:opacity-90"
-            >
-              {planInfo.plan === "free" ? "Upgrade" : "Manage Billing"}
-            </Link>
-          </div>
         </div>
 
         {/* STAT CARDS */}

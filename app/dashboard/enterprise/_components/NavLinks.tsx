@@ -9,6 +9,7 @@ const links = [
   { href: "/dashboard/enterprise/billing", label: "Billing" },
   { href: "/dashboard/settings", label: "Settings" },
   { href: "/dashboard/analytics", label: "Analytics" },
+  { href: "/docs", label: "Docs" },
 ];
 
 export function EnterpriseNavLinks() {
