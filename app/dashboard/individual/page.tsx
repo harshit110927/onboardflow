@@ -466,8 +466,25 @@ export default async function IndividualDashboardPage() {
             </div>
           </div>
         )}
-
+{/* FEEDBACK */}
+        <div className="rounded-lg border border-dashed border-border bg-card p-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <p className="text-sm font-semibold text-foreground">Share your feedback</p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Help us improve OnboardFlow — bugs, missing features, or anything else.
+            </p>
+          </div>
+          
+            <a href="https://docs.google.com/forms/d/e/1FAIpQLSf73_-TjhWiYXqOkHS1Pr1_sNZ__JrTz93O6fgUEUF_F-COhw/viewform?usp=publish-editor"
+            target="_blank"
+            rel="noreferrer"
+            className="shrink-0 rounded-md border border-border px-4 py-2 text-sm font-medium transition-colors hover:bg-secondary"
+          >
+            Give Feedback →
+          </a>
+        </div>
       </div>
+      
     </div>
   );
 }
