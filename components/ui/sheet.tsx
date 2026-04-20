@@ -7,7 +7,9 @@ export function Sheet({ open, onOpenChange, children }: { open: boolean; onOpenC
 }
 
 export function SheetTrigger({ asChild, children, onOpenChange }: any) {
-  if (asChild && React.isValidElement(children)) return React.cloneElement(children, { onClick: () => onOpenChange?.(true) });
+  if (asChild && React.isValidElement(children)) return React.cloneElement(children as React.ReactElement<{ onClick?: () => void }>, {
+  onClick: () => onOpenChange?.(true),
+});
   return <button onClick={() => onOpenChange?.(true)}>{children}</button>;
 }
 
