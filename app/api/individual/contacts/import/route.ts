@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 
 import { db } from "@/db";
 import { individualContacts, individualLists, tenants } from "@/db/schema";
-import { INDIVIDUAL_LIMITS } from "@/lib/plans/limits";
+import { getIndividualLimits } from "@/lib/plans/limits";
 import { createClient } from "@/utils/supabase/server";
 
 export async function POST(req: Request) {
@@ -62,7 +62,7 @@ export async function POST(req: Request) {
       );
     }
 
-    const limits = INDIVIDUAL_LIMITS[tenant.plan];
+    const limits = getIndividualLimits(tenant.plan);
 
     const countResult = await db
       .select({ total: count() })
