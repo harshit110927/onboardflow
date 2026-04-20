@@ -10,7 +10,7 @@ import {
   individualLists,
 } from "@/db/schema";
 import { getTenantPlan } from "@/lib/plans/get-tenant-plan";
-import { INDIVIDUAL_LIMITS, type PlanTier } from "@/lib/plans/limits";
+import { getIndividualLimits } from "@/lib/plans/limits";
 import { getSession } from "@/lib/auth/get-session";
 import { getTenant } from "@/lib/auth/get-tenant";
 import { ContactsManager } from "./_components/ContactsManager";
@@ -34,7 +34,7 @@ export default async function ListDetailPage({
   if (isNaN(listId)) redirect("/dashboard/individual/lists");
 
   const { plan } = await getTenantPlan(tenant.id);
-  const limits = INDIVIDUAL_LIMITS[plan as PlanTier];
+  const limits = getIndividualLimits(plan);
   const MAX_CONTACTS = limits.maxContactsPerList;
 
   const [listRows, contacts, campaignCount] = await Promise.all([
