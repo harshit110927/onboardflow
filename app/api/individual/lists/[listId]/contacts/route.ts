@@ -75,7 +75,7 @@ export async function GET(
     const tagsByContact = new Map<number, { id: number; name: string; color: string }[]>();
     for (const assignment of assignments) {
       const existing = tagsByContact.get(assignment.contactId) ?? [];
-      existing.push({ id: assignment.tagId, name: assignment.name, color: assignment.color });
+      existing.push({ id: assignment.tagId, name: assignment.name, color: assignment.color ?? "#6366f1" });
       tagsByContact.set(assignment.contactId, existing);
     }
 
