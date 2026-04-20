@@ -9,7 +9,9 @@ export function Dialog({ open, onOpenChange, children }: { open: boolean; onOpen
 
 export function DialogTrigger({ asChild, children, onOpenChange }: any) {
   if (asChild && React.isValidElement(children)) {
-    return React.cloneElement(children, { onClick: () => onOpenChange?.(true) });
+    return React.cloneElement(children as React.ReactElement<{ onClick?: () => void }>, {
+  onClick: () => onOpenChange?.(true),
+});
   }
   return <button onClick={() => onOpenChange?.(true)}>{children}</button>;
 }
