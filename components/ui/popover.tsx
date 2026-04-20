@@ -7,7 +7,9 @@ export function Popover({ open, onOpenChange, children }: { open: boolean; onOpe
 }
 
 export function PopoverTrigger({ asChild, children, open, onOpenChange }: any) {
-  if (asChild && React.isValidElement(children)) return React.cloneElement(children, { onClick: () => onOpenChange?.(!open) });
+  if (asChild && React.isValidElement(children)) return React.cloneElement(children as React.ReactElement<{ onClick?: () => void }>, {
+  onClick: () => onOpenChange?.(!open),
+});
   return <button onClick={() => onOpenChange?.(!open)}>{children}</button>;
 }
 
