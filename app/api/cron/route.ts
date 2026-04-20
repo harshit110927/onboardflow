@@ -275,7 +275,11 @@ export async function GET(req: Request) {
         if (!seqTenant) continue;
 
         const contacts = await db
-          .select({ name: individualContacts.name, email: individualContacts.email })
+          .select({
+            name: individualContacts.name,
+            email: individualContacts.email,
+            customFields: individualContacts.customFields,
+          })
           .from(individualContacts)
           .where(eq(individualContacts.listId, step.listId));
 
@@ -288,10 +292,14 @@ export async function GET(req: Request) {
             const decrypted = decryptPassword(seqTenant.smtpPassword!);
             const transporter = createGmailTransporter(seqTenant.smtpEmail!, decrypted);
             for (const contact of contacts) {
-              const body = step.body
+              let body = step.body
                 .replace(/\{name\}/g, contact.name)
                 .replace(/\{email\}/g, contact.email)
                 .replace(/\{contact_name\}/g, contact.name);
+              const customFields = (contact.customFields as Record<string, string>) ?? {};
+              for (const [key, value] of Object.entries(customFields)) {
+                body = body.replace(new RegExp(`\\{${key}\\}`, "g"), value ?? "");
+              }
               await transporter.sendMail({
                 from: seqTenant.smtpEmail!,
                 to: contact.email,
@@ -301,10 +309,14 @@ export async function GET(req: Request) {
             }
           } else {
             for (const contact of contacts) {
-              const body = step.body
+              let body = step.body
                 .replace(/\{name\}/g, contact.name)
                 .replace(/\{email\}/g, contact.email)
                 .replace(/\{contact_name\}/g, contact.name);
+              const customFields = (contact.customFields as Record<string, string>) ?? {};
+              for (const [key, value] of Object.entries(customFields)) {
+                body = body.replace(new RegExp(`\\{${key}\\}`, "g"), value ?? "");
+              }
               await resend.emails.send({
                 from: "OnboardFlow <onboarding@resend.dev>",
                 to: contact.email,
