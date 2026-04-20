@@ -58,7 +58,7 @@ export default async function ListDetailPage({
   const tagsMap = new Map<number, { id: number; name: string; color: string }[]>();
   for (const assignment of assignments) {
     const current = tagsMap.get(assignment.contactId) ?? [];
-    current.push({ id: assignment.id, name: assignment.name, color: assignment.color });
+    current.push({ id: assignment.id, name: assignment.name, color: assignment.color ?? "#6366f1" });
     tagsMap.set(assignment.contactId, current);
   }
 
