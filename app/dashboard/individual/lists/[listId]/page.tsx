@@ -34,7 +34,7 @@ export default async function ListDetailPage({
   if (isNaN(listId)) redirect("/dashboard/individual/lists");
 
   const { plan } = await getTenantPlan(tenant.id);
-  const limits = getIndividualLimits(plan);
+  const limits = getIndividualLimits(plan ?? "free");
   const MAX_CONTACTS = limits.maxContactsPerList;
 
   const [listRows, contacts, campaignCount] = await Promise.all([
