@@ -935,6 +935,105 @@ async function run() {
     fix: 'Call getServerSession() at the top; if no session, return 401 or redirect to /login.',
   });
 
+  // ── 10. Individual contacts: import/notes/tags endpoints ─────────────────
+  await test('individual', 'POST /api/individual/contacts/import without session returns 401', async () => {
+    const fd = new FormData();
+    fd.append('file', new Blob(['name,email\nA,a@example.com'], { type: 'text/csv' }), 'contacts.csv');
+    fd.append('listId', String(process.env.TEST_INDIVIDUAL_LIST_ID || 1));
+    const { res } = await req('/api/individual/contacts/import', { method: 'POST', body: fd });
+    assert(res.status === 401, `expected 401 got ${res.status}`);
+  }, null, {
+    route: 'POST /api/individual/contacts/import',
+    file: 'app/api/individual/contacts/import/route.ts',
+    rootCause: 'Route does not enforce Supabase user auth before processing multipart body',
+    fix: 'Apply createClient().auth.getUser() gate at top and return 401 when no user.',
+  });
+
+  await test('individual', 'Notes GET/POST/PATCH/DELETE without session return 401', async () => {
+    const id = Number(process.env.TEST_INDIVIDUAL_CONTACT_ID || 1);
+    const getRes = await req(`/api/individual/contacts/${id}/notes`);
+    const postRes = await req(`/api/individual/contacts/${id}/notes`, {
+      method: 'POST', headers: json(), body: JSON.stringify({ body: 'test note' }),
+    });
+    const patchRes = await req(`/api/individual/contacts/${id}/notes`, {
+      method: 'PATCH', headers: json(), body: JSON.stringify({ noteId: 1, body: 'updated' }),
+    });
+    const deleteRes = await req(`/api/individual/contacts/${id}/notes`, {
+      method: 'DELETE', headers: json(), body: JSON.stringify({ noteId: 1 }),
+    });
+    assert(getRes.res.status === 401, `GET expected 401 got ${getRes.res.status}`);
+    assert(postRes.res.status === 401, `POST expected 401 got ${postRes.res.status}`);
+    assert(patchRes.res.status === 401, `PATCH expected 401 got ${patchRes.res.status}`);
+    assert(deleteRes.res.status === 401, `DELETE expected 401 got ${deleteRes.res.status}`);
+  }, null, {
+    route: 'GET/POST/PATCH/DELETE /api/individual/contacts/[id]/notes',
+    file: 'app/api/individual/contacts/[id]/notes/route.ts',
+    rootCause: 'One or more handlers skip user auth gate',
+    fix: 'Apply the exact Supabase getUser + tenant lookup pattern at top of each handler.',
+  });
+
+  await test('individual', 'Tags endpoints without session return 401', async () => {
+    const id = Number(process.env.TEST_INDIVIDUAL_CONTACT_ID || 1);
+    const tagsGet = await req('/api/individual/tags');
+    const tagsPost = await req('/api/individual/tags', {
+      method: 'POST', headers: json(), body: JSON.stringify({ name: 'VIP', color: '#6366f1' }),
+    });
+    const assignPost = await req(`/api/individual/contacts/${id}/tags`, {
+      method: 'POST', headers: json(), body: JSON.stringify({ tagId: 1 }),
+    });
+    const assignDelete = await req(`/api/individual/contacts/${id}/tags`, {
+      method: 'DELETE', headers: json(), body: JSON.stringify({ tagId: 1 }),
+    });
+
+    assert(tagsGet.res.status === 401, `GET tags expected 401 got ${tagsGet.res.status}`);
+    assert(tagsPost.res.status === 401, `POST tags expected 401 got ${tagsPost.res.status}`);
+    assert(assignPost.res.status === 401, `POST assign expected 401 got ${assignPost.res.status}`);
+    assert(assignDelete.res.status === 401, `DELETE assign expected 401 got ${assignDelete.res.status}`);
+  }, null, {
+    route: 'GET/POST /api/individual/tags and POST/DELETE /api/individual/contacts/[id]/tags',
+    file: 'app/api/individual/tags/route.ts and app/api/individual/contacts/[id]/tags/route.ts',
+    rootCause: 'One or more tag handlers skip user auth gate',
+    fix: 'Apply the exact Supabase getUser + tenant lookup pattern at top of each handler.',
+  });
+
+  await test('individual', 'DB has contact_notes/contact_tags/contact_tag_assignments tables + required columns', async () => {
+    if (!sql) throw new Error('DATABASE_URL missing for DB assertions');
+
+    const tables = await sql`
+      select table_name
+      from information_schema.tables
+      where table_schema='public'
+        and table_name in ('contact_notes','contact_tags','contact_tag_assignments')
+    `;
+    const names = tables.map((t) => t.table_name);
+    assert(names.includes('contact_notes'), 'missing table contact_notes');
+    assert(names.includes('contact_tags'), 'missing table contact_tags');
+    assert(names.includes('contact_tag_assignments'), 'missing table contact_tag_assignments');
+
+    const columns = await sql`
+      select table_name, column_name
+      from information_schema.columns
+      where table_schema='public'
+        and (
+          (table_name='individual_contacts' and column_name in ('custom_fields','phone','follow_up_at','follow_up_note','follow_up_sent','pipeline_stage')) or
+          (table_name='tenants' and column_name='whatsapp_template')
+        )
+    `;
+    const has = (table, col) => columns.some((r) => r.table_name === table && r.column_name === col);
+    assert(has('individual_contacts', 'custom_fields'), 'missing individual_contacts.custom_fields');
+    assert(has('individual_contacts', 'phone'), 'missing individual_contacts.phone');
+    assert(has('individual_contacts', 'follow_up_at'), 'missing individual_contacts.follow_up_at');
+    assert(has('individual_contacts', 'follow_up_note'), 'missing individual_contacts.follow_up_note');
+    assert(has('individual_contacts', 'follow_up_sent'), 'missing individual_contacts.follow_up_sent');
+    assert(has('individual_contacts', 'pipeline_stage'), 'missing individual_contacts.pipeline_stage');
+    assert(has('tenants', 'whatsapp_template'), 'missing tenants.whatsapp_template');
+  }, !DB_URL ? 'DATABASE_URL missing' : null, {
+    route: 'DB schema assertion',
+    file: 'db/schema.ts and Supabase migrations',
+    rootCause: 'Migrations were not applied or schema.ts is out of sync with live DB',
+    fix: 'Run the Prompt 1 SQL statements in order, then verify db/schema.ts definitions match exactly.',
+  });
+
   // ── Cleanup ───────────────────────────────────────────────────────────────
   for (const fn of cleanupFns) {
     try { await fn(); } catch {}

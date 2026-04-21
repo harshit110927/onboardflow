@@ -128,3 +128,7 @@ export const ENTERPRISE_PLANS = [
     highlights: ["10,000 emails/month", "2,000 tracked users", "Unlimited drip steps", "Webhooks", "Advanced analytics"],
   },
 ] as const;
+
+export function getIndividualLimits(plan: string): IndividualLimits {
+  return INDIVIDUAL_LIMITS[plan as PlanTier] ?? INDIVIDUAL_LIMITS["free"];
+}
