@@ -1034,6 +1034,94 @@ async function run() {
     fix: 'Run the Prompt 1 SQL statements in order, then verify db/schema.ts definitions match exactly.',
   });
 
+  await test('individual', 'Timeline endpoint without session returns 401', async () => {
+    const id = Number(process.env.TEST_INDIVIDUAL_CONTACT_ID || 1);
+    const { res } = await req(`/api/individual/contacts/${id}/timeline`);
+    assert(res.status === 401, `expected 401 got ${res.status}`);
+  }, null, {
+    route: 'GET /api/individual/contacts/[id]/timeline',
+    file: 'app/api/individual/contacts/[id]/timeline/route.ts',
+    rootCause: 'Timeline route is missing mandatory auth gate',
+    fix: 'Apply the exact Supabase getUser + tenant lookup pattern before reading params or DB.',
+  });
+
+  await test('individual', 'Engagement endpoint without session returns 401', async () => {
+    const id = Number(process.env.TEST_INDIVIDUAL_CONTACT_ID || 1);
+    const { res } = await req(`/api/individual/contacts/${id}/engagement`);
+    assert(res.status === 401, `expected 401 got ${res.status}`);
+  }, null, {
+    route: 'GET /api/individual/contacts/[id]/engagement',
+    file: 'app/api/individual/contacts/[id]/engagement/route.ts',
+    rootCause: 'Engagement route is missing mandatory auth gate',
+    fix: 'Apply the exact Supabase getUser + tenant lookup pattern before reading params or DB.',
+  });
+
+  await test('individual', 'Reminder endpoint without session returns 401 for POST/DELETE', async () => {
+    const id = Number(process.env.TEST_INDIVIDUAL_CONTACT_ID || 1);
+    const postRes = await req(`/api/individual/contacts/${id}/reminder`, {
+      method: 'POST',
+      headers: json(),
+      body: JSON.stringify({ followUpAt: '2099-01-01T09:00:00.000Z', followUpNote: 'test' }),
+    });
+    const deleteRes = await req(`/api/individual/contacts/${id}/reminder`, {
+      method: 'DELETE',
+      headers: json(),
+    });
+    assert(postRes.res.status === 401, `POST expected 401 got ${postRes.res.status}`);
+    assert(deleteRes.res.status === 401, `DELETE expected 401 got ${deleteRes.res.status}`);
+  }, null, {
+    route: 'POST/DELETE /api/individual/contacts/[id]/reminder',
+    file: 'app/api/individual/contacts/[id]/reminder/route.ts',
+    rootCause: 'Reminder handlers skip mandatory auth pattern',
+    fix: 'Apply the exact Supabase getUser + tenant lookup pattern at top of both handlers.',
+  });
+
+  await test('tracking', 'Pixel route always returns GIF', async () => {
+    const { res, text } = await req('/api/track/pixel');
+    assert(res.status === 200, `expected 200 got ${res.status}`);
+    assert((res.headers.get('content-type') || '').includes('image/gif'), `expected image/gif got ${res.headers.get('content-type')}`);
+    assert(text.length > 0, 'expected non-empty gif body');
+  }, null, {
+    route: 'GET /api/track/pixel',
+    file: 'app/api/track/pixel/route.ts',
+    rootCause: 'Route may be returning JSON or requiring auth instead of binary gif response',
+    fix: 'Always return the 1x1 gif Response regardless of missing/invalid query params.',
+  });
+
+  await test('tracking', 'Click route rejects non-http URLs with 400', async () => {
+    const { res } = await req('/api/track/click?url=javascript%3Aalert(1)');
+    assert(res.status === 400, `expected 400 got ${res.status}`);
+  }, null, {
+    route: 'GET /api/track/click?url=<value>',
+    file: 'app/api/track/click/route.ts',
+    rootCause: 'Open redirect protection is missing or incomplete',
+    fix: 'Validate decoded URL starts with http:// or https:// before redirecting.',
+  });
+
+  await test('pipeline', 'GET /api/individual/pipeline without session returns 401', async () => {
+    const { res } = await req('/api/individual/pipeline');
+    assert(res.status === 401, `expected 401 got ${res.status}`);
+  }, null, {
+    route: 'GET /api/individual/pipeline',
+    file: 'app/api/individual/pipeline/route.ts',
+    rootCause: 'Pipeline GET is missing mandatory auth gate',
+    fix: 'Apply the exact Supabase getUser + tenant lookup pattern before processing params.',
+  });
+
+  await test('pipeline', 'PATCH /api/individual/pipeline without session returns 401', async () => {
+    const { res } = await req('/api/individual/pipeline', {
+      method: 'PATCH',
+      headers: json(),
+      body: JSON.stringify({ contactId: 1, stage: 'contacted' }),
+    });
+    assert(res.status === 401, `expected 401 got ${res.status}`);
+  }, null, {
+    route: 'PATCH /api/individual/pipeline',
+    file: 'app/api/individual/pipeline/route.ts',
+    rootCause: 'Pipeline PATCH is missing mandatory auth gate',
+    fix: 'Apply the exact Supabase getUser + tenant lookup pattern before body validation.',
+  });
+
   // ── Cleanup ───────────────────────────────────────────────────────────────
   for (const fn of cleanupFns) {
     try { await fn(); } catch {}

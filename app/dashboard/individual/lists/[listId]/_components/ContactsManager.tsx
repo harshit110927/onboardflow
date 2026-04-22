@@ -1,8 +1,8 @@
 "use client";
 
 import Papa from "papaparse";
-import { Loader2, NotepadText, Pencil, Plus, Trash2 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { Bell, Loader2, NotepadText, Pencil, Plus, Trash2 } from "lucide-react";
+import { Fragment, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { Checkbox } from "@/components/ui/checkbox";
@@ -10,15 +10,76 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { formatRelativeTime } from "@/lib/utils/time";
 
 type Tag = { id: number; name: string; color: string };
-type Contact = { id: number; name: string; email: string; phone?: string | null; createdAt?: string; tags: Tag[] };
+type Contact = {
+  id: number;
+  name: string;
+  email: string;
+  phone?: string | null;
+  createdAt?: string;
+  followUpAt?: string | Date | null;
+  followUpNote?: string | null;
+  followUpSent?: boolean | null;
+  tags: Tag[];
+};
 type Note = { id: number; body: string; createdAt: string; updatedAt?: string };
+type TimelineItem = { type: string; description: string; occurredAt: string; metadata?: Record<string, string> };
+type EngagementItem = {
+  campaignId: number;
+  subject: string;
+  sentAt: string;
+  opened: boolean;
+  clicked: boolean;
+  lastActivity: string;
+};
 
 const TAG_COLORS = ["#6366f1", "#f59e0b", "#10b981", "#ef4444", "#3b82f6", "#8b5cf6", "#ec4899", "#14b8a6"];
 
-export function ContactsManager({ listId, initialContacts }: { listId: number; initialContacts: Contact[] }) {
+function formatPhone(phone: string): string {
+  const digits = phone.replace(/\D/g, "");
+  if (digits.startsWith("0")) return `91${digits.slice(1)}`;
+  if (digits.length === 10) return `91${digits}`;
+  return digits;
+}
+
+function timelineEmoji(type: string) {
+  if (type === "email_sent") return "📧";
+  if (type === "email_opened") return "👁";
+  if (type === "email_clicked") return "🔗";
+  if (type === "note_added") return "📝";
+  if (type === "tag_assigned") return "🏷";
+  return "•";
+}
+
+function reminderLabel(contact: Contact) {
+  if (!contact.followUpAt) return { text: "Set reminder", className: "", isButton: true };
+  const date = new Date(contact.followUpAt);
+  const formatted = date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  if (contact.followUpSent) {
+    return { text: "✅ Reminded", className: "text-emerald-600", isButton: false };
+  }
+  if (date <= new Date()) {
+    return { text: `⚠️ Overdue: ${formatted}`, className: "text-red-600", isButton: false };
+  }
+  return { text: `🕐 ${formatted}`, className: "text-amber-600", isButton: false };
+}
+
+export function ContactsManager({
+  listId,
+  initialContacts,
+  initialEngagement,
+  whatsappTemplate: initialWhatsappTemplate,
+}: {
+  listId: number;
+  initialContacts: Contact[];
+  initialEngagement: Record<string, "opened" | "sent" | null>;
+  whatsappTemplate: string;
+}) {
   const [contacts, setContacts] = useState(initialContacts);
+  const [engagementMap, setEngagementMap] = useState(initialEngagement);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
@@ -47,6 +108,24 @@ export function ContactsManager({ listId, initialContacts }: { listId: number; i
   const [editingNoteId, setEditingNoteId] = useState<number | null>(null);
   const [editingText, setEditingText] = useState("");
 
+  const [sheetTab, setSheetTab] = useState<"notes" | "timeline" | "engagement">("notes");
+  const [timelineByContact, setTimelineByContact] = useState<Record<number, TimelineItem[]>>({});
+  const [timelineLoadingByContact, setTimelineLoadingByContact] = useState<Record<number, boolean>>({});
+  const [timelineLoadedByContact, setTimelineLoadedByContact] = useState<Record<number, boolean>>({});
+
+  const [engagementByContact, setEngagementByContact] = useState<Record<number, EngagementItem[]>>({});
+  const [engagementLoadingByContact, setEngagementLoadingByContact] = useState<Record<number, boolean>>({});
+  const [engagementLoadedByContact, setEngagementLoadedByContact] = useState<Record<number, boolean>>({});
+
+  const [openReminderForContactId, setOpenReminderForContactId] = useState<number | null>(null);
+  const [reminderDateByContact, setReminderDateByContact] = useState<Record<number, string>>({});
+  const [reminderNoteByContact, setReminderNoteByContact] = useState<Record<number, string>>({});
+  const [savingReminderFor, setSavingReminderFor] = useState<number | null>(null);
+  const [clearingReminderFor, setClearingReminderFor] = useState<number | null>(null);
+  const [whatsappTemplate] = useState(initialWhatsappTemplate || "Hi {name}, ");
+  const [whatsappPopoverOpenFor, setWhatsappPopoverOpenFor] = useState<number | null>(null);
+  const [editedMessageByContact, setEditedMessageByContact] = useState<Record<number, string>>({});
+
   const filteredContacts = useMemo(() => {
     if (!selectedTagIds.length) return contacts;
     return contacts.filter((contact) => contact.tags.some((tag) => selectedTagIds.includes(tag.id)));
@@ -56,7 +135,16 @@ export function ContactsManager({ listId, initialContacts }: { listId: number; i
     const res = await fetch(`/api/individual/lists/${listId}/contacts`);
     if (!res.ok) return;
     const data = await res.json();
-    setContacts((data.contacts ?? []).map((c: any) => ({ ...c, createdAt: c.createdAt })));
+    const nextContacts = (data.contacts ?? []).map((c: any) => ({ ...c, createdAt: c.createdAt }));
+    setContacts(nextContacts);
+
+    const emails = nextContacts.map((c: Contact) => c.email);
+    if (!emails.length) return;
+    const updatedEngagement: Record<string, "opened" | "sent" | null> = {};
+    for (const c of nextContacts) {
+      updatedEngagement[c.email] = engagementMap[c.email] ?? null;
+    }
+    setEngagementMap(updatedEngagement);
   }
 
   async function fetchTags() {
@@ -93,6 +181,7 @@ export function ContactsManager({ listId, initialContacts }: { listId: number; i
     setNotesOpen(open);
     if (!open) return;
     setActiveContact(contact);
+    setSheetTab("notes");
     setNotesLoading(true);
     const res = await fetch(`/api/individual/contacts/${contact.id}/notes`);
     const data = await res.json();
@@ -100,109 +189,91 @@ export function ContactsManager({ listId, initialContacts }: { listId: number; i
     setNotesLoading(false);
   }
 
+  async function maybeLoadTimeline(contactId: number) {
+    if (timelineLoadedByContact[contactId]) return;
+    setTimelineLoadingByContact((prev) => ({ ...prev, [contactId]: true }));
+    const res = await fetch(`/api/individual/contacts/${contactId}/timeline`);
+    const data = await res.json();
+    if (!res.ok) {
+      setTimelineLoadingByContact((prev) => ({ ...prev, [contactId]: false }));
+      toast.error(data.error || "Failed to load timeline");
+      return;
+    }
+    setTimelineByContact((prev) => ({ ...prev, [contactId]: data ?? [] }));
+    setTimelineLoadedByContact((prev) => ({ ...prev, [contactId]: true }));
+    setTimelineLoadingByContact((prev) => ({ ...prev, [contactId]: false }));
+  }
+
+  async function maybeLoadEngagement(contactId: number) {
+    if (engagementLoadedByContact[contactId]) return;
+    setEngagementLoadingByContact((prev) => ({ ...prev, [contactId]: true }));
+    const res = await fetch(`/api/individual/contacts/${contactId}/engagement`);
+    const data = await res.json();
+    if (!res.ok) {
+      setEngagementLoadingByContact((prev) => ({ ...prev, [contactId]: false }));
+      toast.error(data.error || "Failed to load engagement");
+      return;
+    }
+    setEngagementByContact((prev) => ({ ...prev, [contactId]: data ?? [] }));
+    setEngagementLoadedByContact((prev) => ({ ...prev, [contactId]: true }));
+    setEngagementLoadingByContact((prev) => ({ ...prev, [contactId]: false }));
+  }
+
+  const today = new Date().toISOString().slice(0, 10);
+
   return (
     <>
       <div className="rounded-lg border border-border bg-card p-6">
         <h2 className="text-base font-semibold text-foreground mb-4">Add Contact</h2>
         <form onSubmit={submitAddContact} className="flex flex-col sm:flex-row gap-3 items-end">
-          <input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            name="name"
-            type="text"
-            required
-            maxLength={100}
-            placeholder="Full name"
-            className="flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-          />
-          <input
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            name="email"
-            type="email"
-            required
-            maxLength={255}
-            placeholder="Email address"
-            className="flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-          />
+          <input value={name} onChange={(e) => setName(e.target.value)} name="name" type="text" required maxLength={100} placeholder="Full name" className="flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring" />
+          <input value={email} onChange={(e) => setEmail(e.target.value)} name="email" type="email" required maxLength={255} placeholder="Email address" className="flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring" />
           <div className="flex-1 w-full">
             <label className="block text-xs text-muted-foreground mb-1">Phone (optional)</label>
-            <input
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              name="phone"
-              type="tel"
-              placeholder="+91 98765 43210"
-              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-            />
+            <input value={phone} onChange={(e) => setPhone(e.target.value)} name="phone" type="tel" placeholder="+91 98765 43210" className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring" />
           </div>
-          <button type="submit" disabled={adding} className="rounded-md bg-primary text-primary-foreground px-4 py-2 text-sm font-medium hover:opacity-90 transition-opacity shrink-0">
-            {adding ? <Loader2 className="h-4 w-4 animate-spin" /> : "Add"}
-          </button>
+          <button type="submit" disabled={adding} className="rounded-md bg-primary text-primary-foreground px-4 py-2 text-sm font-medium hover:opacity-90 transition-opacity shrink-0">{adding ? <Loader2 className="h-4 w-4 animate-spin" /> : "Add"}</button>
           <Dialog open={importOpen} onOpenChange={setImportOpen}>
             <DialogTrigger asChild>
               <button type="button" className="rounded-md border border-border px-4 py-2 text-sm font-medium hover:bg-secondary transition-colors shrink-0">Import CSV</button>
             </DialogTrigger>
             <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Import CSV</DialogTitle>
-              </DialogHeader>
+              <DialogHeader><DialogTitle>Import CSV</DialogTitle></DialogHeader>
               <div className="space-y-3">
-                <input
-                  type="file"
-                  accept=".csv"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (!file) return;
-                    setImportFile(file);
-                    Papa.parse(file, {
-                      header: true,
-                      preview: 3,
-                      complete: (results) => {
-                        setPreviewRows(results.data as Record<string, string>[]);
-                        setDetectedColumns(results.meta.fields ?? []);
-                      },
-                    });
-                  }}
-                />
+                <input type="file" accept=".csv" onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  setImportFile(file);
+                  Papa.parse(file, {
+                    header: true,
+                    preview: 3,
+                    complete: (results) => {
+                      setPreviewRows(results.data as Record<string, string>[]);
+                      setDetectedColumns(results.meta.fields ?? []);
+                    },
+                  });
+                }} />
                 <p className="text-sm text-muted-foreground">Detected columns: {detectedColumns.join(", ")}</p>
                 <div className="rounded-md border border-border overflow-auto">
-                  <table className="w-full text-xs">
-                    <tbody>
-                      {previewRows.slice(0, 3).map((row, idx) => (
-                        <tr key={idx} className="border-b border-border last:border-0">
-                          {Object.values(row).map((cell, j) => (
-                            <td key={j} className="px-2 py-1">{String(cell ?? "")}</td>
-                          ))}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                  <table className="w-full text-xs"><tbody>{previewRows.slice(0, 3).map((row, idx) => (<tr key={idx} className="border-b border-border last:border-0">{Object.values(row).map((cell, j) => (<td key={j} className="px-2 py-1">{String(cell ?? "")}</td>))}</tr>))}</tbody></table>
                 </div>
-                <button
-                  type="button"
-                  disabled={importing || !importFile}
-                  className="rounded-md bg-primary text-primary-foreground px-4 py-2 text-sm"
-                  onClick={async () => {
-                    if (!importFile) return;
-                    setImporting(true);
-                    const formData = new FormData();
-                    formData.append("file", importFile);
-                    formData.append("listId", String(listId));
-                    const res = await fetch("/api/individual/contacts/import", { method: "POST", body: formData });
-                    const data = await res.json();
-                    setImporting(false);
-                    if (!res.ok) {
-                      toast.error(data.error || "Import failed");
-                      return;
-                    }
-                    toast.success(`Imported ${data.imported} contacts, updated ${data.updated}. ${data.limitSkipped > 0 ? `${data.limitSkipped} skipped (plan limit).` : ""}`);
-                    setImportOpen(false);
-                    await fetchContacts();
-                  }}
-                >
-                  {importing ? <Loader2 className="h-4 w-4 animate-spin" /> : "Confirm Import"}
-                </button>
+                <button type="button" disabled={importing || !importFile} className="rounded-md bg-primary text-primary-foreground px-4 py-2 text-sm" onClick={async () => {
+                  if (!importFile) return;
+                  setImporting(true);
+                  const formData = new FormData();
+                  formData.append("file", importFile);
+                  formData.append("listId", String(listId));
+                  const res = await fetch("/api/individual/contacts/import", { method: "POST", body: formData });
+                  const data = await res.json();
+                  setImporting(false);
+                  if (!res.ok) {
+                    toast.error(data.error || "Import failed");
+                    return;
+                  }
+                  toast.success(`Imported ${data.imported} contacts, updated ${data.updated}. ${data.limitSkipped > 0 ? `${data.limitSkipped} skipped (plan limit).` : ""}`);
+                  setImportOpen(false);
+                  await fetchContacts();
+                }}>{importing ? <Loader2 className="h-4 w-4 animate-spin" /> : "Confirm Import"}</button>
               </div>
             </DialogContent>
           </Dialog>
@@ -216,26 +287,13 @@ export function ContactsManager({ listId, initialContacts }: { listId: number; i
           <span className="text-sm text-muted-foreground">Filter by tag:</span>
           <Popover open={popoverOpenFor === -1} onOpenChange={async (open) => { if (open) await fetchTags(); setPopoverOpenFor(open ? -1 : null); }}>
             <PopoverTrigger asChild>
-              <button type="button" className="text-sm rounded-md border border-border px-3 py-1.5 hover:bg-secondary transition-colors">
-                {selectedTagIds.length ? `${selectedTagIds.length} tag(s) selected` : "All tags"}
-              </button>
+              <button type="button" className="text-sm rounded-md border border-border px-3 py-1.5 hover:bg-secondary transition-colors">{selectedTagIds.length ? `${selectedTagIds.length} tag(s) selected` : "All tags"}</button>
             </PopoverTrigger>
             <PopoverContent className="w-80">
-              <div className="space-y-2">
-                {tags.map((tag) => (
-                  <label key={tag.id} className="flex items-center gap-2 text-sm">
-                    <Checkbox checked={selectedTagIds.includes(tag.id)} onCheckedChange={(checked) => setSelectedTagIds((prev) => checked ? [...prev, tag.id] : prev.filter((id) => id !== tag.id))} />
-                    <span style={{ backgroundColor: `${tag.color}33`, color: tag.color, fontSize: 11, padding: "2px 7px", borderRadius: 9999 }}>{tag.name}</span>
-                  </label>
-                ))}
-              </div>
+              <div className="space-y-2">{tags.map((tag) => (<label key={tag.id} className="flex items-center gap-2 text-sm"><Checkbox checked={selectedTagIds.includes(tag.id)} onCheckedChange={(checked) => setSelectedTagIds((prev) => checked ? [...prev, tag.id] : prev.filter((id) => id !== tag.id))} /><span style={{ backgroundColor: `${tag.color}33`, color: tag.color, fontSize: 11, padding: "2px 7px", borderRadius: 9999 }}>{tag.name}</span></label>))}</div>
             </PopoverContent>
           </Popover>
-          {selectedTagIds.length > 0 && (
-            <button type="button" onClick={() => setSelectedTagIds([])} className="text-xs text-muted-foreground hover:text-foreground">
-              Clear filters
-            </button>
-          )}
+          {selectedTagIds.length > 0 && (<button type="button" onClick={() => setSelectedTagIds([])} className="text-xs text-muted-foreground hover:text-foreground">Clear filters</button>)}
         </div>
 
         {filteredContacts.length === 0 ? (
@@ -251,165 +309,325 @@ export function ContactsManager({ listId, initialContacts }: { listId: number; i
                   <th className="text-left px-4 py-3 font-medium text-muted-foreground">Name</th>
                   <th className="text-left px-4 py-3 font-medium text-muted-foreground">Email</th>
                   <th className="text-left px-4 py-3 font-medium text-muted-foreground hidden sm:table-cell">Added</th>
+                  <th className="text-left px-4 py-3 font-medium text-muted-foreground">Reminder</th>
                   <th className="px-4 py-3" />
                 </tr>
               </thead>
               <tbody>
-                {filteredContacts.map((contact) => (
-                  <tr key={contact.id} className="border-b border-border last:border-0 hover:bg-secondary/30 transition-colors">
-                    <td className="px-4 py-3 font-medium text-foreground">
-                      <span>{contact.name}</span>
-                      {contact.tags.map((tag) => (
-                        <span key={tag.id} className="ml-2" style={{ backgroundColor: `${tag.color}33`, color: tag.color, fontSize: 11, padding: "2px 7px", borderRadius: 9999 }}>{tag.name}</span>
-                      ))}
-                      <Popover open={popoverOpenFor === contact.id} onOpenChange={async (open) => { if (open) await fetchTags(); setPopoverOpenFor(open ? contact.id : null); }}>
-                        <PopoverTrigger asChild>
-                          <button type="button" className="ml-2 inline-flex items-center justify-center rounded border border-border h-5 w-5" title="Manage tags"><Plus className="h-3 w-3" /></button>
-                        </PopoverTrigger>
-                        <PopoverContent>
-                          <div className="space-y-2">
-                            {tags.map((tag) => (
-                              <label key={tag.id} className="flex items-center gap-2 text-sm">
-                                <Checkbox
-                                  checked={contact.tags.some((t) => t.id === tag.id)}
-                                  onCheckedChange={async (checked) => {
-                                    const res = await fetch(`/api/individual/contacts/${contact.id}/tags`, {
-                                      method: checked ? "POST" : "DELETE",
-                                      headers: { "Content-Type": "application/json" },
-                                      body: JSON.stringify({ tagId: tag.id }),
-                                    });
-                                    if (!res.ok) {
-                                      toast.error("Failed to update tag assignment");
+                {filteredContacts.map((contact) => {
+                  const engagement = engagementMap[contact.email];
+                  const dotColor = engagement === "opened" ? "#10b981" : engagement === "sent" ? "#9ca3af" : null;
+                  const reminder = reminderLabel(contact);
+                  return (
+                    <Fragment key={contact.id}>
+                      <tr className="border-b border-border hover:bg-secondary/30 transition-colors">
+                        <td className="px-4 py-3 font-medium text-foreground">
+                          {dotColor ? <span style={{ display: "inline-block", width: 12, height: 12, borderRadius: "50%", background: dotColor, marginRight: 6 }} /> : null}
+                          <span>{contact.name}</span>
+                          {contact.tags.map((tag) => (<span key={tag.id} className="ml-2" style={{ backgroundColor: `${tag.color}33`, color: tag.color, fontSize: 11, padding: "2px 7px", borderRadius: 9999 }}>{tag.name}</span>))}
+                          <Popover open={popoverOpenFor === contact.id} onOpenChange={async (open) => { if (open) await fetchTags(); setPopoverOpenFor(open ? contact.id : null); }}>
+                            <PopoverTrigger asChild><button type="button" className="ml-2 inline-flex items-center justify-center rounded border border-border h-5 w-5" title="Manage tags"><Plus className="h-3 w-3" /></button></PopoverTrigger>
+                            <PopoverContent>
+                              <div className="space-y-2">
+                                {tags.map((tag) => (
+                                  <label key={tag.id} className="flex items-center gap-2 text-sm">
+                                    <Checkbox checked={contact.tags.some((t) => t.id === tag.id)} onCheckedChange={async (checked) => {
+                                      const res = await fetch(`/api/individual/contacts/${contact.id}/tags`, { method: checked ? "POST" : "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tagId: tag.id }) });
+                                      if (!res.ok) return toast.error("Failed to update tag assignment");
+                                      setContacts((prev) => prev.map((c) => c.id !== contact.id ? c : { ...c, tags: checked ? [...c.tags, tag] : c.tags.filter((t) => t.id !== tag.id) }));
+                                      toast.success(checked ? "Tag assigned" : "Tag removed");
+                                    }} />
+                                    <span style={{ backgroundColor: `${tag.color}33`, color: tag.color, fontSize: 11, padding: "2px 7px", borderRadius: 9999 }}>{tag.name}</span>
+                                  </label>
+                                ))}
+                                <div className="pt-2 border-t border-border">
+                                  <p className="text-xs mb-2">Create new tag</p>
+                                  <input value={newTagName} onChange={(e) => setNewTagName(e.target.value)} maxLength={50} className="w-full rounded border border-input px-2 py-1 text-xs mb-2" placeholder="Tag name" />
+                                  <div className="flex gap-2 mb-2">{TAG_COLORS.map((color) => (<button key={color} type="button" onClick={() => setNewTagColor(color)} className={`h-5 w-5 rounded-full ${newTagColor === color ? "ring-2 ring-offset-1 ring-foreground" : ""}`} style={{ backgroundColor: color }} />))}</div>
+                                  <button type="button" className="text-xs rounded border border-border px-2 py-1" disabled={creatingTag} onClick={async () => {
+                                    setCreatingTag(true);
+                                    const tagRes = await fetch("/api/individual/tags", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: newTagName, color: newTagColor }) });
+                                    const tagData = await tagRes.json();
+                                    if (!tagRes.ok) {
+                                      setCreatingTag(false);
+                                      toast.error(tagData.error || "Failed to create tag");
                                       return;
                                     }
-                                    setContacts((prev) => prev.map((c) => c.id !== contact.id ? c : { ...c, tags: checked ? [...c.tags, tag] : c.tags.filter((t) => t.id !== tag.id) }));
-                                    toast.success(checked ? "Tag assigned" : "Tag removed");
-                                  }}
-                                />
-                                <span style={{ backgroundColor: `${tag.color}33`, color: tag.color, fontSize: 11, padding: "2px 7px", borderRadius: 9999 }}>{tag.name}</span>
-                              </label>
-                            ))}
-                            <div className="pt-2 border-t border-border">
-                              <p className="text-xs mb-2">Create new tag</p>
-                              <input value={newTagName} onChange={(e) => setNewTagName(e.target.value)} maxLength={50} className="w-full rounded border border-input px-2 py-1 text-xs mb-2" placeholder="Tag name" />
-                              <div className="flex gap-2 mb-2">
-                                {TAG_COLORS.map((color) => (
-                                  <button key={color} type="button" onClick={() => setNewTagColor(color)} className={`h-5 w-5 rounded-full ${newTagColor === color ? "ring-2 ring-offset-1 ring-foreground" : ""}`} style={{ backgroundColor: color }} />
-                                ))}
+                                    const createdTag = tagData as Tag;
+                                    await fetch(`/api/individual/contacts/${contact.id}/tags`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tagId: createdTag.id }) });
+                                    setTags((prev) => [...prev, createdTag]);
+                                    setContacts((prev) => prev.map((c) => c.id === contact.id ? { ...c, tags: [...c.tags, createdTag] } : c));
+                                    setNewTagName("");
+                                    setCreatingTag(false);
+                                    toast.success("Tag created and assigned");
+                                  }}>{creatingTag ? <Loader2 className="h-3 w-3 animate-spin" /> : "Create"}</button>
+                                </div>
                               </div>
-                              <button type="button" className="text-xs rounded border border-border px-2 py-1" disabled={creatingTag} onClick={async () => {
-                                setCreatingTag(true);
-                                const tagRes = await fetch("/api/individual/tags", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: newTagName, color: newTagColor }) });
-                                const tagData = await tagRes.json();
-                                if (!tagRes.ok) {
-                                  setCreatingTag(false);
-                                  toast.error(tagData.error || "Failed to create tag");
-                                  return;
-                                }
-                                const createdTag = tagData as Tag;
-                                await fetch(`/api/individual/contacts/${contact.id}/tags`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tagId: createdTag.id }) });
-                                setTags((prev) => [...prev, createdTag]);
-                                setContacts((prev) => prev.map((c) => c.id === contact.id ? { ...c, tags: [...c.tags, createdTag] } : c));
-                                setNewTagName("");
-                                setCreatingTag(false);
-                                toast.success("Tag created and assigned");
-                              }}>
-                                {creatingTag ? <Loader2 className="h-3 w-3 animate-spin" /> : "Create"}
-                              </button>
-                            </div>
-                          </div>
-                        </PopoverContent>
-                      </Popover>
-                    </td>
-                    <td className="px-4 py-3 text-muted-foreground">{contact.email}</td>
-                    <td className="px-4 py-3 text-muted-foreground hidden sm:table-cell">
-                      {contact.createdAt ? new Date(contact.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "-"}
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <div className="inline-flex items-center gap-2">
-                        <Sheet open={notesOpen && activeContact?.id === contact.id} onOpenChange={(open) => openNotes(contact, open)}>
-                          <SheetTrigger asChild>
-                            <button type="button" title="Notes"><NotepadText className="h-4 w-4" /></button>
-                          </SheetTrigger>
-                          <SheetContent side="right">
-                            <SheetHeader>
-                              <SheetTitle>Notes — {contact.name}</SheetTitle>
-                            </SheetHeader>
-                            <div className="space-y-3">
-                              {notesLoading ? (
-                                <>
-                                  <Skeleton className="h-4" />
-                                  <Skeleton className="h-4" />
-                                  <Skeleton className="h-4" />
-                                </>
-                              ) : notes.length === 0 ? (
-                                <p className="text-sm text-muted-foreground">No notes yet. Add the first one below.</p>
-                              ) : (
-                                notes.map((note) => (
-                                  <div key={note.id} className="rounded border border-border p-2">
-                                    <p className="text-sm">{editingNoteId === note.id ? editingText : note.body}</p>
-                                    <p className="text-xs text-muted-foreground mt-1">{new Date(note.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</p>
-                                    {editingNoteId === note.id ? (
-                                      <div className="mt-2">
-                                        <textarea value={editingText} onChange={(e) => setEditingText(e.target.value)} className="w-full rounded border border-input px-2 py-1 text-sm" />
-                                        <button type="button" className="mt-1 text-xs rounded border border-border px-2 py-1" onClick={async () => {
-                                          const res = await fetch(`/api/individual/contacts/${contact.id}/notes`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ noteId: note.id, body: editingText }) });
-                                          const data = await res.json();
-                                          if (!res.ok) return toast.error(data.error || "Update failed");
-                                          setNotes((prev) => prev.map((n) => (n.id === note.id ? data : n)));
-                                          setEditingNoteId(null);
-                                          setEditingText("");
-                                          toast.success("Note updated");
-                                        }}>Save</button>
-                                      </div>
-                                    ) : (
-                                      <div className="mt-2 flex items-center gap-2">
-                                        <button type="button" onClick={() => { setEditingNoteId(note.id); setEditingText(note.body); }}><Pencil className="h-[14px] w-[14px]" /></button>
-                                        <button type="button" onClick={async () => {
+                            </PopoverContent>
+                          </Popover>
+                        </td>
+                        <td className="px-4 py-3 text-muted-foreground">{contact.email}</td>
+                        <td className="px-4 py-3 text-muted-foreground hidden sm:table-cell">{contact.createdAt ? new Date(contact.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "-"}</td>
+                        <td className="px-4 py-3">
+                          <button type="button" onClick={() => {
+                            const isOpen = openReminderForContactId === contact.id;
+                            setOpenReminderForContactId(isOpen ? null : contact.id);
+                            if (isOpen) return;
+                            const existingDate = contact.followUpAt ? new Date(contact.followUpAt).toISOString().slice(0, 10) : "";
+                            setReminderDateByContact((prev) => ({ ...prev, [contact.id]: existingDate }));
+                            setReminderNoteByContact((prev) => ({ ...prev, [contact.id]: contact.followUpNote || "" }));
+                          }} className={reminder.isButton ? "inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-xs" : `text-xs ${reminder.className}`}>
+                            {reminder.isButton ? <Bell size={14} /> : null}
+                            <span className={reminder.isButton ? "hidden md:inline" : ""}>{reminder.text}</span>
+                          </button>
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <div className="inline-flex items-center gap-2">
+                            <Sheet open={notesOpen && activeContact?.id === contact.id} onOpenChange={(open) => openNotes(contact, open)}>
+                              <SheetTrigger asChild><button type="button" title="Notes"><NotepadText className="h-4 w-4" /></button></SheetTrigger>
+                              <SheetContent side="right">
+                                <SheetHeader><SheetTitle>Notes — {contact.name}</SheetTitle></SheetHeader>
+                                <Tabs value={sheetTab} onValueChange={async (nextTab) => {
+                                  const selected = nextTab as "notes" | "timeline" | "engagement";
+                                  setSheetTab(selected);
+                                  if (selected === "timeline") await maybeLoadTimeline(contact.id);
+                                  if (selected === "engagement") await maybeLoadEngagement(contact.id);
+                                }} defaultValue="notes" className="mt-3">
+                                  <TabsList>
+                                    <TabsTrigger value="notes">Notes</TabsTrigger>
+                                    <TabsTrigger value="timeline">Timeline</TabsTrigger>
+                                    <TabsTrigger value="engagement">Engagement</TabsTrigger>
+                                  </TabsList>
+                                  <TabsContent value="notes" className="space-y-3">
+                                    {notesLoading ? (<><Skeleton className="h-4" /><Skeleton className="h-4" /><Skeleton className="h-4" /></>) : notes.length === 0 ? (<p className="text-sm text-muted-foreground">No notes yet. Add the first one below.</p>) : notes.map((note) => (
+                                      <div key={note.id} className="rounded border border-border p-2">
+                                        <p className="text-sm">{editingNoteId === note.id ? editingText : note.body}</p>
+                                        <p className="text-xs text-muted-foreground mt-1">{new Date(note.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</p>
+                                        {editingNoteId === note.id ? (
+                                          <div className="mt-2">
+                                            <textarea value={editingText} onChange={(e) => setEditingText(e.target.value)} className="w-full rounded border border-input px-2 py-1 text-sm" />
+                                            <button type="button" className="mt-1 text-xs rounded border border-border px-2 py-1" onClick={async () => {
+                                              const res = await fetch(`/api/individual/contacts/${contact.id}/notes`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ noteId: note.id, body: editingText }) });
+                                              const data = await res.json();
+                                              if (!res.ok) return toast.error(data.error || "Update failed");
+                                              setNotes((prev) => prev.map((n) => (n.id === note.id ? data : n)));
+                                              setEditingNoteId(null);
+                                              setEditingText("");
+                                              toast.success("Note updated");
+                                            }}>Save</button>
+                                          </div>
+                                        ) : (<div className="mt-2 flex items-center gap-2"><button type="button" onClick={() => { setEditingNoteId(note.id); setEditingText(note.body); }}><Pencil className="h-[14px] w-[14px]" /></button><button type="button" onClick={async () => {
                                           const res = await fetch(`/api/individual/contacts/${contact.id}/notes`, { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ noteId: note.id }) });
                                           if (!res.ok) return toast.error("Failed to delete note");
                                           setNotes((prev) => prev.filter((n) => n.id !== note.id));
                                           toast.success("Note deleted");
-                                        }}><Trash2 className="h-[14px] w-[14px]" /></button>
+                                        }}><Trash2 className="h-[14px] w-[14px]" /></button></div>)}
                                       </div>
-                                    )}
-                                  </div>
-                                ))
-                              )}
-                            </div>
-                            <div className="mt-4">
-                              <textarea value={newNote} onChange={(e) => setNewNote(e.target.value)} placeholder="Add a note..." className="w-full rounded border border-input px-3 py-2 text-sm" />
-                              <button type="button" disabled={savingNote} className="mt-2 rounded border border-border px-3 py-2 text-sm" onClick={async () => {
-                                setSavingNote(true);
-                                const res = await fetch(`/api/individual/contacts/${contact.id}/notes`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ body: newNote }) });
-                                const data = await res.json();
-                                setSavingNote(false);
-                                if (!res.ok) return toast.error(data.error || "Failed to save note");
-                                setNotes((prev) => [data, ...prev]);
-                                setNewNote("");
-                                toast.success("Note added");
-                              }}>
-                                {savingNote ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save Note"}
-                              </button>
-                            </div>
-                          </SheetContent>
-                        </Sheet>
+                                    ))}
+                                    {/*
+                                      ============================================================
+                                      AI FOLLOW-UP SUGGESTIONS — CURRENTLY DISABLED
+                                      ============================================================
+                                      To re-enable AI suggestions:
 
-                        <button type="button" title="Delete" onClick={async () => {
-                          const res = await fetch(`/api/individual/lists/${listId}/contacts/${contact.id}`, { method: "DELETE" });
-                          if (!res.ok) {
-                            toast.error("Failed to delete contact");
-                            return;
-                          }
-                          setContacts((prev) => prev.filter((c) => c.id !== contact.id));
-                          toast.success("Contact deleted");
-                        }}>
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                                      1. Ensure ANTHROPIC_API_KEY is set in your Vercel environment variables.
+
+                                      2. Run this SQL in Supabase to create the usage tracking table:
+                                         CREATE TABLE IF NOT EXISTS ai_usage (
+                                           id serial PRIMARY KEY,
+                                           tenant_id uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+                                           tokens_used integer NOT NULL,
+                                           created_at timestamp DEFAULT now()
+                                         );
+                                         CREATE INDEX IF NOT EXISTS idx_ai_usage_tenant_month
+                                           ON ai_usage(tenant_id, created_at);
+
+                                      3. Add to db/schema.ts:
+                                         export const aiUsage = pgTable("ai_usage", {
+                                           id: serial("id").primaryKey(),
+                                           tenantId: uuid("tenant_id").notNull()
+                                             .references(() => tenants.id, { onDelete: "cascade" }),
+                                           tokensUsed: integer("tokens_used").notNull(),
+                                           createdAt: timestamp("created_at").defaultNow(),
+                                         });
+
+                                      4. Run: npm install @anthropic-ai/sdk
+
+                                      5. Create app/api/individual/contacts/[id]/suggest/route.ts
+                                         — POST route, auth-protected
+                                         — Plan access: PAID PLANS ONLY (Option B). Free plans return 403.
+                                         — API key check: if (!process.env.ANTHROPIC_API_KEY) return 503 BEFORE
+                                           instantiating the Anthropic client.
+                                         — Build a prompt using: contact name, company (customFields.company),
+                                           tags, last email sent (subject + date), last 3 notes.
+                                         — Call claude-haiku-4-5-20251001, max_tokens: 300.
+                                         — Expect response: pure JSON { "subject": "...", "body": "..." }
+                                           Parse it, return 500 with safe message if parse fails.
+                                         — Log token usage to aiUsage table after every successful call.
+                                         — Return { subject, body }.
+
+                                      6. Uncomment the UI below and remove this comment block.
+
+                                      UI to uncomment:
+                                      <Button variant="ghost" size="sm" onClick={handleSuggest} disabled={isSuggesting}>
+                                        {isSuggesting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : '✨ '}
+                                        {isSuggesting ? 'Generating...' : 'Suggest Follow-up'}
+                                      </Button>
+                                      {suggestion && (
+                                        <div className="border rounded-md p-3 text-sm">
+                                          <p className="font-medium mb-1">✨ AI Suggested Follow-up</p>
+                                          <p className="text-xs text-muted-foreground mb-1">Subject:</p>
+                                          <p className="mb-2 font-medium">{suggestion.subject}</p>
+                                          <p className="text-sm whitespace-pre-wrap">{suggestion.body}</p>
+                                          <div className="flex gap-2 mt-3">
+                                            <Button size="sm" onClick={handleUseThis}>Use This</Button>
+                                            <Button size="sm" variant="outline" onClick={handleSuggest}>Regenerate</Button>
+                                            <Button size="sm" variant="ghost" onClick={() => setSuggestion(null)}>Dismiss</Button>
+                                          </div>
+                                        </div>
+                                      )}
+                                      ============================================================
+                                    */}
+                                    <div className="mt-4">
+                                      <textarea value={newNote} onChange={(e) => setNewNote(e.target.value)} placeholder="Add a note..." className="w-full rounded border border-input px-3 py-2 text-sm" />
+                                      <button type="button" disabled={savingNote} className="mt-2 rounded border border-border px-3 py-2 text-sm" onClick={async () => {
+                                        setSavingNote(true);
+                                        const res = await fetch(`/api/individual/contacts/${contact.id}/notes`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ body: newNote }) });
+                                        const data = await res.json();
+                                        setSavingNote(false);
+                                        if (!res.ok) return toast.error(data.error || "Failed to save note");
+                                        setNotes((prev) => [data, ...prev]);
+                                        setNewNote("");
+                                        toast.success("Note added");
+                                      }}>{savingNote ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save Note"}</button>
+                                    </div>
+                                  </TabsContent>
+                                  <TabsContent value="timeline" className="space-y-3">
+                                    {timelineLoadingByContact[contact.id] ? (<><Skeleton className="h-6" /><Skeleton className="h-6" /><Skeleton className="h-6" /></>) : (timelineByContact[contact.id] ?? []).length === 0 ? (<p className="text-sm text-muted-foreground">No activity yet — send a campaign or add a note to get started.</p>) : (timelineByContact[contact.id] ?? []).map((item, idx) => {
+                                      const occurred = new Date(item.occurredAt);
+                                      return (
+                                        <div key={`${item.type}-${idx}`} className="flex items-center justify-between gap-3 rounded border border-border p-2">
+                                          <p className="text-sm"><span className="mr-2">{timelineEmoji(item.type)}</span>{item.description}</p>
+                                          <span className="text-xs text-muted-foreground" title={occurred.toISOString()}>{formatRelativeTime(occurred)}</span>
+                                        </div>
+                                      );
+                                    })}
+                                  </TabsContent>
+                                  <TabsContent value="engagement" className="space-y-3">
+                                    {engagementLoadingByContact[contact.id] ? (<><Skeleton className="h-10" /><Skeleton className="h-10" /><Skeleton className="h-10" /></>) : (engagementByContact[contact.id] ?? []).length === 0 ? (<p className="text-sm text-muted-foreground">No emails sent to this contact yet.</p>) : (engagementByContact[contact.id] ?? []).map((item) => (
+                                      <div key={item.campaignId} className="rounded border border-border p-3 space-y-2">
+                                        <p className="font-medium text-sm">{item.subject}</p>
+                                        <p className="text-xs text-muted-foreground">{new Date(item.sentAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</p>
+                                        <div className="flex items-center gap-2 flex-wrap">
+                                          {item.opened ? <span className="text-xs rounded-full px-2 py-1 bg-emerald-100 text-emerald-700">✅ Opened</span> : <span className="text-xs rounded-full px-2 py-1 bg-gray-100 text-gray-700">📧 Sent · Not opened</span>}
+                                          {item.clicked ? <span className="text-xs rounded-full px-2 py-1 bg-blue-100 text-blue-700">🔗 Clicked</span> : null}
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </TabsContent>
+                                </Tabs>
+                              </SheetContent>
+                            </Sheet>
+
+                            {contact.phone?.trim() ? (
+                              <Popover
+                                open={whatsappPopoverOpenFor === contact.id}
+                                onOpenChange={(open) => {
+                                  setWhatsappPopoverOpenFor(open ? contact.id : null);
+                                  if (open) {
+                                    setEditedMessageByContact((prev) => ({
+                                      ...prev,
+                                      [contact.id]: (whatsappTemplate || "Hi {name}, ").replace("{name}", contact.name),
+                                    }));
+                                  }
+                                }}
+                              >
+                                <PopoverTrigger asChild>
+                                  <button type="button" title="WhatsApp">
+                                    <svg viewBox="0 0 24 24" width="16" height="16" fill="#16a34a">
+                                      <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
+                                    </svg>
+                                  </button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-80 space-y-2">
+                                  <textarea
+                                    className="w-full rounded border border-input px-3 py-2 text-sm"
+                                    value={editedMessageByContact[contact.id] ?? (whatsappTemplate || "Hi {name}, ").replace("{name}", contact.name)}
+                                    onChange={(e) => setEditedMessageByContact((prev) => ({ ...prev, [contact.id]: e.target.value }))}
+                                  />
+                                  <button
+                                    type="button"
+                                    className="rounded border border-border px-3 py-2 text-sm"
+                                    onClick={() => {
+                                      const formattedPhone = formatPhone(contact.phone!);
+                                      const message = editedMessageByContact[contact.id] ?? (whatsappTemplate || "Hi {name}, ").replace("{name}", contact.name);
+                                      const waUrl = `https://wa.me/${formattedPhone}?text=${encodeURIComponent(message)}`;
+                                      window.open(waUrl, "_blank");
+                                      setWhatsappPopoverOpenFor(null);
+                                      toast.success("Opened WhatsApp");
+                                    }}
+                                  >
+                                    Open WhatsApp
+                                  </button>
+                                </PopoverContent>
+                              </Popover>
+                            ) : null}
+
+                            <button type="button" title="Delete" onClick={async () => {
+                              const res = await fetch(`/api/individual/lists/${listId}/contacts/${contact.id}`, { method: "DELETE" });
+                              if (!res.ok) return toast.error("Failed to delete contact");
+                              setContacts((prev) => prev.filter((c) => c.id !== contact.id));
+                              toast.success("Contact deleted");
+                            }}><Trash2 className="h-4 w-4" /></button>
+                          </div>
+                        </td>
+                      </tr>
+                      {openReminderForContactId === contact.id && (
+                        <tr className="border-b border-border last:border-0">
+                          <td colSpan={5} className="px-4 py-3 bg-background">
+                            <div className="grid gap-3 max-w-xl">
+                              <input type="date" min={today} value={reminderDateByContact[contact.id] ?? ""} onChange={(e) => setReminderDateByContact((prev) => ({ ...prev, [contact.id]: e.target.value }))} className="rounded-md border border-input bg-background px-3 py-2 text-sm" />
+                              <div>
+                                <label className="block text-xs text-muted-foreground mb-1">What to follow up about (optional)</label>
+                                <input type="text" value={reminderNoteByContact[contact.id] ?? ""} onChange={(e) => setReminderNoteByContact((prev) => ({ ...prev, [contact.id]: e.target.value }))} className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" />
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <button type="button" disabled={savingReminderFor === contact.id} className="rounded border border-border px-3 py-2 text-sm" onClick={async () => {
+                                  const dayValue = reminderDateByContact[contact.id];
+                                  if (!dayValue) return toast.error("Please choose a date");
+                                  setSavingReminderFor(contact.id);
+                                  const res = await fetch(`/api/individual/contacts/${contact.id}/reminder`, {
+                                    method: "POST",
+                                    headers: { "Content-Type": "application/json" },
+                                    body: JSON.stringify({ followUpAt: `${dayValue}T09:00:00.000Z`, followUpNote: reminderNoteByContact[contact.id] ?? "" }),
+                                  });
+                                  const data = await res.json();
+                                  setSavingReminderFor(null);
+                                  if (!res.ok) return toast.error(data.error || "Failed to save reminder");
+                                  setContacts((prev) => prev.map((c) => c.id === contact.id ? { ...c, followUpAt: data.followUpAt, followUpNote: data.followUpNote, followUpSent: data.followUpSent } : c));
+                                  setOpenReminderForContactId(null);
+                                  toast.success("Reminder set");
+                                }}>{savingReminderFor === contact.id ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save Reminder"}</button>
+                                {contact.followUpAt ? (
+                                  <button type="button" disabled={clearingReminderFor === contact.id} className="rounded border border-border px-3 py-2 text-sm" onClick={async () => {
+                                    setClearingReminderFor(contact.id);
+                                    const res = await fetch(`/api/individual/contacts/${contact.id}/reminder`, { method: "DELETE" });
+                                    const data = await res.json();
+                                    setClearingReminderFor(null);
+                                    if (!res.ok) return toast.error(data.error || "Failed to clear reminder");
+                                    setContacts((prev) => prev.map((c) => c.id === contact.id ? { ...c, followUpAt: null, followUpNote: null, followUpSent: false } : c));
+                                    setOpenReminderForContactId(null);
+                                    toast.success("Reminder cleared");
+                                  }}>{clearingReminderFor === contact.id ? <Loader2 className="h-4 w-4 animate-spin" /> : "Clear Reminder"}</button>
+                                ) : null}
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
+                  );
+                })}
               </tbody>
             </table>
           </div>

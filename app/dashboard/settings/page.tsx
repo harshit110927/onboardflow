@@ -17,6 +17,7 @@ export default function SettingsPage() {
   const [runningCron, setRunningCron] = useState(false);
   const [loading, setLoading] = useState(false);
   const [savingEmail, setSavingEmail] = useState(false);
+  const [savingWhatsapp, setSavingWhatsapp] = useState(false);
   const [fetching, setFetching] = useState(true);
 
   const [formData, setFormData] = useState({
@@ -36,6 +37,7 @@ export default function SettingsPage() {
     resendFromEmail: "",
     hasExistingKey: false,
   });
+  const [whatsappTemplate, setWhatsappTemplate] = useState("Hi {name}, ");
 
   useEffect(() => {
     const loadSettings = async () => {
@@ -60,6 +62,7 @@ export default function SettingsPage() {
             resendFromEmail: data.resendFromEmail || "",
             hasExistingKey: !!data.resendApiKey,
           });
+          setWhatsappTemplate(data.whatsappTemplate || "Hi {name}, ");
         }
       } catch (e) {
         console.error(e);
@@ -151,6 +154,29 @@ export default function SettingsPage() {
       toast.error("Network error triggering bot.");
     } finally {
       setRunningCron(false);
+    }
+  };
+
+  const handleSaveWhatsapp = async () => {
+    setSavingWhatsapp(true);
+    try {
+      const res = await fetch("/api/v1/settings", {
+        method: "POST",
+        body: JSON.stringify({
+          ...formData,
+          automationEnabled,
+          whatsappTemplate,
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Failed");
+      }
+      toast.success("WhatsApp settings saved");
+    } catch (error) {
+      toast.error("Failed to save");
+    } finally {
+      setSavingWhatsapp(false);
     }
   };
 
@@ -323,6 +349,34 @@ export default function SettingsPage() {
                 </ol>
               </div>
 
+            </CardContent>
+          </Card>
+
+          <Card className="border-border bg-card">
+            <CardHeader>
+              <CardTitle>WhatsApp Integration</CardTitle>
+              <CardDescription>Configure the default message used for click-to-chat.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <Label className="text-sm font-semibold">Message Template</Label>
+              <Textarea
+                value={whatsappTemplate}
+                onChange={(e) => setWhatsappTemplate(e.target.value)}
+                placeholder="Hi {name}, "
+              />
+              <p className="text-xs text-muted-foreground">
+                Use {"{name}"} to insert the contact&apos;s name. This pre-fills when you click WhatsApp on a contact.
+              </p>
+              <Button onClick={handleSaveWhatsapp} disabled={savingWhatsapp}>
+                {savingWhatsapp ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  "Save"
+                )}
+              </Button>
             </CardContent>
           </Card>
 

@@ -1,10 +1,11 @@
-import { and, count, eq, inArray } from "drizzle-orm";
+import { and, count, desc, eq, inArray } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { db } from "@/db";
 import {
   contactTagAssignments,
   contactTags,
+  campaignEvents,
   individualCampaigns,
   individualContacts,
   individualLists,
@@ -65,6 +66,28 @@ export default async function ListDetailPage({
   const list = listRows[0];
   if (!list) redirect("/dashboard/individual/lists");
 
+  const contactEmails = contacts.map((contact) => contact.email);
+  const engagementRows = contactEmails.length
+    ? await db
+        .select({ email: campaignEvents.contactEmail, eventType: campaignEvents.eventType })
+        .from(campaignEvents)
+        .where(inArray(campaignEvents.contactEmail, contactEmails))
+        .orderBy(desc(campaignEvents.occurredAt))
+    : [];
+  const engagementMap = new Map<string, "opened" | "sent" | null>();
+  for (const row of engagementRows) {
+    if (engagementMap.has(row.email)) continue;
+    if (row.eventType === "opened" || row.eventType === "open" || row.eventType === "clicked" || row.eventType === "click") {
+      engagementMap.set(row.email, "opened");
+      continue;
+    }
+    if (row.eventType === "sent") {
+      engagementMap.set(row.email, "sent");
+      continue;
+    }
+    engagementMap.set(row.email, null);
+  }
+
   const atLimit = contacts.length >= MAX_CONTACTS;
   const campaigns = campaignCount[0]?.total ?? 0;
 
@@ -106,6 +129,8 @@ export default async function ListDetailPage({
         <ContactsManager
           listId={listId}
           initialContacts={contacts.map((contact) => ({ ...contact, createdAt: contact.createdAt?.toISOString(), tags: tagsMap.get(contact.id) ?? [] }))}
+          initialEngagement={Object.fromEntries(engagementMap)}
+          whatsappTemplate={tenant.whatsappTemplate ?? "Hi {name}, "}
         />
 
         <div>
