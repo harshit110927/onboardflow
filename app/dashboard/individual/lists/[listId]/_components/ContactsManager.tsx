@@ -11,6 +11,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { formatRelativeTime } from "@/lib/utils/time";
 
 type Tag = { id: number; name: string; color: string };
 type Contact = {
@@ -37,22 +38,11 @@ type EngagementItem = {
 
 const TAG_COLORS = ["#6366f1", "#f59e0b", "#10b981", "#ef4444", "#3b82f6", "#8b5cf6", "#ec4899", "#14b8a6"];
 
-function formatRelativeTime(date: Date): string {
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffSeconds = Math.floor(diffMs / 1000);
-  const diffMinutes = Math.floor(diffSeconds / 60);
-  const diffHours = Math.floor(diffMinutes / 60);
-  const diffDays = Math.floor(diffHours / 24);
-  const diffWeeks = Math.floor(diffDays / 7);
-  const diffMonths = Math.floor(diffDays / 30);
-
-  if (diffSeconds < 60) return "just now";
-  if (diffMinutes < 60) return `${diffMinutes} minute${diffMinutes === 1 ? "" : "s"} ago`;
-  if (diffHours < 24) return `${diffHours} hour${diffHours === 1 ? "" : "s"} ago`;
-  if (diffDays < 7) return `${diffDays} day${diffDays === 1 ? "" : "s"} ago`;
-  if (diffWeeks < 4) return `${diffWeeks} week${diffWeeks === 1 ? "" : "s"} ago`;
-  return `${diffMonths} month${diffMonths === 1 ? "" : "s"} ago`;
+function formatPhone(phone: string): string {
+  const digits = phone.replace(/\D/g, "");
+  if (digits.startsWith("0")) return `91${digits.slice(1)}`;
+  if (digits.length === 10) return `91${digits}`;
+  return digits;
 }
 
 function timelineEmoji(type: string) {
@@ -81,10 +71,12 @@ export function ContactsManager({
   listId,
   initialContacts,
   initialEngagement,
+  whatsappTemplate: initialWhatsappTemplate,
 }: {
   listId: number;
   initialContacts: Contact[];
   initialEngagement: Record<string, "opened" | "sent" | null>;
+  whatsappTemplate: string;
 }) {
   const [contacts, setContacts] = useState(initialContacts);
   const [engagementMap, setEngagementMap] = useState(initialEngagement);
@@ -130,6 +122,9 @@ export function ContactsManager({
   const [reminderNoteByContact, setReminderNoteByContact] = useState<Record<number, string>>({});
   const [savingReminderFor, setSavingReminderFor] = useState<number | null>(null);
   const [clearingReminderFor, setClearingReminderFor] = useState<number | null>(null);
+  const [whatsappTemplate] = useState(initialWhatsappTemplate || "Hi {name}, ");
+  const [whatsappPopoverOpenFor, setWhatsappPopoverOpenFor] = useState<number | null>(null);
+  const [editedMessageByContact, setEditedMessageByContact] = useState<Record<number, string>>({});
 
   const filteredContacts = useMemo(() => {
     if (!selectedTagIds.length) return contacts;
@@ -429,6 +424,70 @@ export function ContactsManager({
                                         }}><Trash2 className="h-[14px] w-[14px]" /></button></div>)}
                                       </div>
                                     ))}
+                                    {/*
+                                      ============================================================
+                                      AI FOLLOW-UP SUGGESTIONS — CURRENTLY DISABLED
+                                      ============================================================
+                                      To re-enable AI suggestions:
+
+                                      1. Ensure ANTHROPIC_API_KEY is set in your Vercel environment variables.
+
+                                      2. Run this SQL in Supabase to create the usage tracking table:
+                                         CREATE TABLE IF NOT EXISTS ai_usage (
+                                           id serial PRIMARY KEY,
+                                           tenant_id uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+                                           tokens_used integer NOT NULL,
+                                           created_at timestamp DEFAULT now()
+                                         );
+                                         CREATE INDEX IF NOT EXISTS idx_ai_usage_tenant_month
+                                           ON ai_usage(tenant_id, created_at);
+
+                                      3. Add to db/schema.ts:
+                                         export const aiUsage = pgTable("ai_usage", {
+                                           id: serial("id").primaryKey(),
+                                           tenantId: uuid("tenant_id").notNull()
+                                             .references(() => tenants.id, { onDelete: "cascade" }),
+                                           tokensUsed: integer("tokens_used").notNull(),
+                                           createdAt: timestamp("created_at").defaultNow(),
+                                         });
+
+                                      4. Run: npm install @anthropic-ai/sdk
+
+                                      5. Create app/api/individual/contacts/[id]/suggest/route.ts
+                                         — POST route, auth-protected
+                                         — Plan access: PAID PLANS ONLY (Option B). Free plans return 403.
+                                         — API key check: if (!process.env.ANTHROPIC_API_KEY) return 503 BEFORE
+                                           instantiating the Anthropic client.
+                                         — Build a prompt using: contact name, company (customFields.company),
+                                           tags, last email sent (subject + date), last 3 notes.
+                                         — Call claude-haiku-4-5-20251001, max_tokens: 300.
+                                         — Expect response: pure JSON { "subject": "...", "body": "..." }
+                                           Parse it, return 500 with safe message if parse fails.
+                                         — Log token usage to aiUsage table after every successful call.
+                                         — Return { subject, body }.
+
+                                      6. Uncomment the UI below and remove this comment block.
+
+                                      UI to uncomment:
+                                      <Button variant="ghost" size="sm" onClick={handleSuggest} disabled={isSuggesting}>
+                                        {isSuggesting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : '✨ '}
+                                        {isSuggesting ? 'Generating...' : 'Suggest Follow-up'}
+                                      </Button>
+                                      {suggestion && (
+                                        <div className="border rounded-md p-3 text-sm">
+                                          <p className="font-medium mb-1">✨ AI Suggested Follow-up</p>
+                                          <p className="text-xs text-muted-foreground mb-1">Subject:</p>
+                                          <p className="mb-2 font-medium">{suggestion.subject}</p>
+                                          <p className="text-sm whitespace-pre-wrap">{suggestion.body}</p>
+                                          <div className="flex gap-2 mt-3">
+                                            <Button size="sm" onClick={handleUseThis}>Use This</Button>
+                                            <Button size="sm" variant="outline" onClick={handleSuggest}>Regenerate</Button>
+                                            <Button size="sm" variant="ghost" onClick={() => setSuggestion(null)}>Dismiss</Button>
+                                          </div>
+                                        </div>
+                                      )}
+                                      ============================================================
+                                    */}
                                     <div className="mt-4">
                                       <textarea value={newNote} onChange={(e) => setNewNote(e.target.value)} placeholder="Add a note..." className="w-full rounded border border-input px-3 py-2 text-sm" />
                                       <button type="button" disabled={savingNote} className="mt-2 rounded border border-border px-3 py-2 text-sm" onClick={async () => {
@@ -469,6 +528,50 @@ export function ContactsManager({
                                 </Tabs>
                               </SheetContent>
                             </Sheet>
+
+                            {contact.phone?.trim() ? (
+                              <Popover
+                                open={whatsappPopoverOpenFor === contact.id}
+                                onOpenChange={(open) => {
+                                  setWhatsappPopoverOpenFor(open ? contact.id : null);
+                                  if (open) {
+                                    setEditedMessageByContact((prev) => ({
+                                      ...prev,
+                                      [contact.id]: (whatsappTemplate || "Hi {name}, ").replace("{name}", contact.name),
+                                    }));
+                                  }
+                                }}
+                              >
+                                <PopoverTrigger asChild>
+                                  <button type="button" title="WhatsApp">
+                                    <svg viewBox="0 0 24 24" width="16" height="16" fill="#16a34a">
+                                      <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
+                                    </svg>
+                                  </button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-80 space-y-2">
+                                  <textarea
+                                    className="w-full rounded border border-input px-3 py-2 text-sm"
+                                    value={editedMessageByContact[contact.id] ?? (whatsappTemplate || "Hi {name}, ").replace("{name}", contact.name)}
+                                    onChange={(e) => setEditedMessageByContact((prev) => ({ ...prev, [contact.id]: e.target.value }))}
+                                  />
+                                  <button
+                                    type="button"
+                                    className="rounded border border-border px-3 py-2 text-sm"
+                                    onClick={() => {
+                                      const formattedPhone = formatPhone(contact.phone!);
+                                      const message = editedMessageByContact[contact.id] ?? (whatsappTemplate || "Hi {name}, ").replace("{name}", contact.name);
+                                      const waUrl = `https://wa.me/${formattedPhone}?text=${encodeURIComponent(message)}`;
+                                      window.open(waUrl, "_blank");
+                                      setWhatsappPopoverOpenFor(null);
+                                      toast.success("Opened WhatsApp");
+                                    }}
+                                  >
+                                    Open WhatsApp
+                                  </button>
+                                </PopoverContent>
+                              </Popover>
+                            ) : null}
 
                             <button type="button" title="Delete" onClick={async () => {
                               const res = await fetch(`/api/individual/lists/${listId}/contacts/${contact.id}`, { method: "DELETE" });

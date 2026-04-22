@@ -7,27 +7,33 @@ import { encryptPassword } from "@/lib/email/smtp";
 import { Resend } from "resend";
 
 export async function GET(req: Request) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
 
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const tenant = await db.query.tenants.findFirst({
+      where: eq(tenants.email, user.email!),
+    });
+
+    if (!tenant) {
+      return NextResponse.json({ error: "Tenant not found" }, { status: 404 });
+    }
+
+    return NextResponse.json({
+      ...tenant,
+      resendApiKey: tenant.resendApiKey ? "re_live_***" : null,
+      resendFromEmail: tenant.resendFromEmail || null,
+      smtpPassword: tenant.smtpPassword ? "***" : null,
+      whatsappTemplate: tenant.whatsappTemplate ?? "Hi {name}, ",
+    });
+  } catch (error) {
+    console.error("Settings GET Error:", error);
+    return NextResponse.json({ error: "Server Error" }, { status: 500 });
   }
-
-  const tenant = await db.query.tenants.findFirst({
-    where: eq(tenants.email, user.email!),
-  });
-
-  if (!tenant) {
-    return NextResponse.json({ error: "Tenant not found" }, { status: 404 });
-  }
-
-  return NextResponse.json({
-    ...tenant,
-    resendApiKey: tenant.resendApiKey ? "re_live_***" : null,
-    resendFromEmail: tenant.resendFromEmail || null,
-    smtpPassword: tenant.smtpPassword ? "***" : null,
-  });
 }
 
 export async function POST(req: Request) {
@@ -48,6 +54,7 @@ export async function POST(req: Request) {
       step3, emailSubject3, emailBody3,
       resendApiKey,
       resendFromEmail,
+      whatsappTemplate,
     } = body;
 
     const updates: Record<string, unknown> = {
@@ -61,6 +68,7 @@ export async function POST(req: Request) {
       step3,
       emailSubject3,
       emailBody3,
+      ...(whatsappTemplate !== undefined && { whatsappTemplate: String(whatsappTemplate) }),
     };
 
     // Handle Resend API key

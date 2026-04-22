@@ -60,6 +60,7 @@ export default async function IndividualLayout({
             {[
               { href: "/dashboard/individual", label: "Dashboard" },
               { href: "/dashboard/individual/lists", label: "Lists" },
+              { href: "/dashboard/individual/pipeline", label: "Pipeline" },
               { href: "/dashboard/individual/campaigns", label: "Campaigns" },
             ].map((item) => (
               <Link

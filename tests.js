@@ -1098,6 +1098,30 @@ async function run() {
     fix: 'Validate decoded URL starts with http:// or https:// before redirecting.',
   });
 
+  await test('pipeline', 'GET /api/individual/pipeline without session returns 401', async () => {
+    const { res } = await req('/api/individual/pipeline');
+    assert(res.status === 401, `expected 401 got ${res.status}`);
+  }, null, {
+    route: 'GET /api/individual/pipeline',
+    file: 'app/api/individual/pipeline/route.ts',
+    rootCause: 'Pipeline GET is missing mandatory auth gate',
+    fix: 'Apply the exact Supabase getUser + tenant lookup pattern before processing params.',
+  });
+
+  await test('pipeline', 'PATCH /api/individual/pipeline without session returns 401', async () => {
+    const { res } = await req('/api/individual/pipeline', {
+      method: 'PATCH',
+      headers: json(),
+      body: JSON.stringify({ contactId: 1, stage: 'contacted' }),
+    });
+    assert(res.status === 401, `expected 401 got ${res.status}`);
+  }, null, {
+    route: 'PATCH /api/individual/pipeline',
+    file: 'app/api/individual/pipeline/route.ts',
+    rootCause: 'Pipeline PATCH is missing mandatory auth gate',
+    fix: 'Apply the exact Supabase getUser + tenant lookup pattern before body validation.',
+  });
+
   // ── Cleanup ───────────────────────────────────────────────────────────────
   for (const fn of cleanupFns) {
     try { await fn(); } catch {}

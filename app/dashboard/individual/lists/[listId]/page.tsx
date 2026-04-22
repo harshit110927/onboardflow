@@ -130,6 +130,7 @@ export default async function ListDetailPage({
           listId={listId}
           initialContacts={contacts.map((contact) => ({ ...contact, createdAt: contact.createdAt?.toISOString(), tags: tagsMap.get(contact.id) ?? [] }))}
           initialEngagement={Object.fromEntries(engagementMap)}
+          whatsappTemplate={tenant.whatsappTemplate ?? "Hi {name}, "}
         />
 
         <div>
