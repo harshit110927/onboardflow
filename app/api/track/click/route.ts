@@ -1,34 +1,41 @@
 import { NextResponse } from "next/server";
+
 import { db } from "@/db";
 import { campaignEvents } from "@/db/schema";
-import { verifyTrackingToken } from "@/lib/tracking/hmac";
 
 export async function GET(req: Request) {
-  const { searchParams } = new URL(req.url);
-  const cid = Number(searchParams.get("cid"));
-  const email = searchParams.get("email") ?? "";
-  const token = searchParams.get("token") ?? "";
-  const url = searchParams.get("url") ?? "";
+  const url = new URL(req.url);
+  const campaignId = url.searchParams.get("campaignId");
+  const email = url.searchParams.get("email");
+  const targetUrl = url.searchParams.get("url");
 
-  // Always redirect — never break the click
-  const fallback = url || process.env.NEXT_PUBLIC_BASE_URL || "/";
-
-  if (!cid || !email || !token || !url) {
-    return NextResponse.redirect(fallback);
+  if (!targetUrl) {
+    return NextResponse.json({ error: "Missing url" }, { status: 400 });
   }
 
-  try {
-    if (verifyTrackingToken(cid, email, token)) {
-      await db.insert(campaignEvents).values({
-        campaignId: cid,
-        contactEmail: email,
-        eventType: "click",
-        eventData: url,
-      });
+  const decodedUrl = decodeURIComponent(targetUrl);
+  if (!decodedUrl.startsWith("http://") && !decodedUrl.startsWith("https://")) {
+    return NextResponse.json({ error: "Invalid URL" }, { status: 400 });
+  }
+
+  if (campaignId && email) {
+    try {
+      const parsedCampaignId = Number.parseInt(campaignId, 10);
+      if (!Number.isNaN(parsedCampaignId)) {
+        await db
+          .insert(campaignEvents)
+          .values({
+            campaignId: parsedCampaignId,
+            contactEmail: email,
+            eventType: "clicked",
+            occurredAt: new Date(),
+          })
+          .onConflictDoNothing();
+      }
+    } catch (err) {
+      console.error("Click tracking insert failed:", err);
     }
-  } catch {
-    // Silently fail
   }
 
-  return NextResponse.redirect(url);
+  return NextResponse.redirect(decodedUrl, { status: 302 });
 }
