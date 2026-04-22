@@ -250,3 +250,28 @@ export const unsubscribedContacts = pgTable("unsubscribed_contacts", {
   email: varchar("email", { length: 255 }).notNull().unique(),
   unsubscribedAt: timestamp("unsubscribed_at").defaultNow(),
 });
+
+export const endUserNotes = pgTable("end_user_notes", {
+  id: serial("id").primaryKey(),
+  endUserId: uuid("end_user_id").notNull()
+    .references(() => endUsers.id, { onDelete: "cascade" }),
+  tenantId: uuid("tenant_id").notNull()
+    .references(() => tenants.id, { onDelete: "cascade" }),
+  body: text("body").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const endUserTagAssignments = pgTable(
+  "end_user_tag_assignments",
+  {
+    endUserId: uuid("end_user_id").notNull()
+      .references(() => endUsers.id, { onDelete: "cascade" }),
+    tagId: integer("tag_id").notNull()
+      .references(() => contactTags.id, { onDelete: "cascade" }),
+    assignedAt: timestamp("assigned_at").defaultNow(),
+  },
+  (t) => ({
+    pk: primaryKey({ columns: [t.endUserId, t.tagId] }),
+  }),
+);

@@ -1,14 +1,15 @@
 import Link from "next/link";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { redirect } from "next/navigation";
 
 import { ApiKeyCard } from "@/app/dashboard/ApiKeyCard";
 import { db } from "@/db";
-import { endUsers } from "@/db/schema";
+import { contactTags, endUserTagAssignments, endUsers } from "@/db/schema";
 import { getSession } from "@/lib/auth/get-session";
 import { getTenant } from "@/lib/auth/get-tenant";
 import { getTenantPlan } from "@/lib/plans/get-tenant-plan";
 import { NudgeButton } from "./_components/NudgeButton";
+import { EnterpriseUsersPanel } from "./_components/EnterpriseUsersPanel";
 
 type StepMetric = {
   label: string;
@@ -33,6 +34,25 @@ export default async function EnterpriseDashboardPage() {
   });
 
   const totalUsers = allUsers.length;
+  const userIds = allUsers.map((u) => u.id);
+  const tagAssignments = userIds.length
+    ? await db
+        .select({
+          endUserId: endUserTagAssignments.endUserId,
+          id: contactTags.id,
+          name: contactTags.name,
+          color: contactTags.color,
+        })
+        .from(endUserTagAssignments)
+        .innerJoin(contactTags, eq(endUserTagAssignments.tagId, contactTags.id))
+        .where(inArray(endUserTagAssignments.endUserId, userIds))
+    : [];
+  const tagsMap = new Map<string, { id: number; name: string; color: string }[]>();
+  for (const assignment of tagAssignments) {
+    const current = tagsMap.get(assignment.endUserId) ?? [];
+    current.push({ id: assignment.id, name: assignment.name, color: assignment.color ?? "#6366f1" });
+    tagsMap.set(assignment.endUserId, current);
+  }
   const step1 = tenant.activationStep || "connect_repo";
   const step2 = tenant.step2 || "";
   const step3 = tenant.step3 || "";
@@ -231,6 +251,18 @@ export default async function EnterpriseDashboardPage() {
         </div>
 
         {tenant.apiKey && <ApiKeyCard apiKey={tenant.apiKey} />}
+
+        <div className="space-y-3">
+          <h2 className="text-lg font-semibold text-foreground">End Users</h2>
+          <EnterpriseUsersPanel
+            initialUsers={allUsers.map((u) => ({
+              id: u.id,
+              email: u.email,
+              externalId: u.externalId,
+              tags: tagsMap.get(u.id) ?? [],
+            }))}
+          />
+        </div>
 
         {/* FEEDBACK */}
         <div className="rounded-lg border border-dashed border-border bg-card p-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">

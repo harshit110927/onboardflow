@@ -1034,6 +1034,170 @@ async function run() {
     fix: 'Run the Prompt 1 SQL statements in order, then verify db/schema.ts definitions match exactly.',
   });
 
+  await test('individual', 'Timeline endpoint without session returns 401', async () => {
+    const id = Number(process.env.TEST_INDIVIDUAL_CONTACT_ID || 1);
+    const { res } = await req(`/api/individual/contacts/${id}/timeline`);
+    assert(res.status === 401, `expected 401 got ${res.status}`);
+  }, null, {
+    route: 'GET /api/individual/contacts/[id]/timeline',
+    file: 'app/api/individual/contacts/[id]/timeline/route.ts',
+    rootCause: 'Timeline route is missing mandatory auth gate',
+    fix: 'Apply the exact Supabase getUser + tenant lookup pattern before reading params or DB.',
+  });
+
+  await test('individual', 'Engagement endpoint without session returns 401', async () => {
+    const id = Number(process.env.TEST_INDIVIDUAL_CONTACT_ID || 1);
+    const { res } = await req(`/api/individual/contacts/${id}/engagement`);
+    assert(res.status === 401, `expected 401 got ${res.status}`);
+  }, null, {
+    route: 'GET /api/individual/contacts/[id]/engagement',
+    file: 'app/api/individual/contacts/[id]/engagement/route.ts',
+    rootCause: 'Engagement route is missing mandatory auth gate',
+    fix: 'Apply the exact Supabase getUser + tenant lookup pattern before reading params or DB.',
+  });
+
+  await test('individual', 'Reminder endpoint without session returns 401 for POST/DELETE', async () => {
+    const id = Number(process.env.TEST_INDIVIDUAL_CONTACT_ID || 1);
+    const postRes = await req(`/api/individual/contacts/${id}/reminder`, {
+      method: 'POST',
+      headers: json(),
+      body: JSON.stringify({ followUpAt: '2099-01-01T09:00:00.000Z', followUpNote: 'test' }),
+    });
+    const deleteRes = await req(`/api/individual/contacts/${id}/reminder`, {
+      method: 'DELETE',
+      headers: json(),
+    });
+    assert(postRes.res.status === 401, `POST expected 401 got ${postRes.res.status}`);
+    assert(deleteRes.res.status === 401, `DELETE expected 401 got ${deleteRes.res.status}`);
+  }, null, {
+    route: 'POST/DELETE /api/individual/contacts/[id]/reminder',
+    file: 'app/api/individual/contacts/[id]/reminder/route.ts',
+    rootCause: 'Reminder handlers skip mandatory auth pattern',
+    fix: 'Apply the exact Supabase getUser + tenant lookup pattern at top of both handlers.',
+  });
+
+  await test('tracking', 'Pixel route always returns GIF', async () => {
+    const { res, text } = await req('/api/track/pixel');
+    assert(res.status === 200, `expected 200 got ${res.status}`);
+    assert((res.headers.get('content-type') || '').includes('image/gif'), `expected image/gif got ${res.headers.get('content-type')}`);
+    assert(text.length > 0, 'expected non-empty gif body');
+  }, null, {
+    route: 'GET /api/track/pixel',
+    file: 'app/api/track/pixel/route.ts',
+    rootCause: 'Route may be returning JSON or requiring auth instead of binary gif response',
+    fix: 'Always return the 1x1 gif Response regardless of missing/invalid query params.',
+  });
+
+  await test('tracking', 'Click route rejects non-http URLs with 400', async () => {
+    const { res } = await req('/api/track/click?url=javascript%3Aalert(1)');
+    assert(res.status === 400, `expected 400 got ${res.status}`);
+  }, null, {
+    route: 'GET /api/track/click?url=<value>',
+    file: 'app/api/track/click/route.ts',
+    rootCause: 'Open redirect protection is missing or incomplete',
+    fix: 'Validate decoded URL starts with http:// or https:// before redirecting.',
+  });
+
+  await test('pipeline', 'GET /api/individual/pipeline without session returns 401', async () => {
+    const { res } = await req('/api/individual/pipeline');
+    assert(res.status === 401, `expected 401 got ${res.status}`);
+  }, null, {
+    route: 'GET /api/individual/pipeline',
+    file: 'app/api/individual/pipeline/route.ts',
+    rootCause: 'Pipeline GET is missing mandatory auth gate',
+    fix: 'Apply the exact Supabase getUser + tenant lookup pattern before processing params.',
+  });
+
+  await test('pipeline', 'PATCH /api/individual/pipeline without session returns 401', async () => {
+    const { res } = await req('/api/individual/pipeline', {
+      method: 'PATCH',
+      headers: json(),
+      body: JSON.stringify({ contactId: 1, stage: 'contacted' }),
+    });
+    assert(res.status === 401, `expected 401 got ${res.status}`);
+  }, null, {
+    route: 'PATCH /api/individual/pipeline',
+    file: 'app/api/individual/pipeline/route.ts',
+    rootCause: 'Pipeline PATCH is missing mandatory auth gate',
+    fix: 'Apply the exact Supabase getUser + tenant lookup pattern before body validation.',
+  });
+
+  await test('enterprise', 'Enterprise notes route without session returns 401', async () => {
+    const uid = process.env.TEST_ENTERPRISE_USER_ID || '00000000-0000-0000-0000-000000000000';
+    const getRes = await req(`/api/enterprise/users/${uid}/notes`);
+    const postRes = await req(`/api/enterprise/users/${uid}/notes`, {
+      method: 'POST',
+      headers: json(),
+      body: JSON.stringify({ body: 'test note' }),
+    });
+    assert(getRes.res.status === 401, `GET expected 401 got ${getRes.res.status}`);
+    assert(postRes.res.status === 401, `POST expected 401 got ${postRes.res.status}`);
+  }, null, {
+    route: 'GET/POST /api/enterprise/users/[id]/notes',
+    file: 'app/api/enterprise/users/[id]/notes/route.ts',
+    rootCause: 'Enterprise notes route is missing mandatory auth gate',
+    fix: 'Apply the exact Supabase getUser + tenant lookup pattern before UUID validation and DB queries.',
+  });
+
+  await test('enterprise', 'Enterprise tags route without session returns 401', async () => {
+    const uid = process.env.TEST_ENTERPRISE_USER_ID || '00000000-0000-0000-0000-000000000000';
+    const postRes = await req(`/api/enterprise/users/${uid}/tags`, {
+      method: 'POST',
+      headers: json(),
+      body: JSON.stringify({ tagId: 1 }),
+    });
+    const delRes = await req(`/api/enterprise/users/${uid}/tags`, {
+      method: 'DELETE',
+      headers: json(),
+      body: JSON.stringify({ tagId: 1 }),
+    });
+    assert(postRes.res.status === 401, `POST expected 401 got ${postRes.res.status}`);
+    assert(delRes.res.status === 401, `DELETE expected 401 got ${delRes.res.status}`);
+  }, null, {
+    route: 'POST/DELETE /api/enterprise/users/[id]/tags',
+    file: 'app/api/enterprise/users/[id]/tags/route.ts',
+    rootCause: 'Enterprise tags route is missing mandatory auth gate',
+    fix: 'Apply the exact Supabase getUser + tenant lookup pattern before UUID validation and DB queries.',
+  });
+
+  await test('code-review', 'AI placeholder exists and suggest route/sdk are absent', async () => {
+    const managerPath = path.join(process.cwd(), 'app/dashboard/individual/lists/[listId]/_components/ContactsManager.tsx');
+    const managerCode = fs.readFileSync(managerPath, 'utf8');
+    assert(managerCode.includes('AI FOLLOW-UP SUGGESTIONS — CURRENTLY DISABLED'), 'missing AI placeholder block');
+
+    const suggestPath = path.join(process.cwd(), 'app/api/individual/contacts/[id]/suggest/route.ts');
+    assert(!fs.existsSync(suggestPath), 'suggest route should not exist');
+
+    const pkg = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'package.json'), 'utf8'));
+    assert(!pkg.dependencies?.['@anthropic-ai/sdk'], '@anthropic-ai/sdk should not be installed');
+    assert(!pkg.devDependencies?.['@anthropic-ai/sdk'], '@anthropic-ai/sdk should not be installed');
+  }, null, {
+    route: 'Code-level audit',
+    file: 'ContactsManager.tsx / package.json / suggest route path',
+    rootCause: 'AI suppression requirements were not respected',
+    fix: 'Keep only placeholder comment, remove suggest route, and do not add @anthropic-ai/sdk.',
+  });
+
+  await test('code-review', 'Mobile responsiveness guards are present for contacts/pipeline/settings', async () => {
+    const contactsCode = fs.readFileSync(path.join(process.cwd(), 'app/dashboard/individual/lists/[listId]/_components/ContactsManager.tsx'), 'utf8');
+    assert(contactsCode.includes('hidden md:table-cell'), 'expected hidden md:table-cell for mobile table columns');
+    assert(contactsCode.includes('const visibleTags = contact.tags.slice(0, 2);'), 'expected mobile tag slicing logic');
+    assert(contactsCode.includes('md:hidden'), 'expected mobile-only +N tags indicator');
+
+    const pipelineCode = fs.readFileSync(path.join(process.cwd(), 'app/dashboard/individual/pipeline/page.tsx'), 'utf8');
+    assert(pipelineCode.includes('expandedStages'), 'expected expandedStages mobile collapse state');
+    assert(pipelineCode.includes('ChevronDown'), 'expected ChevronDown mobile collapse icon');
+    assert(pipelineCode.includes('md:block'), 'expected md:block wrapper for column body');
+
+    const settingsCode = fs.readFileSync(path.join(process.cwd(), 'app/dashboard/settings/page.tsx'), 'utf8');
+    assert(settingsCode.includes('className="w-full"'), 'expected full-width whatsapp textarea');
+  }, null, {
+    route: 'Code-level mobile audit',
+    file: 'ContactsManager.tsx / pipeline page / settings page',
+    rootCause: 'Requested mobile responsiveness variants were not applied',
+    fix: 'Add hidden table columns, tag overflow handling, collapsible mobile pipeline columns, and full-width textarea.',
+  });
+
   // ── Cleanup ───────────────────────────────────────────────────────────────
   for (const fn of cleanupFns) {
     try { await fn(); } catch {}
