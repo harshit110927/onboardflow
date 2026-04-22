@@ -4,10 +4,12 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { usePathname } from "next/navigation";
 import { useEffect } from "react";
+import { KanbanSquare } from "lucide-react";
 
 const links = [
   { href: "/dashboard/individual", label: "Dashboard" },
   { href: "/dashboard/individual/lists", label: "Lists" },
+  { href: "/dashboard/individual/pipeline", label: "Pipeline", icon: KanbanSquare },
   { href: "/dashboard/individual/campaigns", label: "Campaigns" },
   { href: "/dashboard/individual/billing", label: "Billing" },
   { href: "/dashboard/individual/settings", label: "Settings" },
@@ -29,6 +31,7 @@ export function NavLinks() {
         const isActive = item.href === "/dashboard/individual"
           ? pathname === item.href
           : pathname.startsWith(item.href);
+        const Icon = item.icon;
         return (
           <Link
             key={item.href}
@@ -40,6 +43,7 @@ export function NavLinks() {
                 : "hover:text-white hover:bg-white/10"
             }`}
           >
+            {Icon ? <Icon size={18} className="inline mr-1.5 align-text-bottom" /> : null}
             {item.label}
           </Link>
         );
