@@ -360,6 +360,7 @@ export default function SettingsPage() {
             <CardContent className="space-y-3">
               <Label className="text-sm font-semibold">Message Template</Label>
               <Textarea
+                className="w-full"
                 value={whatsappTemplate}
                 onChange={(e) => setWhatsappTemplate(e.target.value)}
                 placeholder="Hi {name}, "
