@@ -6,83 +6,22 @@ type LandingPageEffectsProps = {
   rootId: string;
 };
 
-const THEMES: Record<string, { name: string }> = {
-  indigo: { name: "Indigo" },
-  midnight: { name: "Midnight" },
-  ember: { name: "Ember" },
-  nord: { name: "Nord" },
-};
-
 // This component keeps all browser-only behavior out of app/page.tsx. The landing markup is
 // rendered from the static v2 HTML prototype, then this effect progressively enhances it with
-// the same behavior that existed in the prototype script: theme selection, reveal animations,
-// animated funnel bars, and stat counters.
+// scroll reveal animations, the sticky nav shadow, animated funnel bars, stat counters, and
+// code-line reveal. Theme switching was intentionally removed so the page always uses indigo.
 export function LandingPageEffects({ rootId }: LandingPageEffectsProps) {
   useEffect(() => {
     const root = document.getElementById(rootId);
     if (!root) return;
 
-    // Query inside the landing root only so these enhancements never attach to dashboard/login
-    // elements that might happen to reuse the same IDs or class names in the future.
-    const themeBtn = root.querySelector<HTMLButtonElement>("#themeBtn");
-    const themePanel = root.querySelector<HTMLElement>("#themePanel");
-    const themeName = root.querySelector<HTMLElement>("#themeName");
-    const themeOptions = Array.from(root.querySelectorAll<HTMLButtonElement>(".theme-opt"));
-
-    const applyTheme = (theme: string) => {
-      if (!THEMES[theme] || !themeName) return;
-
-      root.setAttribute("data-theme", theme);
-      themeName.textContent = THEMES[theme].name;
-      window.localStorage.setItem("of-theme", theme);
-
-      themeOptions.forEach((option) => {
-        const active = option.dataset.theme === theme;
-        option.classList.toggle("active", active);
-        option.setAttribute("aria-selected", String(active));
-      });
-    };
-
-    // Match the supplied prototype exactly on first render: data-theme="indigo".
-    // Users can still preview other palettes during the session via the theme picker.
-    applyTheme("indigo");
-
-    const closeThemePanel = () => {
-      themePanel?.classList.remove("open");
-      themeBtn?.setAttribute("aria-expanded", "false");
-    };
-
-    const handleThemeButtonClick = (event: MouseEvent) => {
-      event.stopPropagation();
-      const open = Boolean(themePanel?.classList.toggle("open"));
-      themeBtn?.setAttribute("aria-expanded", String(open));
-    };
-
-    const themeOptionCleanups = themeOptions.map((option) => {
-      const handler = () => {
-        applyTheme(option.dataset.theme || "indigo");
-        closeThemePanel();
-      };
-      option.addEventListener("click", handler);
-      return () => option.removeEventListener("click", handler);
-    });
-
-    themeBtn?.addEventListener("click", handleThemeButtonClick);
-
-    const handleDocumentClick = (event: MouseEvent) => {
-      const target = event.target as Node;
-      if (!themeBtn?.contains(target) && !themePanel?.contains(target)) closeThemePanel();
-    };
-
-    const handleKeydown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") closeThemePanel();
-    };
+    // Force the only supported palette on the landing shell. This prevents stale localStorage
+    // values from earlier prototypes from changing the visual theme.
+    root.setAttribute("data-theme", "indigo");
 
     const nav = root.querySelector<HTMLElement>("#nav");
     const handleScroll = () => nav?.classList.toggle("scrolled", window.scrollY > 20);
 
-    document.addEventListener("click", handleDocumentClick);
-    document.addEventListener("keydown", handleKeydown);
     window.addEventListener("scroll", handleScroll, { passive: true });
     handleScroll();
 
@@ -166,10 +105,6 @@ export function LandingPageEffects({ rootId }: LandingPageEffectsProps) {
     if (codeBlock) codeObserver.observe(codeBlock);
 
     return () => {
-      themeBtn?.removeEventListener("click", handleThemeButtonClick);
-      themeOptionCleanups.forEach((cleanup) => cleanup());
-      document.removeEventListener("click", handleDocumentClick);
-      document.removeEventListener("keydown", handleKeydown);
       window.removeEventListener("scroll", handleScroll);
       revealObserver.disconnect();
       funnelObserver.disconnect();

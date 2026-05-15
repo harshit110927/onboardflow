@@ -20,12 +20,13 @@ export const metadata: Metadata = {
   },
 };
 
-// Keep the copied v2 landing CSS in one named constant so future theme edits are isolated
-// from the JSX shell below. The original file in the repo root uses data-theme="indigo";
-// this page keeps that same default by rendering the root shell with data-theme="indigo".
+// Keep the copied v2 landing CSS in one named constant so future visual edits are isolated
+// from the JSX shell below. Only the indigo palette is intentionally shipped here; do
+// not re-add the prototype theme switcher unless the product explicitly supports themes.
 const landingStyles = String.raw`
 /* ═══════════════════════════════════════════
-   THEME VARIABLES  (4 themes)
+   INDIGO THEME VARIABLES
+   Only the indigo palette is shipped on the landing page.
 ═══════════════════════════════════════════ */
 [data-theme="indigo"] {
   --bg:            #f0effe;
@@ -59,110 +60,8 @@ const landingStyles = String.raw`
   --code-bg:       rgba(0,0,0,0.28);
   --code-border:   rgba(129,140,248,0.18);
   --glow:          rgba(99,102,241,0.22);
-  --theme-swatch:  #6366f1;
 }
-[data-theme="midnight"] {
-  --bg:            #07080f;
-  --bg-alt:        #0c0e1b;
-  --surface:       #111827;
-  --surface-2:     #0e1320;
-  --deep:          #161d35;
-  --deep-2:        #1d2540;
-  --border:        #1e2540;
-  --divider:       #1a2545;
-  --primary:       #4f8ef0;
-  --primary-h:     #3b7de8;
-  --primary-rgb:   79,142,240;
-  --accent:        #60a5fa;
-  --accent-soft:   #93c5fd;
-  --accent-pale:   #bfdbfe;
-  --accent-palest: #dbeafe;
-  --text:          #e2e8f0;
-  --text-muted:    #94a3b8;
-  --text-subtle:   #64748b;
-  --placeholder:   #4b5d7a;
-  --on-deep:       #dbeafe;
-  --on-deep-sub:   #93c5fd;
-  --on-deep-muted: #60a5fa;
-  --emerald:       #22d3ee;
-  --red:           #f87171;
-  --nav-bg:        rgba(7,8,15,0.9);
-  --shadow:        0 4px 40px rgba(0,0,0,0.5);
-  --shadow-sm:     0 2px 14px rgba(0,0,0,0.3);
-  --shadow-hov:    0 12px 40px rgba(79,142,240,0.25);
-  --code-bg:       rgba(0,0,0,0.5);
-  --code-border:   rgba(79,142,240,0.2);
-  --glow:          rgba(79,142,240,0.25);
-  --theme-swatch:  #4f8ef0;
-}
-[data-theme="ember"] {
-  --bg:            #0f0805;
-  --bg-alt:        #170c07;
-  --surface:       #1d1008;
-  --surface-2:     #160d06;
-  --deep:          #230f06;
-  --deep-2:        #2d1408;
-  --border:        #3d1f0a;
-  --divider:       #2d1a08;
-  --primary:       #f97316;
-  --primary-h:     #ea6c0a;
-  --primary-rgb:   249,115,22;
-  --accent:        #fb923c;
-  --accent-soft:   #fdba74;
-  --accent-pale:   #fed7aa;
-  --accent-palest: #ffedd5;
-  --text:          #fef3c7;
-  --text-muted:    #c2844a;
-  --text-subtle:   #7c4a1e;
-  --placeholder:   #6b3d18;
-  --on-deep:       #fef3c7;
-  --on-deep-sub:   #fdba74;
-  --on-deep-muted: #fb923c;
-  --emerald:       #fbbf24;
-  --red:           #f87171;
-  --nav-bg:        rgba(15,8,5,0.92);
-  --shadow:        0 4px 40px rgba(0,0,0,0.6);
-  --shadow-sm:     0 2px 14px rgba(0,0,0,0.35);
-  --shadow-hov:    0 12px 40px rgba(249,115,22,0.25);
-  --code-bg:       rgba(0,0,0,0.4);
-  --code-border:   rgba(249,115,22,0.18);
-  --glow:          rgba(249,115,22,0.25);
-  --theme-swatch:  #f97316;
-}
-[data-theme="nord"] {
-  --bg:            #eef6ff;
-  --bg-alt:        #e4f0fb;
-  --surface:       #ffffff;
-  --surface-2:     #f7fbff;
-  --deep:          #0c2340;
-  --deep-2:        #0f2d52;
-  --border:        #c8e0f5;
-  --divider:       #d9ecff;
-  --primary:       #0ea5e9;
-  --primary-h:     #0284c7;
-  --primary-rgb:   14,165,233;
-  --accent:        #38bdf8;
-  --accent-soft:   #7dd3fc;
-  --accent-pale:   #bae6fd;
-  --accent-palest: #e0f2fe;
-  --text:          #0c2340;
-  --text-muted:    #3b6b9e;
-  --text-subtle:   #64748b;
-  --placeholder:   #8ab4d4;
-  --on-deep:       #e0f2fe;
-  --on-deep-sub:   #7dd3fc;
-  --on-deep-muted: #38bdf8;
-  --emerald:       #10b981;
-  --red:           #f87171;
-  --nav-bg:        rgba(238,246,255,0.9);
-  --shadow:        0 4px 40px rgba(12,35,64,0.1);
-  --shadow-sm:     0 2px 14px rgba(12,35,64,0.06);
-  --shadow-hov:    0 12px 40px rgba(14,165,233,0.18);
-  --code-bg:       rgba(0,0,0,0.25);
-  --code-border:   rgba(14,165,233,0.18);
-  --glow:          rgba(14,165,233,0.22);
-  --theme-swatch:  #0ea5e9;
-}
+
 
 /* ═══════════════════════════════════════════
    BASE
@@ -196,7 +95,6 @@ html{scroll-behavior:smooth;}
   100%{background-position:0% 50%}
 }
 @keyframes codeReveal{from{opacity:0;transform:translateX(-8px)}to{opacity:1;transform:none}}
-@keyframes themePop{0%{transform:scale(.85);opacity:0}100%{transform:scale(1);opacity:1}}
 
 /* ═══════════════════════════════════════════
    SCROLL REVEAL
@@ -245,62 +143,7 @@ nav.scrolled{box-shadow:var(--shadow-sm);}
 .nav-links a:hover{color:var(--primary);}
 .nav-right{display:flex;align-items:center;gap:10px;}
 
-/* THEME TOGGLE */
-.theme-wrap{position:relative;}
-.theme-btn{
-  display:flex;align-items:center;gap:7px;
-  background:var(--surface);
-  border:1.5px solid var(--border);
-  border-radius:8px;
-  padding:7px 11px;
-  cursor:pointer;
-  font-family:'DM Sans',sans-serif;
-  font-size:.78rem;font-weight:600;
-  color:var(--text-muted);
-  transition:border-color .2s,background .5s,color .2s;
-}
-.theme-btn:hover{border-color:var(--primary);color:var(--primary);}
-.theme-btn svg{flex-shrink:0;transition:color .2s;}
-.theme-swatch-dot{
-  width:10px;height:10px;border-radius:50%;
-  background:var(--primary);
-  flex-shrink:0;
-  transition:background .5s;
-}
-.theme-panel{
-  position:absolute;top:calc(100% + 8px);right:0;
-  background:var(--surface);
-  border:1.5px solid var(--border);
-  border-radius:12px;
-  padding:8px;
-  box-shadow:var(--shadow);
-  min-width:160px;
-  display:none;
-  flex-direction:column;gap:2px;
-  animation:themePop .2s ease-out both;
-  z-index:300;
-  transition:background .5s,border-color .5s;
-}
-.theme-panel.open{display:flex;}
-.theme-opt{
-  display:flex;align-items:center;gap:10px;
-  padding:9px 12px;
-  border-radius:8px;
-  cursor:pointer;
-  font-size:.83rem;font-weight:500;
-  color:var(--text-muted);
-  transition:background .15s,color .15s;
-  border:none;background:transparent;
-  font-family:'DM Sans',sans-serif;
-  width:100%;text-align:left;
-}
-.theme-opt:hover{background:var(--divider);color:var(--text);}
-.theme-opt.active{color:var(--primary);font-weight:600;}
-.theme-opt-swatch{width:14px;height:14px;border-radius:50%;flex-shrink:0;border:2px solid rgba(255,255,255,.3);}
-.theme-opt-tick{margin-left:auto;color:var(--primary);opacity:0;}
-.theme-opt.active .theme-opt-tick{opacity:1;}
 
-/* BTNs */
 .btn-ghost{font-family:'DM Sans',sans-serif;font-size:.875rem;font-weight:500;color:var(--text-muted);background:none;border:none;cursor:pointer;text-decoration:none;transition:color .2s;padding:6px 4px;}
 .btn-ghost:hover{color:var(--primary);}
 .btn-primary{
@@ -868,10 +711,6 @@ const landingMarkup = String.raw`<!-- ══════════════
   <symbol id="i-chevron-down" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
     <path d="m6 9 6 6 6-6"/>
   </symbol>
-  <symbol id="i-palette" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
-    <circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/>
-    <path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/>
-  </symbol>
   <symbol id="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
     <polyline points="20 6 9 17 4 12"/>
   </symbol>
@@ -903,36 +742,7 @@ const landingMarkup = String.raw`<!-- ══════════════
         <li><a href="#faq">FAQ</a></li>
       </ul>
       <div class="nav-right">
-        <!-- Theme Toggle -->
-        <div class="theme-wrap">
-          <button class="theme-btn" id="themeBtn" aria-label="Switch theme" aria-expanded="false">
-            <svg class="ico" width="14" height="14"><use href="#i-palette"/></svg>
-            <span class="theme-swatch-dot"></span>
-            <span id="themeName">Indigo</span>
-          </button>
-          <div class="theme-panel" id="themePanel" role="listbox">
-            <button class="theme-opt active" data-theme="indigo" role="option" aria-selected="true">
-              <span class="theme-opt-swatch" style="background:#6366f1"></span>
-              Indigo
-              <svg class="theme-opt-tick ico" width="14" height="14"><use href="#i-check"/></svg>
-            </button>
-            <button class="theme-opt" data-theme="midnight" role="option" aria-selected="false">
-              <span class="theme-opt-swatch" style="background:#4f8ef0"></span>
-              Midnight
-              <svg class="theme-opt-tick ico" width="14" height="14"><use href="#i-check"/></svg>
-            </button>
-            <button class="theme-opt" data-theme="ember" role="option" aria-selected="false">
-              <span class="theme-opt-swatch" style="background:#f97316"></span>
-              Ember
-              <svg class="theme-opt-tick ico" width="14" height="14"><use href="#i-check"/></svg>
-            </button>
-            <button class="theme-opt" data-theme="nord" role="option" aria-selected="false">
-              <span class="theme-opt-swatch" style="background:#0ea5e9"></span>
-              Nord
-              <svg class="theme-opt-tick ico" width="14" height="14"><use href="#i-check"/></svg>
-            </button>
-          </div>
-        </div>
+        <!-- Theme selector intentionally removed: the landing page is fixed to the indigo palette. -->
         <a href="/login" class="btn-ghost">Log in</a>
         <a href="/login" class="btn-primary">
           Start free
@@ -1485,9 +1295,8 @@ const landingMarkup = String.raw`<!-- ══════════════
 
 export default function Home() {
   return (
-    // The wrapper owns the theme variables for the entire imported landing page. Changing
-    // data-theme here is the fastest way to switch the page palette without touching section
-    // markup; the client effects also update this same attribute when the theme picker is used.
+    // The wrapper owns the fixed indigo theme variables for the entire imported landing page.
+    // Future color changes should update the indigo variables above instead of adding a theme toggle.
     <main id="landing-page" className="landing-shell" data-theme="indigo">
       {/* Global landing styles copied from the v2 HTML prototype and scoped to this shell. */}
       <style dangerouslySetInnerHTML={{ __html: landingStyles }} />
@@ -1495,7 +1304,7 @@ export default function Home() {
       {/* Semantic landing content: nav, hero, social proof, roadmap, pricing, FAQ, and footer. */}
       <div dangerouslySetInnerHTML={{ __html: landingMarkup }} />
 
-      {/* Client-only enhancements for theme switching, sticky nav shadow, reveals, and counters. */}
+      {/* Client-only enhancements for sticky nav shadow, reveals, counters, and prototype animations. */}
       <LandingPageEffects rootId="landing-page" />
     </main>
   );
