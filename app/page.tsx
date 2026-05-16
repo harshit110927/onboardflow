@@ -860,7 +860,7 @@ const landingMarkup = String.raw`<!-- ══════════════
 <!-- ══════════════════════════════════════════════════
      AUDIENCE STRIP
 ══════════════════════════════════════════════════ -->
-<div class="audience-strip" aria-label="Who OnboardFlow is for">
+<div class="audience-strip" id="about" aria-label="Who OnboardFlow is for">
   <div class="container">
     <div class="aud-grid">
       <div class="aud-tile reveal">
@@ -1099,7 +1099,6 @@ const landingMarkup = String.raw`<!-- ══════════════
     <div class="cta-banner reveal">
       <p class="cta-kicker">Free to start.</p>
       <h2>Stop guessing.<br/><strong>Start recovering lost signups.</strong></h2>
-      <p>(No credit card required.)</p>
       <div class="cta-btns">
         <a href="/login" class="btn-white">
           Start free — no credit card required
@@ -1173,17 +1172,16 @@ const landingMarkup = String.raw`<!-- ══════════════
       <div class="foot-col">
         <h4>Company</h4>
         <ul>
-          <li><a href="https://harshitshukla.codes" target="_blank" rel="noopener">About</a></li>
+          <li><a href="#about">About</a></li>
           <li><a href="#roadmap">Roadmap</a></li>
           <li><a href="https://www.producthunt.com/products/onboardflow-3" target="_blank" rel="noopener">Product Hunt</a></li>
-          <li><a href="mailto:founder@onboardflow.xyz">Contact</a></li>
+          <li><a href="mailto:harshit@onboardflow.xyz">Contact</a></li>
         </ul>
       </div>
       <div class="foot-col">
         <h4>Account</h4>
         <ul>
-          <li><a href="/login">Sign up free</a></li>
-          <li><a href="/login">Log in</a></li>
+          <li><a href="/login">Log in / Sign up</a></li>
           <li><a href="https://onboardflow.xyz/privacy">Privacy</a></li>
           <li><a href="https://onboardflow.xyz/terms">Terms</a></li>
         </ul>
@@ -1194,7 +1192,7 @@ const landingMarkup = String.raw`<!-- ══════════════
       <div class="foot-bot-links">
         <a href="https://onboardflow.xyz/privacy">Privacy</a>
         <a href="https://onboardflow.xyz/terms">Terms</a>
-        <a href="mailto:founder@onboardflow.xyz">Contact</a>
+        <a href="mailto:harshit@onboardflow.xyz">Contact</a>
       </div>
     </div>
   </div>
