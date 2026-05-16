@@ -302,7 +302,7 @@ export function ContactsManager({
             <p className="text-sm text-muted-foreground mt-1">Add your first contact using the form above.</p>
           </div>
         ) : (
-          <div className="rounded-lg border border-border bg-card overflow-hidden">
+          <div className="rounded-lg border border-border bg-card overflow-visible">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border bg-secondary/50">
