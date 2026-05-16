@@ -1,12 +1,11 @@
-// MODIFIED — tier selection
 import { createServerClient } from "@supabase/ssr";
 import { type NextRequest, NextResponse } from "next/server";
 
-import { updateSession } from "@/utils/supabase/middleware";
-
-// MODIFIED — tier selection
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+  let response = NextResponse.next({
+    request: { headers: request.headers },
+  });
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -16,16 +15,17 @@ export async function middleware(request: NextRequest) {
         getAll() {
           return request.cookies.getAll();
         },
-        setAll() {
-          return;
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value, options }) => {
+            request.cookies.set(name, value);
+            response.cookies.set(name, value, options); // ✅ actually sets cookies
+          });
         },
       },
     },
   );
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { data: { user } } = await supabase.auth.getUser();
 
   if (pathname === "/tier-selection" && !user?.email) {
     return NextResponse.redirect(new URL("/login", request.url));
@@ -52,10 +52,9 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  return updateSession(request);
+  return response;
 }
 
-// MODIFIED — tier selection
 export const config = {
   matcher: ["/dashboard/:path*", "/account/:path*", "/tier-selection"],
 };

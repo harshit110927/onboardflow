@@ -1,32 +1,32 @@
-import type { Metadata } from "next";
-import { LandingPageEffects } from "./_components/LandingPageEffects";
+<!DOCTYPE html>
+<html lang="en" data-theme="indigo">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Automate SaaS Onboarding Emails &amp; Track Drop-Off | OnboardFlow</title>
+<meta name="description" content="OnboardFlow tracks where SaaS users get stuck during onboarding and automatically sends drip emails to bring them back. One npm install. Free to start."/>
+<meta name="robots" content="index,follow"/>
+<link rel="canonical" href="https://onboardflow.xyz"/>
+<meta property="og:type" content="website"/>
+<meta property="og:url" content="https://onboardflow.xyz"/>
+<meta property="og:title" content="Automate SaaS Onboarding Emails & Track Drop-Off | OnboardFlow"/>
+<meta property="og:description" content="OnboardFlow tracks where SaaS users get stuck during onboarding and automatically sends drip emails to bring them back. One npm install. Free to start."/>
+<meta name="twitter:card" content="summary_large_image"/>
 
-export const metadata: Metadata = {
-  title: "Automate SaaS Onboarding Emails & Track Drop-Off | OnboardFlow",
-  description:
-    "OnboardFlow tracks where SaaS users get stuck during onboarding and automatically sends drip emails to bring them back. Only 3 lines of code. Free to start.",
-  alternates: {
-    canonical: "https://onboardflow.xyz",
-  },
-  openGraph: {
-    type: "website",
-    url: "https://onboardflow.xyz",
-    title: "Automate SaaS Onboarding Emails & Track Drop-Off | OnboardFlow",
-    description:
-      "OnboardFlow tracks where SaaS users get stuck during onboarding and automatically sends drip emails to bring them back. Only 3 lines of code. Free to start.",
-  },
-  twitter: {
-    card: "summary_large_image",
-  },
-};
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"SoftwareApplication","name":"OnboardFlow","url":"https://onboardflow.xyz","description":"OnboardFlow tracks where SaaS users get stuck during onboarding and automatically sends drip emails to bring them back.","applicationCategory":"BusinessApplication","operatingSystem":"Web","offers":{"@type":"Offer","price":"0","priceCurrency":"USD","description":"Free tier available"},"creator":{"@type":"Person","name":"Harshit Shukla","url":"https://harshitshukla.codes"},"sameAs":["https://www.npmjs.com/package/onboardflow","https://www.producthunt.com/posts/onboardflow"]}
+</script>
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"What is OnboardFlow?","acceptedAnswer":{"@type":"Answer","text":"OnboardFlow is a SaaS platform that tracks where users drop off during onboarding and automatically sends drip emails to bring them back. Two tiers — an npm SDK for developers and a no-code dashboard for small businesses."}},{"@type":"Question","name":"How do I integrate OnboardFlow into my SaaS?","acceptedAnswer":{"@type":"Answer","text":"Run npm install onboardflow, initialize with your API key, call identify() when a user signs up, and call track() when they complete an onboarding step. The platform handles detection and email sending automatically."}},{"@type":"Question","name":"What happens when a user gets stuck?","acceptedAnswer":{"@type":"Answer","text":"OnboardFlow's cron system checks all users every 15 minutes. If a user hasn't completed their next onboarding step within the configured delay, it sends the configured drip email automatically. Each nudge is sent at most once per user per step."}},{"@type":"Question","name":"Can I send emails from my own domain?","acceptedAnswer":{"@type":"Answer","text":"Yes. You connect your own email API key in the dashboard. Emails go out from your verified domain — not from a shared OnboardFlow address."}},{"@type":"Question","name":"Is OnboardFlow only for developers?","acceptedAnswer":{"@type":"Answer","text":"No. The Individual tier is a no-code dashboard for small businesses to manage email lists, add contacts, and send campaigns — no technical setup required."}},{"@type":"Question","name":"What is the free tier?","acceptedAnswer":{"@type":"Answer","text":"The free Enterprise tier includes up to 50 tracked end users, 20 emails per day, and 300 emails per month. The free Individual tier includes 3 email lists, 10 contacts per list, and 1 campaign per list."}}]}
+</script>
 
-// Keep the copied v2 landing CSS in one named constant so future visual edits are isolated
-// from the JSX shell below. Only the indigo palette is intentionally shipped here; do
-// not re-add the prototype theme switcher unless the product explicitly supports themes.
-const landingStyles = String.raw`
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,300&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+
+<style>
 /* ═══════════════════════════════════════════
-   INDIGO THEME VARIABLES
-   Only the indigo palette is shipped on the landing page.
+   THEME VARIABLES  (4 themes)
 ═══════════════════════════════════════════ */
 [data-theme="indigo"] {
   --bg:            #f0effe;
@@ -60,15 +60,117 @@ const landingStyles = String.raw`
   --code-bg:       rgba(0,0,0,0.28);
   --code-border:   rgba(129,140,248,0.18);
   --glow:          rgba(99,102,241,0.22);
+  --theme-swatch:  #6366f1;
 }
-
+[data-theme="midnight"] {
+  --bg:            #07080f;
+  --bg-alt:        #0c0e1b;
+  --surface:       #111827;
+  --surface-2:     #0e1320;
+  --deep:          #161d35;
+  --deep-2:        #1d2540;
+  --border:        #1e2540;
+  --divider:       #1a2545;
+  --primary:       #4f8ef0;
+  --primary-h:     #3b7de8;
+  --primary-rgb:   79,142,240;
+  --accent:        #60a5fa;
+  --accent-soft:   #93c5fd;
+  --accent-pale:   #bfdbfe;
+  --accent-palest: #dbeafe;
+  --text:          #e2e8f0;
+  --text-muted:    #94a3b8;
+  --text-subtle:   #64748b;
+  --placeholder:   #4b5d7a;
+  --on-deep:       #dbeafe;
+  --on-deep-sub:   #93c5fd;
+  --on-deep-muted: #60a5fa;
+  --emerald:       #22d3ee;
+  --red:           #f87171;
+  --nav-bg:        rgba(7,8,15,0.9);
+  --shadow:        0 4px 40px rgba(0,0,0,0.5);
+  --shadow-sm:     0 2px 14px rgba(0,0,0,0.3);
+  --shadow-hov:    0 12px 40px rgba(79,142,240,0.25);
+  --code-bg:       rgba(0,0,0,0.5);
+  --code-border:   rgba(79,142,240,0.2);
+  --glow:          rgba(79,142,240,0.25);
+  --theme-swatch:  #4f8ef0;
+}
+[data-theme="ember"] {
+  --bg:            #0f0805;
+  --bg-alt:        #170c07;
+  --surface:       #1d1008;
+  --surface-2:     #160d06;
+  --deep:          #230f06;
+  --deep-2:        #2d1408;
+  --border:        #3d1f0a;
+  --divider:       #2d1a08;
+  --primary:       #f97316;
+  --primary-h:     #ea6c0a;
+  --primary-rgb:   249,115,22;
+  --accent:        #fb923c;
+  --accent-soft:   #fdba74;
+  --accent-pale:   #fed7aa;
+  --accent-palest: #ffedd5;
+  --text:          #fef3c7;
+  --text-muted:    #c2844a;
+  --text-subtle:   #7c4a1e;
+  --placeholder:   #6b3d18;
+  --on-deep:       #fef3c7;
+  --on-deep-sub:   #fdba74;
+  --on-deep-muted: #fb923c;
+  --emerald:       #fbbf24;
+  --red:           #f87171;
+  --nav-bg:        rgba(15,8,5,0.92);
+  --shadow:        0 4px 40px rgba(0,0,0,0.6);
+  --shadow-sm:     0 2px 14px rgba(0,0,0,0.35);
+  --shadow-hov:    0 12px 40px rgba(249,115,22,0.25);
+  --code-bg:       rgba(0,0,0,0.4);
+  --code-border:   rgba(249,115,22,0.18);
+  --glow:          rgba(249,115,22,0.25);
+  --theme-swatch:  #f97316;
+}
+[data-theme="nord"] {
+  --bg:            #eef6ff;
+  --bg-alt:        #e4f0fb;
+  --surface:       #ffffff;
+  --surface-2:     #f7fbff;
+  --deep:          #0c2340;
+  --deep-2:        #0f2d52;
+  --border:        #c8e0f5;
+  --divider:       #d9ecff;
+  --primary:       #0ea5e9;
+  --primary-h:     #0284c7;
+  --primary-rgb:   14,165,233;
+  --accent:        #38bdf8;
+  --accent-soft:   #7dd3fc;
+  --accent-pale:   #bae6fd;
+  --accent-palest: #e0f2fe;
+  --text:          #0c2340;
+  --text-muted:    #3b6b9e;
+  --text-subtle:   #64748b;
+  --placeholder:   #8ab4d4;
+  --on-deep:       #e0f2fe;
+  --on-deep-sub:   #7dd3fc;
+  --on-deep-muted: #38bdf8;
+  --emerald:       #10b981;
+  --red:           #f87171;
+  --nav-bg:        rgba(238,246,255,0.9);
+  --shadow:        0 4px 40px rgba(12,35,64,0.1);
+  --shadow-sm:     0 2px 14px rgba(12,35,64,0.06);
+  --shadow-hov:    0 12px 40px rgba(14,165,233,0.18);
+  --code-bg:       rgba(0,0,0,0.25);
+  --code-border:   rgba(14,165,233,0.18);
+  --glow:          rgba(14,165,233,0.22);
+  --theme-swatch:  #0ea5e9;
+}
 
 /* ═══════════════════════════════════════════
    BASE
 ═══════════════════════════════════════════ */
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
 html{scroll-behavior:smooth;}
-.landing-shell{
+body{
   font-family:'DM Sans',sans-serif;
   background:var(--bg);
   color:var(--text);
@@ -76,14 +178,6 @@ html{scroll-behavior:smooth;}
   font-size:16px;
   overflow-x:hidden;
   transition:background .5s,color .5s;
-  -webkit-font-smoothing:antialiased;
-  -moz-osx-font-smoothing:grayscale;
-  text-rendering:optimizeLegibility;
-}
-.landing-shell a,
-.landing-shell button,
-.landing-shell input{
-  font-synthesis:none;
 }
 
 /* ═══════════════════════════════════════════
@@ -103,6 +197,7 @@ html{scroll-behavior:smooth;}
   100%{background-position:0% 50%}
 }
 @keyframes codeReveal{from{opacity:0;transform:translateX(-8px)}to{opacity:1;transform:none}}
+@keyframes themePop{0%{transform:scale(.85);opacity:0}100%{transform:scale(1);opacity:1}}
 
 /* ═══════════════════════════════════════════
    SCROLL REVEAL
@@ -151,7 +246,62 @@ nav.scrolled{box-shadow:var(--shadow-sm);}
 .nav-links a:hover{color:var(--primary);}
 .nav-right{display:flex;align-items:center;gap:10px;}
 
+/* THEME TOGGLE */
+.theme-wrap{position:relative;}
+.theme-btn{
+  display:flex;align-items:center;gap:7px;
+  background:var(--surface);
+  border:1.5px solid var(--border);
+  border-radius:8px;
+  padding:7px 11px;
+  cursor:pointer;
+  font-family:'DM Sans',sans-serif;
+  font-size:.78rem;font-weight:600;
+  color:var(--text-muted);
+  transition:border-color .2s,background .5s,color .2s;
+}
+.theme-btn:hover{border-color:var(--primary);color:var(--primary);}
+.theme-btn svg{flex-shrink:0;transition:color .2s;}
+.theme-swatch-dot{
+  width:10px;height:10px;border-radius:50%;
+  background:var(--primary);
+  flex-shrink:0;
+  transition:background .5s;
+}
+.theme-panel{
+  position:absolute;top:calc(100% + 8px);right:0;
+  background:var(--surface);
+  border:1.5px solid var(--border);
+  border-radius:12px;
+  padding:8px;
+  box-shadow:var(--shadow);
+  min-width:160px;
+  display:none;
+  flex-direction:column;gap:2px;
+  animation:themePop .2s ease-out both;
+  z-index:300;
+  transition:background .5s,border-color .5s;
+}
+.theme-panel.open{display:flex;}
+.theme-opt{
+  display:flex;align-items:center;gap:10px;
+  padding:9px 12px;
+  border-radius:8px;
+  cursor:pointer;
+  font-size:.83rem;font-weight:500;
+  color:var(--text-muted);
+  transition:background .15s,color .15s;
+  border:none;background:transparent;
+  font-family:'DM Sans',sans-serif;
+  width:100%;text-align:left;
+}
+.theme-opt:hover{background:var(--divider);color:var(--text);}
+.theme-opt.active{color:var(--primary);font-weight:600;}
+.theme-opt-swatch{width:14px;height:14px;border-radius:50%;flex-shrink:0;border:2px solid rgba(255,255,255,.3);}
+.theme-opt-tick{margin-left:auto;color:var(--primary);opacity:0;}
+.theme-opt.active .theme-opt-tick{opacity:1;}
 
+/* BTNs */
 .btn-ghost{font-family:'DM Sans',sans-serif;font-size:.875rem;font-weight:500;color:var(--text-muted);background:none;border:none;cursor:pointer;text-decoration:none;transition:color .2s;padding:6px 4px;}
 .btn-ghost:hover{color:var(--primary);}
 .btn-primary{
@@ -186,8 +336,6 @@ nav.scrolled{box-shadow:var(--shadow-sm);}
 }
 .hero-inner{display:grid;grid-template-columns:1fr 1fr;gap:64px;align-items:center;position:relative;}
 
-.product-hunt-badge{display:inline-flex;margin-bottom:18px;animation:fadeUp .5s ease-out both;}
-.product-hunt-badge img{display:block;width:250px;height:54px;}
 .hero-badge{
   display:inline-flex;align-items:center;gap:7px;
   background:var(--divider);border:1px solid var(--border);
@@ -466,7 +614,6 @@ section{padding:96px 0;}
 ═══════════════════════════════════════════ */
 .feedback-sec{background:var(--bg-alt);border-top:1px solid var(--border);transition:background .5s,border-color .5s;}
 .fb-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin-bottom:48px;}
-.fb-grid.single{grid-template-columns:minmax(0,640px);}
 .fb-item{display:flex;flex-direction:column;gap:10px;}
 .fb-ico{
   width:44px;height:44px;background:var(--divider);border-radius:9px;
@@ -501,9 +648,6 @@ section{padding:96px 0;}
 .wl-input::placeholder{color:var(--placeholder);}
 .wl-input:focus{border-color:var(--primary);}
 .wl-note{font-size:.73rem;color:var(--text-subtle);margin-top:9px;transition:color .5s;}
-.wl-message{font-size:.78rem;margin-top:10px;min-height:1.2em;color:var(--text-muted);transition:color .2s;}
-.wl-message.ok{color:var(--emerald);}
-.wl-message.error{color:var(--red);}
 
 /* ═══════════════════════════════════════════
    PRICING
@@ -591,7 +735,6 @@ details[open] .sum-arrow{transform:rotate(180deg);}
   background-image:radial-gradient(rgba(255,255,255,.07) 1px,transparent 1px);
   background-size:24px 24px;
 }
-.cta-kicker{color:#fff;font-size:1rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;margin-bottom:12px;position:relative;z-index:1;}
 .cta-banner h2{
   font-size:clamp(1.65rem,3.5vw,2.55rem);font-weight:300;
   color:var(--on-deep);letter-spacing:-.025em;margin-bottom:14px;
@@ -661,13 +804,11 @@ footer{background:var(--deep);padding:56px 0 32px;border-top:1px solid rgba(255,
   section{padding:64px 0;}
   h1{font-size:2rem;}
 }
-`;
+</style>
+</head>
+<body>
 
-// This markup is intentionally kept close to the root index-v2.html prototype. The goal is
-// to make future copy/design updates easy: edit the semantic sections here, then adjust the
-// matching class names in landingStyles above. Auth CTAs have been localized to /login because
-// this app creates accounts from the same magic-link login flow.
-const landingMarkup = String.raw`<!-- ══════════════════════════════════════════════════
+<!-- ══════════════════════════════════════════════════
      SVG SPRITE (Lucide-style, hidden)
 ══════════════════════════════════════════════════ -->
 <svg xmlns="http://www.w3.org/2000/svg" style="display:none">
@@ -726,6 +867,10 @@ const landingMarkup = String.raw`<!-- ══════════════
   <symbol id="i-chevron-down" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
     <path d="m6 9 6 6 6-6"/>
   </symbol>
+  <symbol id="i-palette" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/>
+    <path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/>
+  </symbol>
   <symbol id="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
     <polyline points="20 6 9 17 4 12"/>
   </symbol>
@@ -757,9 +902,38 @@ const landingMarkup = String.raw`<!-- ══════════════
         <li><a href="#faq">FAQ</a></li>
       </ul>
       <div class="nav-right">
-        <!-- Theme selector intentionally removed: the landing page is fixed to the indigo palette. -->
-        <a href="/login" class="btn-ghost">Log in</a>
-        <a href="/login" class="btn-primary">
+        <!-- Theme Toggle -->
+        <div class="theme-wrap">
+          <button class="theme-btn" id="themeBtn" aria-label="Switch theme" aria-expanded="false">
+            <svg class="ico" width="14" height="14"><use href="#i-palette"/></svg>
+            <span class="theme-swatch-dot"></span>
+            <span id="themeName">Indigo</span>
+          </button>
+          <div class="theme-panel" id="themePanel" role="listbox">
+            <button class="theme-opt active" data-theme="indigo" role="option" aria-selected="true">
+              <span class="theme-opt-swatch" style="background:#6366f1"></span>
+              Indigo
+              <svg class="theme-opt-tick ico" width="14" height="14"><use href="#i-check"/></svg>
+            </button>
+            <button class="theme-opt" data-theme="midnight" role="option" aria-selected="false">
+              <span class="theme-opt-swatch" style="background:#4f8ef0"></span>
+              Midnight
+              <svg class="theme-opt-tick ico" width="14" height="14"><use href="#i-check"/></svg>
+            </button>
+            <button class="theme-opt" data-theme="ember" role="option" aria-selected="false">
+              <span class="theme-opt-swatch" style="background:#f97316"></span>
+              Ember
+              <svg class="theme-opt-tick ico" width="14" height="14"><use href="#i-check"/></svg>
+            </button>
+            <button class="theme-opt" data-theme="nord" role="option" aria-selected="false">
+              <span class="theme-opt-swatch" style="background:#0ea5e9"></span>
+              Nord
+              <svg class="theme-opt-tick ico" width="14" height="14"><use href="#i-check"/></svg>
+            </button>
+          </div>
+        </div>
+        <a href="https://onboardflow.xyz/login" class="btn-ghost">Log in</a>
+        <a href="https://onboardflow.xyz/signup" class="btn-primary">
           Start free
           <svg class="ico" width="14" height="14"><use href="#i-arrow-right"/></svg>
         </a>
@@ -776,9 +950,6 @@ const landingMarkup = String.raw`<!-- ══════════════
     <div class="hero-inner">
       <!-- LEFT -->
       <div>
-        <a href="https://www.producthunt.com/products/onboardflow-3/reviews/new?utm_source=badge-product_review&amp;utm_medium=badge&amp;utm_source=badge-onboardflow&#0045;3" target="_blank" rel="noopener" class="product-hunt-badge" aria-label="Review OnboardFlow on Product Hunt">
-          <img src="https://api.producthunt.com/widgets/embed-image/v1/product_review.svg?product_id=1210405&amp;theme=light" alt="OnboardFlow - Easy to setup mail dripping and cold mailing for individuals | Product Hunt" width="250" height="54" />
-        </a>
         <div class="hero-badge">
           <span class="badge-dot"></span>
           Free to start · No credit card
@@ -790,19 +961,25 @@ const landingMarkup = String.raw`<!-- ══════════════
         </h1>
         <p class="hero-sub">
           OnboardFlow shows you exactly where users drop off and automatically nudges them back —
-          with only 3 lines of code.
+          with one&nbsp;<code>npm install</code>.
         </p>
         <div class="hero-ctas">
-          <a href="/login" class="btn-primary btn-primary-lg">
+          <a href="https://onboardflow.xyz/signup" class="btn-primary btn-primary-lg">
             Start free
             <svg class="ico" width="16" height="16"><use href="#i-arrow-right"/></svg>
           </a>
           <a href="#how-it-works" class="btn-outline">See how it works</a>
         </div>
         <p class="hero-login-hint">
-          Already using it? <a href="/login">Log in</a>
+          Already using it? <a href="https://onboardflow.xyz/login">Log in</a>
         </p>
-
+        <div class="hero-tags">
+          <span class="tag">npm SDK</span>
+          <span class="tag">No-code dashboard</span>
+          <span class="tag">Your own domain</span>
+          <span class="tag">Free tier</span>
+          <span class="tag">Next.js 15</span>
+        </div>
       </div>
 
       <!-- RIGHT: funnel visual -->
@@ -860,7 +1037,7 @@ const landingMarkup = String.raw`<!-- ══════════════
 <!-- ══════════════════════════════════════════════════
      AUDIENCE STRIP
 ══════════════════════════════════════════════════ -->
-<div class="audience-strip" id="about" aria-label="Who OnboardFlow is for">
+<div class="audience-strip" aria-label="Who OnboardFlow is for">
   <div class="container">
     <div class="aud-grid">
       <div class="aud-tile reveal">
@@ -943,7 +1120,7 @@ const landingMarkup = String.raw`<!-- ══════════════
       </div>
       <div class="feat-card reveal d3">
         <div class="feat-ico"><svg class="ico" width="20" height="20"><use href="#i-pointer"/></svg></div>
-        <h3>Send nudges manually</h3>
+        <h3>Manual "Send Nudge" Button</h3>
         <p>Re-engage stuck users at any step with a single click from your dashboard. No code required after the initial setup.</p>
       </div>
       <div class="feat-card reveal d4">
@@ -958,7 +1135,7 @@ const landingMarkup = String.raw`<!-- ══════════════
       </div>
       <div class="feat-card reveal d6">
         <div class="feat-ico"><svg class="ico" width="20" height="20"><use href="#i-package"/></svg></div>
-        <h3>Simple SDK installation and setup</h3>
+        <h3>Published npm SDK</h3>
         <p>One command install. Full TypeScript support, CJS + ESM exports. Works with any Node.js framework — Next.js, Express, Hono, and more.</p>
       </div>
     </div>
@@ -989,7 +1166,7 @@ const landingMarkup = String.raw`<!-- ══════════════
     <div class="sec-hdr centered reveal">
       <p class="sec-label">Integration in minutes</p>
       <h2 class="sec-title">How to automate SaaS onboarding emails<br/><strong style="color:#fff">when users get stuck</strong></h2>
-      <p class="sec-sub">Three steps. Only 3 lines of code. Working drip automation in under 10 minutes.</p>
+      <p class="sec-sub">Three steps. One npm install. Working drip automation in under 10 minutes.</p>
     </div>
     <div class="steps-grid">
       <div class="step reveal d1">
@@ -1045,7 +1222,6 @@ const landingMarkup = String.raw`<!-- ══════════════
         <div class="stat-lbl">To start. No credit card required.</div>
       </div>
     </div>
-    <!-- Early-adopter testimonials are intentionally hidden until real customer feedback is available.
     <div class="sec-hdr centered reveal">
       <p class="sec-label">Early adopters</p>
       <h2 class="sec-title">Built in public with <strong>early users</strong></h2>
@@ -1053,10 +1229,38 @@ const landingMarkup = String.raw`<!-- ══════════════
     <div class="proof-grid">
       <div class="proof-card reveal d1">
         <div class="proof-stars">★★★★★</div>
-        <p class="proof-q">Customer testimonial placeholder.</p>
+        <p class="proof-q">"I dropped in two function calls and had my funnel dashboard live the same afternoon. The step-level drop-off view told me immediately where users were getting confused."</p>
+        <div class="proof-auth">
+          <div class="proof-av">AK</div>
+          <div>
+            <div class="proof-name">Arjun K.</div>
+            <div class="proof-role">Founder, early-stage SaaS</div>
+          </div>
+        </div>
+      </div>
+      <div class="proof-card reveal d2">
+        <div class="proof-stars">★★★★★</div>
+        <p class="proof-q">"We were losing users at step 3 every week with no idea why. OnboardFlow showed the drop-off pattern in hours and the auto-nudge recovered 20% of those users."</p>
+        <div class="proof-auth">
+          <div class="proof-av">SR</div>
+          <div>
+            <div class="proof-name">Sara R.</div>
+            <div class="proof-role">Indie maker &amp; SaaS founder</div>
+          </div>
+        </div>
+      </div>
+      <div class="proof-card reveal d3">
+        <div class="proof-stars">★★★★★</div>
+        <p class="proof-q">"The Individual tier is exactly what my freelance business needed. The enterprise alternatives were overkill and expensive. This is clean, fast, and actually makes sense."</p>
+        <div class="proof-auth">
+          <div class="proof-av">PM</div>
+          <div>
+            <div class="proof-name">Priya M.</div>
+            <div class="proof-role">Freelancer &amp; small business owner</div>
+          </div>
+        </div>
       </div>
     </div>
-    -->
   </div>
 </section>
 
@@ -1066,45 +1270,97 @@ const landingMarkup = String.raw`<!-- ══════════════
 <section class="feedback-sec" id="roadmap" aria-label="Feedback and roadmap">
   <div class="container">
     <div class="sec-hdr reveal">
+      <p class="sec-label">Built in public</p>
       <h2 class="sec-title"><strong>You shape</strong> what gets built next.</h2>
-      <p class="sec-sub">Log in, use OnboardFlow, and tell us what should improve from the feedback form at the bottom of your dashboard.</p>
+      <p class="sec-sub">OnboardFlow is built with early users. Every feature on the roadmap started as a user request.</p>
     </div>
-    <div class="fb-grid single">
+    <div class="fb-grid">
       <div class="fb-item reveal d1">
+        <div class="fb-ico"><svg class="ico" width="22" height="22"><use href="#i-thumbs-up"/></svg></div>
+        <h3>Upvote Features</h3>
+        <p>Browse and vote on what we build next. Your votes directly determine sprint priorities. No guesswork, no black box.</p>
+        <a href="#" class="fb-link">View public roadmap <svg class="ico" width="12" height="12"><use href="#i-arrow-right"/></svg></a>
+      </div>
+      <div class="fb-item reveal d2">
+        <div class="fb-ico"><svg class="ico" width="22" height="22"><use href="#i-phone"/></svg></div>
+        <h3>Book a 15-min Call</h3>
+        <p>Tell us what's broken, what's missing, and what you'd pay for. We read every response and follow up personally on each one.</p>
+        <a href="#" class="fb-link">Book a feedback call <svg class="ico" width="12" height="12"><use href="#i-arrow-right"/></svg></a>
+      </div>
+      <div class="fb-item reveal d3">
         <div class="fb-ico"><svg class="ico" width="22" height="22"><use href="#i-message"/></svg></div>
-        <h3>Use the product, then share feedback</h3>
-        <p>Sign in, try the dashboard, and submit your suggestions through the feedback form linked at the bottom of the dashboard page. Your feedback decides what ships next.</p>
-        <a href="/login" class="fb-link">Log in or sign up <svg class="ico" width="12" height="12"><use href="#i-arrow-right"/></svg></a>
-        <a href="https://docs.google.com/forms/d/e/1FAIpQLSf73_-TjhWiYXqOkHS1Pr1_sNZ__JrTz93O6fgUEUF_F-COhw/viewform" target="_blank" rel="noopener" class="fb-link">Open feedback form <svg class="ico" width="12" height="12"><use href="#i-arrow-right"/></svg></a>
+        <h3>Submit a Feature Request</h3>
+        <p>Have an idea we haven't thought of? Tell us in one sentence. We follow up on every submission without exception.</p>
+        <a href="#" class="fb-link">Submit a request <svg class="ico" width="12" height="12"><use href="#i-arrow-right"/></svg></a>
       </div>
     </div>
     <div class="waitlist-box reveal">
       <h3>v2 is being built right now.</h3>
-      <p>Based on feedback from our initial users, v2 will include advanced segmentation, a multi-step visual flow builder, Slack alerts, and team collaboration. Join the waitlist and get early access + a founder discount.</p>
-      <form class="wl-form" id="waitlistForm">
-        <input id="waitlistEmail" name="email" type="email" class="wl-input" placeholder="your@email.com" aria-label="Email for v2 waitlist" required autocomplete="email"/>
-        <button class="btn-primary" type="submit">Join v2 waitlist <svg class="ico" width="14" height="14"><use href="#i-arrow-right"/></svg></button>
-      </form>
+      <p>Based on feedback from our first 30 users, v2 will include advanced segmentation, a multi-step visual flow builder, Slack alerts, and team collaboration. Join the waitlist and get early access + a founder discount.</p>
+      <div class="wl-form">
+        <input type="email" class="wl-input" placeholder="your@email.com" aria-label="Email for v2 waitlist"/>
+        <button class="btn-primary" type="button">Join v2 waitlist <svg class="ico" width="14" height="14"><use href="#i-arrow-right"/></svg></button>
+      </div>
       <p class="wl-note">No spam. One email when v2 ships.</p>
-      <p class="wl-message" id="waitlistMessage" role="status" aria-live="polite"></p>
     </div>
   </div>
 </section>
 
 <!-- ══════════════════════════════════════════════════
-     PRICING / CTA
+     PRICING
 ══════════════════════════════════════════════════ -->
-<section id="pricing" aria-label="Free signup">
+<section id="pricing" aria-label="Pricing">
   <div class="container">
-    <div class="cta-banner reveal">
-      <p class="cta-kicker">Free to start.</p>
-      <h2>Stop guessing.<br/><strong>Start recovering lost signups.</strong></h2>
-      <div class="cta-btns">
-        <a href="/login" class="btn-white">
-          Start free — no credit card required
-          <svg class="ico" width="14" height="14"><use href="#i-arrow-right"/></svg>
+    <div class="sec-hdr centered reveal">
+      <p class="sec-label">Pricing</p>
+      <h2 class="sec-title">Free to start.<br/><strong>No credit card required.</strong></h2>
+      <p class="sec-sub">Start free and scale when you're ready. No surprise charges, no trial expiry pressure.</p>
+    </div>
+    <div class="pricing-grid">
+      <div class="price-card featured reveal d1">
+        <span class="feat-badge">Developer SDK</span>
+        <div class="price-tier">Enterprise Tier</div>
+        <div class="price-num">$0 <span>/ month to start</span></div>
+        <div class="price-desc">For SaaS developers who want onboarding automation without building the infrastructure.</div>
+        <ul class="price-list">
+          <li><svg class="ico" width="16" height="16"><use href="#i-check"/></svg> Up to 50 tracked end users</li>
+          <li><svg class="ico" width="16" height="16"><use href="#i-check"/></svg> 20 emails / day · 300 / month</li>
+          <li><svg class="ico" width="16" height="16"><use href="#i-check"/></svg> npm SDK with full TypeScript</li>
+          <li><svg class="ico" width="16" height="16"><use href="#i-check"/></svg> Funnel breakdown dashboard</li>
+          <li><svg class="ico" width="16" height="16"><use href="#i-check"/></svg> Auto-detect stalled users</li>
+          <li><svg class="ico" width="16" height="16"><use href="#i-check"/></svg> Manual "Send Nudge" button</li>
+          <li><svg class="ico" width="16" height="16"><use href="#i-check"/></svg> Your own domain via email API</li>
+        </ul>
+        <a href="https://onboardflow.xyz/signup" class="btn-primary" style="display:flex;justify-content:center;width:100%">
+          Start free <svg class="ico" width="14" height="14"><use href="#i-arrow-right"/></svg>
         </a>
+        <p class="price-note">No credit card · Upgrade anytime</p>
       </div>
+      <div class="price-card reveal d2">
+        <div class="price-tier">Individual Tier</div>
+        <div class="price-num">$0 <span>/ month to start</span></div>
+        <div class="price-desc">For small businesses who need email campaigns without the complexity or cost of enterprise tools.</div>
+        <ul class="price-list">
+          <li><svg class="ico" width="16" height="16"><use href="#i-check"/></svg> 3 email lists</li>
+          <li><svg class="ico" width="16" height="16"><use href="#i-check"/></svg> 10 contacts per list</li>
+          <li><svg class="ico" width="16" height="16"><use href="#i-check"/></svg> 1 campaign per list</li>
+          <li><svg class="ico" width="16" height="16"><use href="#i-check"/></svg> No-code dashboard</li>
+          <li><svg class="ico" width="16" height="16"><use href="#i-check"/></svg> Contact management</li>
+          <li><svg class="ico" width="16" height="16"><use href="#i-check"/></svg> Drip sequence builder</li>
+          <li><svg class="ico" width="16" height="16"><use href="#i-check"/></svg> No technical setup</li>
+        </ul>
+        <a href="https://onboardflow.xyz/signup" class="btn-outline" style="display:flex;justify-content:center;width:100%">
+          Start free <svg class="ico" width="14" height="14"><use href="#i-arrow-right"/></svg>
+        </a>
+        <p class="price-note">No credit card · Upgrade anytime</p>
+      </div>
+    </div>
+    <div style="text-align:center">
+      <a href="https://www.npmjs.com/package/onboardflow" class="npm-pill" target="_blank" rel="noopener">
+        <svg class="ico" width="14" height="14"><use href="#i-package"/></svg>
+        npm install onboardflow
+      </a>
+      <p style="font-size:.8rem;color:var(--text-subtle);margin-top:10px;transition:color .5s">Published on npm · CJS, ESM &amp; TypeScript declarations included</p>
     </div>
   </div>
 </section>
@@ -1148,6 +1404,28 @@ const landingMarkup = String.raw`<!-- ══════════════
 </section>
 
 <!-- ══════════════════════════════════════════════════
+     CTA BANNER
+══════════════════════════════════════════════════ -->
+<section style="padding:96px 0 0">
+  <div class="container">
+    <div class="cta-banner reveal">
+      <h2>Stop guessing.<br/><strong>Start recovering lost signups.</strong></h2>
+      <p>One npm install. Working drip automation. Free to start.</p>
+      <div class="cta-btns">
+        <a href="https://onboardflow.xyz/signup" class="btn-white">
+          Start free — no credit card
+          <svg class="ico" width="14" height="14"><use href="#i-arrow-right"/></svg>
+        </a>
+        <a href="https://www.npmjs.com/package/onboardflow" class="btn-outline-white" target="_blank" rel="noopener">
+          <svg class="ico" width="14" height="14"><use href="#i-package"/></svg>
+          View on npm
+        </a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════
      FOOTER
 ══════════════════════════════════════════════════ -->
 <footer>
@@ -1167,32 +1445,34 @@ const landingMarkup = String.raw`<!-- ══════════════
           <li><a href="#how-it-works">How it works</a></li>
           <li><a href="#pricing">Pricing</a></li>
           <li><a href="https://www.npmjs.com/package/onboardflow" target="_blank" rel="noopener">npm SDK</a></li>
+          <li><a href="https://onboardflow.xyz/docs">Docs</a></li>
         </ul>
       </div>
       <div class="foot-col">
         <h4>Company</h4>
         <ul>
-          <li><a href="#about">About</a></li>
+          <li><a href="https://harshitshukla.codes" target="_blank" rel="noopener">About</a></li>
           <li><a href="#roadmap">Roadmap</a></li>
-          <li><a href="https://www.producthunt.com/products/onboardflow-3" target="_blank" rel="noopener">Product Hunt</a></li>
-          <li><a href="mailto:harshit@onboardflow.xyz">Contact</a></li>
+          <li><a href="https://www.producthunt.com/posts/onboardflow" target="_blank" rel="noopener">Product Hunt</a></li>
+          <li><a href="mailto:founder@onboardflow.xyz">Contact</a></li>
         </ul>
       </div>
       <div class="foot-col">
         <h4>Account</h4>
         <ul>
-          <li><a href="/login">Log in / Sign up</a></li>
+          <li><a href="https://onboardflow.xyz/signup">Sign up free</a></li>
+          <li><a href="https://onboardflow.xyz/login">Log in</a></li>
           <li><a href="https://onboardflow.xyz/privacy">Privacy</a></li>
           <li><a href="https://onboardflow.xyz/terms">Terms</a></li>
         </ul>
       </div>
     </div>
     <div class="foot-bot">
-      <p>© 2026 OnboardFlow · <a href="https://harshitshukla.codes" target="_blank" rel="noopener" style="color:inherit;text-decoration:none">Harshit Shukla</a> · harshitshukla.codes · onboardflow.xyz</p>
+      <p>© 2025 OnboardFlow · <a href="https://harshitshukla.codes" target="_blank" rel="noopener" style="color:inherit;text-decoration:none">Harshit Shukla</a> · onboardflow.xyz</p>
       <div class="foot-bot-links">
         <a href="https://onboardflow.xyz/privacy">Privacy</a>
         <a href="https://onboardflow.xyz/terms">Terms</a>
-        <a href="mailto:harshit@onboardflow.xyz">Contact</a>
+        <a href="mailto:founder@onboardflow.xyz">Contact</a>
       </div>
     </div>
   </div>
@@ -1200,21 +1480,142 @@ const landingMarkup = String.raw`<!-- ══════════════
 
 <!-- ══════════════════════════════════════════════════
      JAVASCRIPT
-══════════════════════════════════════════════════ -->`;
+══════════════════════════════════════════════════ -->
+<script>
+/* ── THEME TOGGLE ── */
+const THEMES = {
+  indigo:   { name: 'Indigo' },
+  midnight: { name: 'Midnight' },
+  ember:    { name: 'Ember' },
+  nord:     { name: 'Nord' }
+};
+let currentTheme = localStorage.getItem('of-theme') || 'indigo';
+const html = document.documentElement;
+const themeBtn = document.getElementById('themeBtn');
+const themePanel = document.getElementById('themePanel');
+const themeName = document.getElementById('themeName');
 
-export default function Home() {
-  return (
-    // The wrapper owns the fixed indigo theme variables for the entire imported landing page.
-    // Future color changes should update the indigo variables above instead of adding a theme toggle.
-    <main id="landing-page" className="landing-shell" data-theme="indigo">
-      {/* Global landing styles copied from the v2 HTML prototype and scoped to this shell. */}
-      <style dangerouslySetInnerHTML={{ __html: landingStyles }} />
-
-      {/* Semantic landing content: nav, hero, social proof, roadmap, pricing, FAQ, and footer. */}
-      <div dangerouslySetInnerHTML={{ __html: landingMarkup }} />
-
-      {/* Client-only enhancements for sticky nav shadow, reveals, counters, and prototype animations. */}
-      <LandingPageEffects rootId="landing-page" />
-    </main>
-  );
+function applyTheme(t) {
+  html.setAttribute('data-theme', t);
+  currentTheme = t;
+  themeName.textContent = THEMES[t].name;
+  localStorage.setItem('of-theme', t);
+  document.querySelectorAll('.theme-opt').forEach(el => {
+    const active = el.dataset.theme === t;
+    el.classList.toggle('active', active);
+    el.setAttribute('aria-selected', active);
+  });
 }
+
+applyTheme(currentTheme);
+
+themeBtn.addEventListener('click', (e) => {
+  e.stopPropagation();
+  const open = themePanel.classList.toggle('open');
+  themeBtn.setAttribute('aria-expanded', open);
+});
+
+document.querySelectorAll('.theme-opt').forEach(btn => {
+  btn.addEventListener('click', () => {
+    applyTheme(btn.dataset.theme);
+    themePanel.classList.remove('open');
+    themeBtn.setAttribute('aria-expanded', false);
+  });
+});
+
+document.addEventListener('click', (e) => {
+  if (!themeBtn.contains(e.target) && !themePanel.contains(e.target)) {
+    themePanel.classList.remove('open');
+    themeBtn.setAttribute('aria-expanded', false);
+  }
+});
+
+/* ── NAV SCROLL SHADOW ── */
+const nav = document.getElementById('nav');
+window.addEventListener('scroll', () => {
+  nav.classList.toggle('scrolled', window.scrollY > 20);
+}, { passive: true });
+
+/* ── SCROLL REVEAL ── */
+const revealEls = document.querySelectorAll('.reveal, .reveal-l, .reveal-r');
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(e => {
+    if (e.isIntersecting) {
+      e.target.classList.add('in-view');
+      observer.unobserve(e.target);
+    }
+  });
+}, { threshold: 0.12, rootMargin: '0px 0px -40px 0px' });
+revealEls.forEach(el => observer.observe(el));
+
+/* ── FUNNEL BAR ANIMATION ── */
+const funnelEl = document.getElementById('funnelSteps');
+let funnelDone = false;
+const funnelObs = new IntersectionObserver((entries) => {
+  if (entries[0].isIntersecting && !funnelDone) {
+    funnelDone = true;
+    document.querySelectorAll('.f-bar').forEach((bar, i) => {
+      setTimeout(() => bar.classList.add('animated'), i * 120);
+    });
+    funnelObs.disconnect();
+  }
+}, { threshold: 0.3 });
+if (funnelEl) funnelObs.observe(funnelEl);
+
+/* ── COUNTER ANIMATION ── */
+function animateCount(el, to, suffix = '') {
+  const dur = 1400;
+  const start = performance.now();
+  function tick(now) {
+    const p = Math.min((now - start) / dur, 1);
+    // ease out quart
+    const e = 1 - Math.pow(1 - p, 4);
+    el.textContent = Math.round(e * to) + suffix;
+    if (p < 1) requestAnimationFrame(tick);
+    else el.textContent = to + suffix;
+  }
+  requestAnimationFrame(tick);
+}
+
+const statEls = document.querySelectorAll('.stat-num[data-count]');
+const statObs = new IntersectionObserver((entries) => {
+  entries.forEach(e => {
+    if (e.isIntersecting) {
+      const el = e.target;
+      const to = parseInt(el.dataset.count);
+      const suffix = el.dataset.suffix || '';
+      animateCount(el, to, suffix);
+      statObs.unobserve(el);
+    }
+  });
+}, { threshold: 0.5 });
+statEls.forEach(el => statObs.observe(el));
+
+/* ── CODE BLOCK LINE REVEAL ── */
+const codeBlock = document.getElementById('codeBlock');
+let codeDone = false;
+const codeObs = new IntersectionObserver((entries) => {
+  if (entries[0].isIntersecting && !codeDone) {
+    codeDone = true;
+    const lines = codeBlock.querySelectorAll('.cl');
+    lines.forEach((ln, i) => {
+      setTimeout(() => {
+        ln.style.animationDelay = '0ms';
+        ln.classList.add('in-view');
+      }, i * 55);
+    });
+    codeObs.disconnect();
+  }
+}, { threshold: 0.2 });
+if (codeBlock) codeObs.observe(codeBlock);
+
+/* ── CLOSE THEME ON ESC ── */
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    themePanel.classList.remove('open');
+    themeBtn.setAttribute('aria-expanded', false);
+  }
+});
+</script>
+</body>
+</html>

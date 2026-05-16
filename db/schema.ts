@@ -3,9 +3,11 @@ import {
   integer,
   jsonb,
   pgTable,
+  primaryKey,
   serial,
   text,
   timestamp,
+  unique,
   uniqueIndex,
   uuid,
   varchar,
@@ -60,6 +62,7 @@ export const tenants = pgTable('tenants', {
   smtpPassword: text("smtp_password"),
   smtpVerified: boolean("smtp_verified").default(false).notNull(),
   smtpProvider: varchar("smtp_provider", { length: 50 }),
+  whatsappTemplate: text("whatsapp_template").default("Hi {name}, "),
 });
 
 export const endUsers = pgTable("end_users", {
@@ -94,6 +97,12 @@ export const individualContacts = pgTable(
       .references(() => individualLists.id, { onDelete: "cascade" }),
     name: varchar("name", { length: 100 }).notNull(),
     email: varchar("email", { length: 255 }).notNull(),
+    customFields: jsonb("custom_fields").$type<Record<string, string>>().default({}),
+    phone: varchar("phone", { length: 20 }),
+    followUpAt: timestamp("follow_up_at"),
+    followUpNote: text("follow_up_note"),
+    followUpSent: boolean("follow_up_sent").default(false),
+    pipelineStage: varchar("pipeline_stage", { length: 20 }).default("new"),
     createdAt: timestamp("created_at").defaultNow(),
   },
   (table) => ({
@@ -101,6 +110,47 @@ export const individualContacts = pgTable(
       table.listId,
       table.email,
     ),
+  }),
+);
+
+export const contactNotes = pgTable("contact_notes", {
+  id: serial("id").primaryKey(),
+  contactId: integer("contact_id")
+    .notNull()
+    .references(() => individualContacts.id, { onDelete: "cascade" }),
+  tenantId: uuid("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+  body: text("body").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const contactTags = pgTable(
+  "contact_tags",
+  {
+    id: serial("id").primaryKey(),
+    tenantId: uuid("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    name: varchar("name", { length: 50 }).notNull(),
+    color: varchar("color", { length: 7 }).default("#6366f1"),
+    createdAt: timestamp("created_at").defaultNow(),
+  },
+  (t) => ({
+    uniqueTenantName: unique().on(t.tenantId, t.name),
+  }),
+);
+
+export const contactTagAssignments = pgTable(
+  "contact_tag_assignments",
+  {
+    contactId: integer("contact_id")
+      .notNull()
+      .references(() => individualContacts.id, { onDelete: "cascade" }),
+    tagId: integer("tag_id")
+      .notNull()
+      .references(() => contactTags.id, { onDelete: "cascade" }),
+    assignedAt: timestamp("assigned_at").defaultNow(),
+  },
+  (t) => ({
+    pk: primaryKey({ columns: [t.contactId, t.tagId] }),
   }),
 );
 
@@ -163,6 +213,21 @@ export const campaignEvents = pgTable("campaign_events", {
   eventData: text("event_data"),
   occurredAt: timestamp("occurred_at").defaultNow(),
 });
+
+
+export const waitlistEntries = pgTable(
+  "waitlist_entries",
+  {
+    id: serial("id").primaryKey(),
+    email: varchar("email", { length: 255 }).notNull(),
+    source: varchar("source", { length: 100 }).notNull().default("v2_landing"),
+    userAgent: text("user_agent"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    emailUnique: uniqueIndex("waitlist_entries_email_idx").on(table.email),
+  }),
+);
 
 export const dripSteps = pgTable("drip_steps", {
   id: serial("id").primaryKey(),

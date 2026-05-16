@@ -29,6 +29,10 @@ export function buildEmailHtml(options: {
         .join("");
   const fromLabel = senderEmail ?? "OnboardFlow";
 
+  const pixelTag = trackingPixelUrl
+    ? `<img src="${trackingPixelUrl}" width="1" height="1" style="display:none" alt="" />`
+    : "";
+
   return `<!DOCTYPE html>
 <html>
 <head>
@@ -54,7 +58,6 @@ export function buildEmailHtml(options: {
               <div style="font-size:15px;line-height:1.7;color:#374151;">
                 ${htmlBody}
               </div>
-              ${trackingPixelUrl ? `<img src="${trackingPixelUrl}" width="1" height="1" alt="" style="display:block;opacity:0;width:1px;height:1px;border:0;" />` : ""}
             </td>
           </tr>
 
@@ -74,8 +77,36 @@ export function buildEmailHtml(options: {
       </td>
     </tr>
   </table>
+  ${pixelTag}
 </body>
 </html>`;
+}
+
+export function wrapLinksWithTracking(
+  html: string,
+  campaignId: number,
+  contactEmail: string,
+  baseUrl: string,
+): string {
+  return html.replace(
+    /href="(https?:\/\/[^\"]+)"/g,
+    (match, originalUrl) => {
+      if (
+        originalUrl.includes("unsubscribe") ||
+        originalUrl.includes("/api/track/")
+      ) {
+        return match;
+      }
+
+      const trackedUrl =
+        `${baseUrl}/api/track/click` +
+        `?campaignId=${campaignId}` +
+        `&email=${encodeURIComponent(contactEmail)}` +
+        `&url=${encodeURIComponent(originalUrl)}`;
+
+      return `href="${trackedUrl}"`;
+    },
+  );
 }
 
 export function createUnsubscribeToken(email: string): string {

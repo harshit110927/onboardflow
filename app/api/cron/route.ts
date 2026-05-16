@@ -4,13 +4,13 @@ import { tenants, endUsers, individualCampaigns, individualLists, individualCont
 import { NextResponse } from "next/server";
 import { Resend } from "resend";
 import { subHours } from "date-fns";
-import { and, eq, isNotNull } from "drizzle-orm";
+import { and, eq, isNotNull, lte } from "drizzle-orm";
 import { checkEmailRateLimit, incrementEmailCount } from "@/lib/rate-limit/enterprise";
 import { decryptPassword, createGmailTransporter } from "@/lib/email/smtp";
 import { getTenantPlan } from "@/lib/plans/get-tenant-plan";
 import { ENTERPRISE_LIMITS, type EnterprisePlanTier } from "@/lib/plans/limits";
 import { deliverWebhookEvent } from "@/lib/webhooks/deliver";
-import { buildEmailHtml } from "@/lib/email/templates";
+import { buildEmailHtml, wrapLinksWithTracking } from "@/lib/email/templates";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -275,7 +275,11 @@ export async function GET(req: Request) {
         if (!seqTenant) continue;
 
         const contacts = await db
-          .select({ name: individualContacts.name, email: individualContacts.email })
+          .select({
+            name: individualContacts.name,
+            email: individualContacts.email,
+            customFields: individualContacts.customFields,
+          })
           .from(individualContacts)
           .where(eq(individualContacts.listId, step.listId));
 
@@ -288,28 +292,54 @@ export async function GET(req: Request) {
             const decrypted = decryptPassword(seqTenant.smtpPassword!);
             const transporter = createGmailTransporter(seqTenant.smtpEmail!, decrypted);
             for (const contact of contacts) {
-              const body = step.body
+              let body = step.body
                 .replace(/\{name\}/g, contact.name)
                 .replace(/\{email\}/g, contact.email)
                 .replace(/\{contact_name\}/g, contact.name);
+              const customFields = (contact.customFields as Record<string, string>) ?? {};
+              for (const [key, value] of Object.entries(customFields)) {
+                body = body.replace(new RegExp(`\\{${key}\\}`, "g"), value ?? "");
+              }
+              const baseUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_BASE_URL;
+              const trackingPixelUrl = baseUrl
+                ? `${baseUrl}/api/track/pixel?campaignId=${step.id}&email=${encodeURIComponent(contact.email)}`
+                : undefined;
+              let html = buildEmailHtml({ body, trackingPixelUrl });
+              if (baseUrl) {
+                html = wrapLinksWithTracking(html, step.id, contact.email, baseUrl);
+              }
+
               await transporter.sendMail({
                 from: seqTenant.smtpEmail!,
                 to: contact.email,
                 subject: step.subject,
-                html: buildEmailHtml({ body }),
+                html,
               });
             }
           } else {
             for (const contact of contacts) {
-              const body = step.body
+              let body = step.body
                 .replace(/\{name\}/g, contact.name)
                 .replace(/\{email\}/g, contact.email)
                 .replace(/\{contact_name\}/g, contact.name);
+              const customFields = (contact.customFields as Record<string, string>) ?? {};
+              for (const [key, value] of Object.entries(customFields)) {
+                body = body.replace(new RegExp(`\\{${key}\\}`, "g"), value ?? "");
+              }
+              const baseUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_BASE_URL;
+              const trackingPixelUrl = baseUrl
+                ? `${baseUrl}/api/track/pixel?campaignId=${step.id}&email=${encodeURIComponent(contact.email)}`
+                : undefined;
+              let html = buildEmailHtml({ body, trackingPixelUrl });
+              if (baseUrl) {
+                html = wrapLinksWithTracking(html, step.id, contact.email, baseUrl);
+              }
+
               await resend.emails.send({
                 from: "OnboardFlow <onboarding@resend.dev>",
                 to: contact.email,
                 subject: step.subject,
-                html: buildEmailHtml({ body }),
+                html,
               });
             }
           }
@@ -327,6 +357,61 @@ export async function GET(req: Request) {
     } catch (err) {
       console.error("Sequence processing error:", err);
     }
+
+    // ============ FOLLOW-UP REMINDER PROCESSING ============
+    try {
+      const now = new Date();
+
+      const dueContacts = await db
+        .select({
+          contact: individualContacts,
+          listUserId: individualLists.userId,
+        })
+        .from(individualContacts)
+        .innerJoin(individualLists, eq(individualContacts.listId, individualLists.id))
+        .where(
+          and(
+            isNotNull(individualContacts.followUpAt),
+            eq(individualContacts.followUpSent, false),
+            lte(individualContacts.followUpAt, now),
+          ),
+        );
+
+      for (const { contact, listUserId } of dueContacts) {
+        try {
+          const ownerTenant = await db.query.tenants.findFirst({
+            where: eq(tenants.id, listUserId),
+          });
+          if (!ownerTenant?.email) continue;
+
+          const sender = resolveEmailSender(ownerTenant);
+          const noteSection = contact.followUpNote
+            ? `\n\nYour note: "${contact.followUpNote}"`
+            : "";
+          const bodyText = `Hi ${ownerTenant.name || "there"},\n\nThis is your reminder to follow up with ${contact.name} (${contact.email}).${noteSection}\n\nLog into OnboardFlow to take action.`;
+
+          const html = buildEmailHtml({
+            body: bodyText,
+          });
+
+          await sender({
+            to: ownerTenant.email,
+            subject: `Reminder: Follow up with ${contact.name}`,
+            html,
+          });
+
+          await db
+            .update(individualContacts)
+            .set({ followUpSent: true })
+            .where(eq(individualContacts.id, contact.id));
+        } catch (contactError) {
+          console.error(`Failed to send reminder for contact ${contact.id}:`, contactError);
+        }
+      }
+    } catch (reminderBlockError) {
+      console.error("Reminder processing block failed:", reminderBlockError);
+    }
+    // ============ END FOLLOW-UP REMINDER PROCESSING ============
 
     return NextResponse.json({ success: true, emailsSent, emailsBlocked });
   } catch (error) {
