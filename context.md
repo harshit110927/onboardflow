@@ -246,14 +246,14 @@ File: `app/page.tsx`
 `app/actions.ts`:
 
 - `login(formData)`: reads email, determines `origin` header, calls `supabase.auth.signInWithOtp({ shouldCreateUser: true, emailRedirectTo: origin + /auth/callback })`, then redirects to `/check-email`.
-- `signInWithGoogle()`: calls `supabase.auth.signInWithOAuth({ provider: "google", redirectTo: NEXT_PUBLIC_BASE_URL + /auth/callback })`, then redirects to provider URL.
+- `signInWithGoogle()`: determines the request origin and calls `supabase.auth.signInWithOAuth({ provider: "google", options: { redirectTo: origin + /auth/callback } })`, then redirects to provider URL.
 
 #### `/login` secondary route
 
 Files: `app/(auth)/login/page.tsx`, `app/(auth)/login/actions.ts`
 
 - Simple centered card UI.
-- Uses a separate `login(formData)` action that currently hardcodes `http://localhost:3000/auth/callback`; this is less production-ready than the landing page action.
+- Uses a separate `login(formData)` action that determines the request origin and sends magic links to `origin + /auth/callback`.
 
 #### `/auth/callback`
 
@@ -730,12 +730,11 @@ Likely required/used variables:
 ## 15. Known quirks and naming mismatches
 
 1. `/api/individual/drip-steps` and `/api/individual/webhooks` are Enterprise endpoints despite the path name.
-2. `app/(auth)/login/actions.ts` hardcodes `http://localhost:3000/auth/callback`; the landing page action in `app/actions.ts` is more deployment-safe because it uses the request origin.
-3. `processedWebhookEvents.stripeEventId` is used as a generic idempotency column, including Razorpay events.
-4. README still says Stripe is “coming soon,” but Razorpay is the current subscription path in code.
-5. The dashboard has both legacy shared `/dashboard/settings` and newer tier-specific `/dashboard/enterprise/*` and `/dashboard/individual/*` routes.
-6. Some comments still say “MODIFIED” or “NEW FILE” from prior agent edits; they are historical and not necessarily meaningful.
-7. `next lint` may fail in Next 15+ because the command has been removed/deprecated; use TypeScript/build checks as primary validation.
+2. `processedWebhookEvents.stripeEventId` is used as a generic idempotency column, including Razorpay events.
+3. README still says Stripe is “coming soon,” but Razorpay is the current subscription path in code.
+4. The dashboard has both legacy shared `/dashboard/settings` and newer tier-specific `/dashboard/enterprise/*` and `/dashboard/individual/*` routes.
+5. Some comments still say “MODIFIED” or “NEW FILE” from prior agent edits; they are historical and not necessarily meaningful.
+6. `next lint` may fail in Next 15+ because the command has been removed/deprecated; use TypeScript/build checks as primary validation.
 
 ---
 
