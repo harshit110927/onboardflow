@@ -109,8 +109,8 @@ export async function sendTestEmail(): Promise<ActionResult> {
   await transporter.sendMail({
     from: tenant.smtpEmail,
     to: user.email,
-    subject: "OnboardFlow — Test Email",
-    text: "Your Gmail is connected and working correctly with OnboardFlow.",
+    subject: "Dripmetric — Test Email",
+    text: "Your Gmail is connected and working correctly with Dripmetric.",
   });
 
   return { success: true };

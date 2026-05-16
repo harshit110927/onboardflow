@@ -122,14 +122,14 @@ export async function POST(req: Request) {
         for (const contact of activeContacts) {
           const body = firstStep.body.replace(/\{contact_name\}/g, contact.name);
           await resend.emails.send({
-            from: "OnboardFlow <onboarding@resend.dev>",
+            from: "Dripmetric <hello@dripmetric.com>",
             to: contact.email,
             subject: firstStep.subject,
             html: buildEmailHtml({
               body,
               contactEmail: contact.email,
               unsubscribeToken: createUnsubscribeToken(contact.email),
-              senderEmail: "onboarding@resend.dev",
+              senderEmail: "hello@dripmetric.com",
             }),
           });
         }

@@ -1,6 +1,9 @@
-# OnboardFlow Complete Project Context
+# Dripmetric Project Context (Single-File Handoff)
 
-> Purpose: give a future AI or contributor enough context to understand what this repository is, what sits where, which URL loads which file, and how the major function calls/data flows connect. This is a high-signal map of the codebase as of 2026-05-15.
+## 1) What this repo is
+Dripmetric is a Next.js 15 App Router SaaS app with two product tiers:
+- **Enterprise**: SDK/API-key based onboarding + event tracking + drip/webhook automation.
+- **Individual**: no-code email list/campaign product for small businesses.
 
 ---
 

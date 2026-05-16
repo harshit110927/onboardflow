@@ -505,7 +505,7 @@ export default function SettingsPage() {
             <CardHeader>
               <CardTitle>Session</CardTitle>
               <CardDescription>
-                Log out of OnboardFlow on this device when you're done managing your automation settings.
+                Log out of Dripmetric on this device when you're done managing your automation settings.
               </CardDescription>
             </CardHeader>
             <CardContent className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">

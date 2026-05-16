@@ -79,7 +79,7 @@ export default async function LoginPage() {
                   <path d="M3 8.5h11M8.5 3v11" stroke="#1e1b4b" strokeWidth="2.5" strokeLinecap="round"/>
                 </svg>
               </div>
-              <span style={{ fontSize: 16, fontWeight: 500, color: "#e0e7ff", letterSpacing: -0.3 }}>OnboardFlow</span>
+              <span style={{ fontSize: 16, fontWeight: 500, color: "#e0e7ff", letterSpacing: -0.3 }}>Dripmetric</span>
             </div>
 
             {/* Hero */}
@@ -108,7 +108,7 @@ export default async function LoginPage() {
                   <span style={{ color: "#818cf8" }}>import</span>
                   {" "}<span style={{ color: "#e0e7ff" }}>{"{onboardMiddleware}"}</span>{" "}
                   <span style={{ color: "#818cf8" }}>from</span>{" "}
-                  <span style={{ color: "#34d399" }}>&apos;@onboardflow/sdk&apos;</span>
+                  <span style={{ color: "#34d399" }}>&apos;dripmetric&apos;</span>
                 </div>
                 <div>&nbsp;</div>
                 <div>
@@ -178,11 +178,11 @@ export default async function LoginPage() {
                 <path d="M2 7h10M7 2v10" stroke="#fff" strokeWidth="2" strokeLinecap="round"/>
               </svg>
             </div>
-            <span style={{ fontSize: 15, fontWeight: 500, color: "#1e1b4b" }}>OnboardFlow</span>
+            <span style={{ fontSize: 15, fontWeight: 500, color: "#1e1b4b" }}>Dripmetric</span>
           </div>
 
           <h2 style={{ fontSize: 22, fontWeight: 500, color: "#1e1b4b", letterSpacing: -0.4, marginBottom: 5 }}>Welcome back</h2>
-          <p style={{ fontSize: 13.5, color: "#64748b", marginBottom: 26 }}>Sign in to your OnboardFlow account</p>
+          <p style={{ fontSize: 13.5, color: "#64748b", marginBottom: 26 }}>Sign in to your Dripmetric account</p>
 
           <TierChips />
 

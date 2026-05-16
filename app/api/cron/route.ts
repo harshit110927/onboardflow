@@ -63,7 +63,7 @@ function resolveEmailSender(tenant: {
   // Shared fallback — only works for Resend account owner's email
   return async ({ to, subject, html }) => {
     await resend.emails.send({
-      from: "OnboardFlow <onboarding@resend.dev>",
+      from: "Dripmetric <hello@dripmetric.com>",
       to: [to],
       subject,
       html,
@@ -336,7 +336,7 @@ export async function GET(req: Request) {
               }
 
               await resend.emails.send({
-                from: "OnboardFlow <onboarding@resend.dev>",
+                from: "Dripmetric <hello@dripmetric.com>",
                 to: contact.email,
                 subject: step.subject,
                 html,
@@ -388,7 +388,7 @@ export async function GET(req: Request) {
           const noteSection = contact.followUpNote
             ? `\n\nYour note: "${contact.followUpNote}"`
             : "";
-          const bodyText = `Hi ${ownerTenant.name || "there"},\n\nThis is your reminder to follow up with ${contact.name} (${contact.email}).${noteSection}\n\nLog into OnboardFlow to take action.`;
+          const bodyText = `Hi ${ownerTenant.name || "there"},\n\nThis is your reminder to follow up with ${contact.name} (${contact.email}).${noteSection}\n\nLog into Dripmetric to take action.`;
 
           const html = buildEmailHtml({
             body: bodyText,

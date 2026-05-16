@@ -9,7 +9,7 @@ export default function DocsPage() {
 
       <nav className="border-b sticky top-0 bg-white/80 backdrop-blur-md z-50">
         <div className="max-w-5xl mx-auto px-6 h-16 flex items-center justify-between">
-          <div className="font-bold text-xl tracking-tight">OnboardFlow <span className="text-blue-600">Docs</span></div>
+          <div className="font-bold text-xl tracking-tight">Dripmetric <span className="text-blue-600">Docs</span></div>
           <Link href="/dashboard">
             <Button variant="ghost" className="gap-2">
               <ArrowLeft className="h-4 w-4" /> Back to Dashboard
@@ -24,7 +24,7 @@ export default function DocsPage() {
         <section className="space-y-4">
           <h1 className="text-4xl font-extrabold tracking-tight lg:text-5xl">Documentation</h1>
           <p className="text-xl text-slate-500 max-w-2xl">
-            Complete integration guide for OnboardFlow Enterprise — track onboarding steps, automate drip emails, and recover stuck users.
+            Complete integration guide for Dripmetric Enterprise — track onboarding steps, automate drip emails, and recover stuck users.
           </p>
         </section>
 
@@ -36,12 +36,12 @@ export default function DocsPage() {
           </div>
           <p className="text-slate-600">Install the SDK and initialize it with your API key from the dashboard.</p>
           <div className="bg-slate-950 rounded-lg p-4 text-slate-50 overflow-x-auto shadow-xl">
-            <code className="font-mono text-sm">npm install onboardflow</code>
+            <code className="font-mono text-sm">npm install dripmetric</code>
           </div>
           <div className="bg-slate-900 rounded-md p-4 overflow-x-auto">
-<pre className="text-sm font-mono text-blue-300">{`import { OnboardFlow } from "onboardflow";
+<pre className="text-sm font-mono text-blue-300">{`import { Dripmetric } from "dripmetric";
 
-const onboard = new OnboardFlow("obf_live_your_api_key");`}</pre>
+const onboard = new Dripmetric("obf_live_your_api_key");`}</pre>
           </div>
           <Card className="bg-amber-50 border-amber-100">
             <CardContent className="pt-4">
@@ -63,7 +63,7 @@ const onboard = new OnboardFlow("obf_live_your_api_key");`}</pre>
           <div className="space-y-4">
             <h3 className="text-lg font-semibold">onboard.identify()</h3>
             <p className="text-slate-600">
-              Call this when a user signs up or logs in. It creates the user in your OnboardFlow dashboard and immediately sends them your configured Step 1 welcome email.
+              Call this when a user signs up or logs in. It creates the user in your Dripmetric dashboard and immediately sends them your configured Step 1 welcome email.
             </p>
             <div className="bg-slate-900 rounded-md p-4 overflow-x-auto">
 <pre className="text-sm font-mono text-blue-300">{`await onboard.identify({
@@ -104,7 +104,7 @@ const onboard = new OnboardFlow("obf_live_your_api_key");`}</pre>
             <h2 className="text-2xl font-bold">How Drip Emails Work</h2>
           </div>
           <p className="text-slate-600">
-            OnboardFlow runs an automated cron job that checks all your users for onboarding progress. Emails are sent when a user is stuck — not on every step completion.
+            Dripmetric runs an automated cron job that checks all your users for onboarding progress. Emails are sent when a user is stuck — not on every step completion.
           </p>
           <div className="bg-slate-900 rounded-md p-4 overflow-x-auto">
 <pre className="text-sm font-mono text-slate-300">{`User signs up
@@ -134,7 +134,7 @@ User completes a step via track()
     <h2 className="text-2xl font-bold">Setting Up Your Sending Domain</h2>
   </div>
   <p className="text-slate-600">
-    By default OnboardFlow uses a shared sending domain which only works for your own inbox during testing.
+    By default Dripmetric uses a shared sending domain which only works for your own inbox during testing.
     For production, connect your own Resend account so emails arrive from your domain.
   </p>
 
@@ -160,7 +160,7 @@ User completes a step via track()
 3. Go to API Keys → Create API Key → Full Access
    Copy the key (starts with re_live_...)
 
-4. In OnboardFlow → Automation Settings → Email Sending:
+4. In Dripmetric → Automation Settings → Email Sending:
    - Paste your Resend API key
    - Enter your from address (e.g. hello@yourdomain.com)
    - Click Save Email Settings

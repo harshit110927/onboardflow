@@ -65,7 +65,7 @@ export async function GET(req: Request) {
         console.log(`⚠️ User ${user.externalId} stuck on '${requiredStep}'. Sending Nudge...`);
         
         await resend.emails.send({
-            from: 'OnboardFlow <onboarding@resend.dev>',
+            from: 'Dripmetric <hello@dripmetric.com>',
             to: user.email, 
             subject: 'Quick question...',
             html: NUDGE_EMAIL(user.externalId, requiredStep),

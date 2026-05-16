@@ -1,15 +1,15 @@
-export class OnboardFlow {
+export class Dripmetric {
   private apiKey: string;
   private baseUrl: string;
 
   constructor(apiKey: string, options?: { baseUrl?: string }) {
     this.apiKey = apiKey;
-    this.baseUrl = options?.baseUrl || "https://www.onboardflow.xyz/api/v1";
+    this.baseUrl = options?.baseUrl || "https://www.dripmetric.com/api/v1";
   }
 
   /**
    * Identify a user on signup or login.
-   * Creates the user in your OnboardFlow dashboard.
+   * Creates the user in your Dripmetric dashboard.
    */
   async identify(user: { userId: string; email: string }): Promise<{ success: boolean }> {
     return this._request("/identify", {
@@ -41,7 +41,7 @@ export class OnboardFlow {
 
     if (!response.ok) {
       const error = await response.json().catch(() => ({}));
-      throw new Error(`OnboardFlow error (${response.status}): ${error?.error || "Unknown error"}`);
+      throw new Error(`Dripmetric error (${response.status}): ${error?.error || "Unknown error"}`);
     }
 
     return response.json();

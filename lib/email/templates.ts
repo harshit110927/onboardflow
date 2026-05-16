@@ -10,7 +10,7 @@ export function buildEmailHtml(options: {
 }): string {
   const { body, unsubscribeToken, contactEmail, senderEmail, trackingPixelUrl } = options;
 
-  const appUrl = BASE_URL || "https://www.onboardflow.xyz";
+  const appUrl = BASE_URL || "https://www.dripmetric.com";
   const unsubscribeUrl = unsubscribeToken && contactEmail
     ? `${appUrl}/unsubscribe?token=${unsubscribeToken}&email=${encodeURIComponent(contactEmail)}`
     : `${appUrl}/unsubscribe`;
@@ -27,7 +27,7 @@ export function buildEmailHtml(options: {
         .split("\n")
         .map((line) => line.trim() ? `<p style="margin:0 0 12px 0;">${line}</p>` : "")
         .join("");
-  const fromLabel = senderEmail ?? "OnboardFlow";
+  const fromLabel = senderEmail ?? "Dripmetric";
 
   const pixelTag = trackingPixelUrl
     ? `<img src="${trackingPixelUrl}" width="1" height="1" style="display:none" alt="" />`
@@ -68,7 +68,7 @@ export function buildEmailHtml(options: {
                 Sent via ${fromLabel}.<br />
                 <a href="${unsubscribeUrl}" style="color:#6366f1;text-decoration:underline;">Unsubscribe</a>
                 &nbsp;·&nbsp;
-                <a href="${appUrl}/privacy" style="color:#6366f1;text-decoration:underline;">Privacy Policy</a>
+                <a href="https://www.dripmetric.com/privacy" style="color:#6366f1;text-decoration:underline;">Privacy Policy</a>
               </p>
             </td>
           </tr>

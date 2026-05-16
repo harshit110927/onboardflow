@@ -2,18 +2,18 @@ import type { Metadata } from "next";
 import { LandingPageEffects } from "./_components/LandingPageEffects";
 
 export const metadata: Metadata = {
-  title: "Automate SaaS Onboarding Emails & Track Drop-Off | OnboardFlow",
+  title: "Automate SaaS Onboarding Emails & Track Drop-Off | Dripmetric",
   description:
-    "OnboardFlow tracks where SaaS users get stuck during onboarding and automatically sends drip emails to bring them back. Only 3 lines of code. Free to start.",
+    "Dripmetric tracks where SaaS users get stuck during onboarding and automatically sends drip emails to bring them back. Only 3 lines of code. Free to start.",
   alternates: {
-    canonical: "https://onboardflow.xyz",
+    canonical: "https://dripmetric.com",
   },
   openGraph: {
     type: "website",
-    url: "https://onboardflow.xyz",
-    title: "Automate SaaS Onboarding Emails & Track Drop-Off | OnboardFlow",
+    url: "https://dripmetric.com",
+    title: "Automate SaaS Onboarding Emails & Track Drop-Off | Dripmetric",
     description:
-      "OnboardFlow tracks where SaaS users get stuck during onboarding and automatically sends drip emails to bring them back. Only 3 lines of code. Free to start.",
+      "Dripmetric tracks where SaaS users get stuck during onboarding and automatically sends drip emails to bring them back. Only 3 lines of code. Free to start.",
   },
   twitter: {
     card: "summary_large_image",
@@ -746,9 +746,9 @@ const landingMarkup = String.raw`<!-- ══════════════
 <nav id="nav">
   <div class="container">
     <div class="nav-inner">
-      <a href="/" class="nav-logo" aria-label="OnboardFlow home">
+      <a href="/" class="nav-logo" aria-label="Dripmetric home">
         <div class="nav-logo-icon">OF</div>
-        OnboardFlow
+        Dripmetric
       </a>
       <ul class="nav-links" role="list">
         <li><a href="#features">Features</a></li>
@@ -776,8 +776,8 @@ const landingMarkup = String.raw`<!-- ══════════════
     <div class="hero-inner">
       <!-- LEFT -->
       <div>
-        <a href="https://www.producthunt.com/products/onboardflow-3/reviews/new?utm_source=badge-product_review&amp;utm_medium=badge&amp;utm_source=badge-onboardflow&#0045;3" target="_blank" rel="noopener" class="product-hunt-badge" aria-label="Review OnboardFlow on Product Hunt">
-          <img src="https://api.producthunt.com/widgets/embed-image/v1/product_review.svg?product_id=1210405&amp;theme=light" alt="OnboardFlow - Easy to setup mail dripping and cold mailing for individuals | Product Hunt" width="250" height="54" />
+        <a href="https://www.producthunt.com/products/dripmetric-3/reviews/new?utm_source=badge-product_review&amp;utm_medium=badge&amp;utm_source=badge-dripmetric&#0045;3" target="_blank" rel="noopener" class="product-hunt-badge" aria-label="Review Dripmetric on Product Hunt">
+          <img src="https://api.producthunt.com/widgets/embed-image/v1/product_review.svg?product_id=1210405&amp;theme=light" alt="Dripmetric - Easy to setup mail dripping and cold mailing for individuals | Product Hunt" width="250" height="54" />
         </a>
         <div class="hero-badge">
           <span class="badge-dot"></span>
@@ -789,7 +789,7 @@ const landingMarkup = String.raw`<!-- ══════════════
           <strong>before activation.</strong>
         </h1>
         <p class="hero-sub">
-          OnboardFlow shows you exactly where users drop off and automatically nudges them back —
+          Dripmetric shows you exactly where users drop off and automatically nudges them back —
           with only 3 lines of code.
         </p>
         <div class="hero-ctas">
@@ -860,7 +860,7 @@ const landingMarkup = String.raw`<!-- ══════════════
 <!-- ══════════════════════════════════════════════════
      AUDIENCE STRIP
 ══════════════════════════════════════════════════ -->
-<div class="audience-strip" id="about" aria-label="Who OnboardFlow is for">
+<div class="audience-strip" id="about" aria-label="Who Dripmetric is for">
   <div class="container">
     <div class="aud-grid">
       <div class="aud-tile reveal">
@@ -949,7 +949,7 @@ const landingMarkup = String.raw`<!-- ══════════════
       <div class="feat-card reveal d4">
         <div class="feat-ico"><svg class="ico" width="20" height="20"><use href="#i-send"/></svg></div>
         <h3>Your Domain, Your Emails</h3>
-        <p>Connect your own email API key. All emails send from your verified domain — never from a shared OnboardFlow address.</p>
+        <p>Connect your own email API key. All emails send from your verified domain — never from a shared Dripmetric address.</p>
       </div>
       <div class="feat-card reveal d5">
         <div class="feat-ico"><svg class="ico" width="20" height="20"><use href="#i-list"/></svg></div>
@@ -967,7 +967,7 @@ const landingMarkup = String.raw`<!-- ══════════════
         <div class="feat-ico"><svg class="ico" width="20" height="20"><use href="#i-building"/></svg></div>
         <div>
           <h3>Enterprise Tier — For Developers</h3>
-          <p>Install the npm SDK, call <code style="font-family:'DM Mono',monospace;font-size:.85em;background:rgba(255,255,255,.08);padding:2px 6px;border-radius:4px;color:var(--accent-soft)">identify()</code> on signup and <code style="font-family:'DM Mono',monospace;font-size:.85em;background:rgba(255,255,255,.08);padding:2px 6px;border-radius:4px;color:var(--accent-soft)">track()</code> on step completion. OnboardFlow detects stalled users and fires drip emails automatically. Dashboard shows your full funnel.</p>
+          <p>Install the npm SDK, call <code style="font-family:'DM Mono',monospace;font-size:.85em;background:rgba(255,255,255,.08);padding:2px 6px;border-radius:4px;color:var(--accent-soft)">identify()</code> on signup and <code style="font-family:'DM Mono',monospace;font-size:.85em;background:rgba(255,255,255,.08);padding:2px 6px;border-radius:4px;color:var(--accent-soft)">track()</code> on step completion. Dripmetric detects stalled users and fires drip emails automatically. Dashboard shows your full funnel.</p>
         </div>
       </div>
       <div class="feat-card-dark reveal d2">
@@ -984,7 +984,7 @@ const landingMarkup = String.raw`<!-- ══════════════
 <!-- ══════════════════════════════════════════════════
      HOW IT WORKS
 ══════════════════════════════════════════════════ -->
-<section class="how-sec" id="how-it-works" aria-label="How OnboardFlow works">
+<section class="how-sec" id="how-it-works" aria-label="How Dripmetric works">
   <div class="container">
     <div class="sec-hdr centered reveal">
       <p class="sec-label">Integration in minutes</p>
@@ -995,7 +995,7 @@ const landingMarkup = String.raw`<!-- ══════════════
       <div class="step reveal d1">
         <div class="step-num">01</div>
         <h3>Install &amp; Initialize</h3>
-        <p>Run <code>npm install onboardflow</code>, add your API key from the dashboard, and initialize the client in your backend. Any Node.js framework works.</p>
+        <p>Run <code>npm install dripmetric</code>, add your API key from the dashboard, and initialize the client in your backend. Any Node.js framework works.</p>
       </div>
       <div class="step reveal d2">
         <div class="step-num">02</div>
@@ -1004,24 +1004,24 @@ const landingMarkup = String.raw`<!-- ══════════════
       </div>
       <div class="step reveal d3">
         <div class="step-num">03</div>
-        <h3>OnboardFlow Does the Rest</h3>
+        <h3>Dripmetric Does the Rest</h3>
         <p>Cron detection finds stalled users and fires drip emails automatically. Your dashboard shows funnel data, completion rates, and nudge history live.</p>
       </div>
     </div>
     <!-- code block -->
     <div class="code-block reveal" id="codeBlock">
       <span class="cl cc">// 1. Install</span>
-      <span class="cl"><span class="cf">npm</span> install <span class="cs">onboardflow</span></span>
+      <span class="cl"><span class="cf">npm</span> install <span class="cs">dripmetric</span></span>
       <span class="cl">&nbsp;</span>
       <span class="cl cc">// 2. Initialize</span>
-      <span class="cl"><span class="ck">import</span> { OnboardFlow } <span class="ck">from</span> <span class="cs">'onboardflow'</span>;</span>
-      <span class="cl"><span class="ck">const</span> of = <span class="ck">new</span> <span class="cf">OnboardFlow</span>({ apiKey: <span class="cs">'YOUR_KEY'</span> });</span>
+      <span class="cl"><span class="ck">import</span> { Dripmetric } <span class="ck">from</span> <span class="cs">'dripmetric'</span>;</span>
+      <span class="cl"><span class="ck">const</span> of = <span class="ck">new</span> <span class="cf">Dripmetric</span>({ apiKey: <span class="cs">'YOUR_KEY'</span> });</span>
       <span class="cl">&nbsp;</span>
       <span class="cl cc">// 3. Track your users</span>
       <span class="cl">await of.<span class="cf">identify</span>({ userId: user.id, email: user.email });</span>
       <span class="cl">await of.<span class="cf">track</span>({ userId: user.id, step: <span class="cs">'profile_completed'</span> });</span>
       <span class="cl">&nbsp;</span>
-      <span class="cl cc">// ✓ OnboardFlow detects stalls → sends drip emails automatically</span>
+      <span class="cl cc">// ✓ Dripmetric detects stalls → sends drip emails automatically</span>
     </div>
   </div>
 </section>
@@ -1067,7 +1067,7 @@ const landingMarkup = String.raw`<!-- ══════════════
   <div class="container">
     <div class="sec-hdr reveal">
       <h2 class="sec-title"><strong>You shape</strong> what gets built next.</h2>
-      <p class="sec-sub">Log in, use OnboardFlow, and tell us what should improve from the feedback form at the bottom of your dashboard.</p>
+      <p class="sec-sub">Log in, use Dripmetric, and tell us what should improve from the feedback form at the bottom of your dashboard.</p>
     </div>
     <div class="fb-grid single">
       <div class="fb-item reveal d1">
@@ -1120,23 +1120,23 @@ const landingMarkup = String.raw`<!-- ══════════════
     </div>
     <div class="faq-list">
       <details open class="reveal d1">
-        <summary>What is OnboardFlow?<span class="sum-arrow"><svg class="ico" width="14" height="14"><use href="#i-chevron-down"/></svg></span></summary>
-        <div class="faq-ans">OnboardFlow is a multi-tenant SaaS platform for onboarding automation and email campaign management. It has two tiers — an <strong>Enterprise tier</strong> with an npm SDK for developers, and an <strong>Individual tier</strong> with a no-code dashboard for small businesses. Both are free to start, no credit card required.</div>
+        <summary>What is Dripmetric?<span class="sum-arrow"><svg class="ico" width="14" height="14"><use href="#i-chevron-down"/></svg></span></summary>
+        <div class="faq-ans">Dripmetric is a multi-tenant SaaS platform for onboarding automation and email campaign management. It has two tiers — an <strong>Enterprise tier</strong> with an npm SDK for developers, and an <strong>Individual tier</strong> with a no-code dashboard for small businesses. Both are free to start, no credit card required.</div>
       </details>
       <details class="reveal d2">
-        <summary>How do I integrate OnboardFlow into my SaaS?<span class="sum-arrow"><svg class="ico" width="14" height="14"><use href="#i-chevron-down"/></svg></span></summary>
-        <div class="faq-ans">Run <code>npm install onboardflow</code>, initialize with your API key, call <code>identify()</code> when a user signs up, and call <code>track()</code> when they complete an onboarding step. The platform handles stall detection and email sending automatically. Most developers are fully live in under 10 minutes.</div>
+        <summary>How do I integrate Dripmetric into my SaaS?<span class="sum-arrow"><svg class="ico" width="14" height="14"><use href="#i-chevron-down"/></svg></span></summary>
+        <div class="faq-ans">Run <code>npm install dripmetric</code>, initialize with your API key, call <code>identify()</code> when a user signs up, and call <code>track()</code> when they complete an onboarding step. The platform handles stall detection and email sending automatically. Most developers are fully live in under 10 minutes.</div>
       </details>
       <details class="reveal d3">
         <summary>What happens when a user gets stuck?<span class="sum-arrow"><svg class="ico" width="14" height="14"><use href="#i-chevron-down"/></svg></span></summary>
-        <div class="faq-ans">OnboardFlow's cron system checks all users every 15 minutes. If a user hasn't completed their next onboarding step within the configured delay (1 hour for step 1, 24 hours for steps 2 and 3), it sends the configured drip email automatically. Each nudge is sent at most once per user per step — no spam, no duplicates.</div>
+        <div class="faq-ans">Dripmetric's cron system checks all users every 15 minutes. If a user hasn't completed their next onboarding step within the configured delay (1 hour for step 1, 24 hours for steps 2 and 3), it sends the configured drip email automatically. Each nudge is sent at most once per user per step — no spam, no duplicates.</div>
       </details>
       <details class="reveal d4">
         <summary>Can I send emails from my own domain?<span class="sum-arrow"><svg class="ico" width="14" height="14"><use href="#i-chevron-down"/></svg></span></summary>
-        <div class="faq-ans">Yes. You connect your own email API key in the dashboard. All emails go out from your verified domain — not from a shared OnboardFlow address. Your users see your brand, not ours.</div>
+        <div class="faq-ans">Yes. You connect your own email API key in the dashboard. All emails go out from your verified domain — not from a shared Dripmetric address. Your users see your brand, not ours.</div>
       </details>
       <details class="reveal d5">
-        <summary>Is OnboardFlow only for developers?<span class="sum-arrow"><svg class="ico" width="14" height="14"><use href="#i-chevron-down"/></svg></span></summary>
+        <summary>Is Dripmetric only for developers?<span class="sum-arrow"><svg class="ico" width="14" height="14"><use href="#i-chevron-down"/></svg></span></summary>
         <div class="faq-ans">No. The Individual tier is a fully no-code dashboard for small businesses to manage email lists, add contacts, build drip sequences, and send campaigns — no technical setup, no SDK, no API keys required. Just sign up and go.</div>
       </details>
       <details class="reveal d6">
@@ -1156,7 +1156,7 @@ const landingMarkup = String.raw`<!-- ══════════════
       <div>
         <a href="/" class="foot-logo">
           <div class="foot-logo-ico">OF</div>
-          <span class="foot-logo-text">OnboardFlow</span>
+          <span class="foot-logo-text">Dripmetric</span>
         </a>
         <p class="foot-desc">Onboarding automation and email campaign management for SaaS developers and small businesses. Built in public.</p>
       </div>
@@ -1166,7 +1166,7 @@ const landingMarkup = String.raw`<!-- ══════════════
           <li><a href="#features">Features</a></li>
           <li><a href="#how-it-works">How it works</a></li>
           <li><a href="#pricing">Pricing</a></li>
-          <li><a href="https://www.npmjs.com/package/onboardflow" target="_blank" rel="noopener">npm SDK</a></li>
+          <li><a href="https://www.npmjs.com/package/dripmetric" target="_blank" rel="noopener">npm SDK</a></li>
         </ul>
       </div>
       <div class="foot-col">
@@ -1174,25 +1174,25 @@ const landingMarkup = String.raw`<!-- ══════════════
         <ul>
           <li><a href="#about">About</a></li>
           <li><a href="#roadmap">Roadmap</a></li>
-          <li><a href="https://www.producthunt.com/products/onboardflow-3" target="_blank" rel="noopener">Product Hunt</a></li>
-          <li><a href="mailto:harshit@onboardflow.xyz">Contact</a></li>
+          <li><a href="https://www.producthunt.com/products/dripmetric-3" target="_blank" rel="noopener">Product Hunt</a></li>
+          <li><a href="mailto:harshit@dripmetric.com">Contact</a></li>
         </ul>
       </div>
       <div class="foot-col">
         <h4>Account</h4>
         <ul>
           <li><a href="/login">Log in / Sign up</a></li>
-          <li><a href="https://onboardflow.xyz/privacy">Privacy</a></li>
-          <li><a href="https://onboardflow.xyz/terms">Terms</a></li>
+          <li><a href="https://dripmetric.com/privacy">Privacy</a></li>
+          <li><a href="https://dripmetric.com/terms">Terms</a></li>
         </ul>
       </div>
     </div>
     <div class="foot-bot">
-      <p>© 2026 OnboardFlow · <a href="https://harshitshukla.codes" target="_blank" rel="noopener" style="color:inherit;text-decoration:none">Harshit Shukla</a> · harshitshukla.codes · onboardflow.xyz</p>
+      <p>© 2026 Dripmetric · <a href="https://harshitshukla.codes" target="_blank" rel="noopener" style="color:inherit;text-decoration:none">Harshit Shukla</a> · harshitshukla.codes · dripmetric.com</p>
       <div class="foot-bot-links">
-        <a href="https://onboardflow.xyz/privacy">Privacy</a>
-        <a href="https://onboardflow.xyz/terms">Terms</a>
-        <a href="mailto:harshit@onboardflow.xyz">Contact</a>
+        <a href="https://dripmetric.com/privacy">Privacy</a>
+        <a href="https://dripmetric.com/terms">Terms</a>
+        <a href="mailto:harshit@dripmetric.com">Contact</a>
       </div>
     </div>
   </div>
