@@ -4,7 +4,7 @@ import { LandingPageEffects } from "./_components/LandingPageEffects";
 export const metadata: Metadata = {
   title: "Automate SaaS Onboarding Emails & Track Drop-Off | OnboardFlow",
   description:
-    "OnboardFlow tracks where SaaS users get stuck during onboarding and automatically sends drip emails to bring them back. One npm install. Free to start.",
+    "OnboardFlow tracks where SaaS users get stuck during onboarding and automatically sends drip emails to bring them back. Only 3 lines of code. Free to start.",
   alternates: {
     canonical: "https://onboardflow.xyz",
   },
@@ -13,7 +13,7 @@ export const metadata: Metadata = {
     url: "https://onboardflow.xyz",
     title: "Automate SaaS Onboarding Emails & Track Drop-Off | OnboardFlow",
     description:
-      "OnboardFlow tracks where SaaS users get stuck during onboarding and automatically sends drip emails to bring them back. One npm install. Free to start.",
+      "OnboardFlow tracks where SaaS users get stuck during onboarding and automatically sends drip emails to bring them back. Only 3 lines of code. Free to start.",
   },
   twitter: {
     card: "summary_large_image",
@@ -76,6 +76,14 @@ html{scroll-behavior:smooth;}
   font-size:16px;
   overflow-x:hidden;
   transition:background .5s,color .5s;
+  -webkit-font-smoothing:antialiased;
+  -moz-osx-font-smoothing:grayscale;
+  text-rendering:optimizeLegibility;
+}
+.landing-shell a,
+.landing-shell button,
+.landing-shell input{
+  font-synthesis:none;
 }
 
 /* ═══════════════════════════════════════════
@@ -178,6 +186,8 @@ nav.scrolled{box-shadow:var(--shadow-sm);}
 }
 .hero-inner{display:grid;grid-template-columns:1fr 1fr;gap:64px;align-items:center;position:relative;}
 
+.product-hunt-badge{display:inline-flex;margin-bottom:18px;animation:fadeUp .5s ease-out both;}
+.product-hunt-badge img{display:block;width:250px;height:54px;}
 .hero-badge{
   display:inline-flex;align-items:center;gap:7px;
   background:var(--divider);border:1px solid var(--border);
@@ -456,6 +466,7 @@ section{padding:96px 0;}
 ═══════════════════════════════════════════ */
 .feedback-sec{background:var(--bg-alt);border-top:1px solid var(--border);transition:background .5s,border-color .5s;}
 .fb-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin-bottom:48px;}
+.fb-grid.single{grid-template-columns:minmax(0,640px);}
 .fb-item{display:flex;flex-direction:column;gap:10px;}
 .fb-ico{
   width:44px;height:44px;background:var(--divider);border-radius:9px;
@@ -580,6 +591,7 @@ details[open] .sum-arrow{transform:rotate(180deg);}
   background-image:radial-gradient(rgba(255,255,255,.07) 1px,transparent 1px);
   background-size:24px 24px;
 }
+.cta-kicker{color:#fff;font-size:1rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;margin-bottom:12px;position:relative;z-index:1;}
 .cta-banner h2{
   font-size:clamp(1.65rem,3.5vw,2.55rem);font-weight:300;
   color:var(--on-deep);letter-spacing:-.025em;margin-bottom:14px;
@@ -764,6 +776,9 @@ const landingMarkup = String.raw`<!-- ══════════════
     <div class="hero-inner">
       <!-- LEFT -->
       <div>
+        <a href="https://www.producthunt.com/products/onboardflow-3/reviews/new?utm_source=badge-product_review&amp;utm_medium=badge&amp;utm_source=badge-onboardflow&#0045;3" target="_blank" rel="noopener" class="product-hunt-badge" aria-label="Review OnboardFlow on Product Hunt">
+          <img src="https://api.producthunt.com/widgets/embed-image/v1/product_review.svg?product_id=1210405&amp;theme=light" alt="OnboardFlow - Easy to setup mail dripping and cold mailing for individuals | Product Hunt" width="250" height="54" />
+        </a>
         <div class="hero-badge">
           <span class="badge-dot"></span>
           Free to start · No credit card
@@ -775,7 +790,7 @@ const landingMarkup = String.raw`<!-- ══════════════
         </h1>
         <p class="hero-sub">
           OnboardFlow shows you exactly where users drop off and automatically nudges them back —
-          with one&nbsp;<code>npm install</code>.
+          with only 3 lines of code.
         </p>
         <div class="hero-ctas">
           <a href="/login" class="btn-primary btn-primary-lg">
@@ -787,13 +802,7 @@ const landingMarkup = String.raw`<!-- ══════════════
         <p class="hero-login-hint">
           Already using it? <a href="/login">Log in</a>
         </p>
-        <div class="hero-tags">
-          <span class="tag">npm SDK</span>
-          <span class="tag">No-code dashboard</span>
-          <span class="tag">Your own domain</span>
-          <span class="tag">Free tier</span>
-          <span class="tag">Next.js 15</span>
-        </div>
+
       </div>
 
       <!-- RIGHT: funnel visual -->
@@ -934,7 +943,7 @@ const landingMarkup = String.raw`<!-- ══════════════
       </div>
       <div class="feat-card reveal d3">
         <div class="feat-ico"><svg class="ico" width="20" height="20"><use href="#i-pointer"/></svg></div>
-        <h3>Manual "Send Nudge" Button</h3>
+        <h3>Send nudges manually</h3>
         <p>Re-engage stuck users at any step with a single click from your dashboard. No code required after the initial setup.</p>
       </div>
       <div class="feat-card reveal d4">
@@ -949,7 +958,7 @@ const landingMarkup = String.raw`<!-- ══════════════
       </div>
       <div class="feat-card reveal d6">
         <div class="feat-ico"><svg class="ico" width="20" height="20"><use href="#i-package"/></svg></div>
-        <h3>Published npm SDK</h3>
+        <h3>Simple SDK installation and setup</h3>
         <p>One command install. Full TypeScript support, CJS + ESM exports. Works with any Node.js framework — Next.js, Express, Hono, and more.</p>
       </div>
     </div>
@@ -980,7 +989,7 @@ const landingMarkup = String.raw`<!-- ══════════════
     <div class="sec-hdr centered reveal">
       <p class="sec-label">Integration in minutes</p>
       <h2 class="sec-title">How to automate SaaS onboarding emails<br/><strong style="color:#fff">when users get stuck</strong></h2>
-      <p class="sec-sub">Three steps. One npm install. Working drip automation in under 10 minutes.</p>
+      <p class="sec-sub">Three steps. Only 3 lines of code. Working drip automation in under 10 minutes.</p>
     </div>
     <div class="steps-grid">
       <div class="step reveal d1">
@@ -1036,6 +1045,7 @@ const landingMarkup = String.raw`<!-- ══════════════
         <div class="stat-lbl">To start. No credit card required.</div>
       </div>
     </div>
+    <!-- Early-adopter testimonials are intentionally hidden until real customer feedback is available.
     <div class="sec-hdr centered reveal">
       <p class="sec-label">Early adopters</p>
       <h2 class="sec-title">Built in public with <strong>early users</strong></h2>
@@ -1043,38 +1053,10 @@ const landingMarkup = String.raw`<!-- ══════════════
     <div class="proof-grid">
       <div class="proof-card reveal d1">
         <div class="proof-stars">★★★★★</div>
-        <p class="proof-q">"I dropped in two function calls and had my funnel dashboard live the same afternoon. The step-level drop-off view told me immediately where users were getting confused."</p>
-        <div class="proof-auth">
-          <div class="proof-av">AK</div>
-          <div>
-            <div class="proof-name">Arjun K.</div>
-            <div class="proof-role">Founder, early-stage SaaS</div>
-          </div>
-        </div>
-      </div>
-      <div class="proof-card reveal d2">
-        <div class="proof-stars">★★★★★</div>
-        <p class="proof-q">"We were losing users at step 3 every week with no idea why. OnboardFlow showed the drop-off pattern in hours and the auto-nudge recovered 20% of those users."</p>
-        <div class="proof-auth">
-          <div class="proof-av">SR</div>
-          <div>
-            <div class="proof-name">Sara R.</div>
-            <div class="proof-role">Indie maker &amp; SaaS founder</div>
-          </div>
-        </div>
-      </div>
-      <div class="proof-card reveal d3">
-        <div class="proof-stars">★★★★★</div>
-        <p class="proof-q">"The Individual tier is exactly what my freelance business needed. The enterprise alternatives were overkill and expensive. This is clean, fast, and actually makes sense."</p>
-        <div class="proof-auth">
-          <div class="proof-av">PM</div>
-          <div>
-            <div class="proof-name">Priya M.</div>
-            <div class="proof-role">Freelancer &amp; small business owner</div>
-          </div>
-        </div>
+        <p class="proof-q">Customer testimonial placeholder.</p>
       </div>
     </div>
+    -->
   </div>
 </section>
 
@@ -1084,33 +1066,21 @@ const landingMarkup = String.raw`<!-- ══════════════
 <section class="feedback-sec" id="roadmap" aria-label="Feedback and roadmap">
   <div class="container">
     <div class="sec-hdr reveal">
-      <p class="sec-label">Built in public</p>
       <h2 class="sec-title"><strong>You shape</strong> what gets built next.</h2>
-      <p class="sec-sub">OnboardFlow is built with early users. Every feature on the roadmap started as a user request.</p>
+      <p class="sec-sub">Log in, use OnboardFlow, and tell us what should improve from the feedback form at the bottom of your dashboard.</p>
     </div>
-    <div class="fb-grid">
+    <div class="fb-grid single">
       <div class="fb-item reveal d1">
-        <div class="fb-ico"><svg class="ico" width="22" height="22"><use href="#i-thumbs-up"/></svg></div>
-        <h3>Upvote Features</h3>
-        <p>Browse and vote on what we build next. Your votes directly determine sprint priorities. No guesswork, no black box.</p>
-        <a href="#" class="fb-link">View public roadmap <svg class="ico" width="12" height="12"><use href="#i-arrow-right"/></svg></a>
-      </div>
-      <div class="fb-item reveal d2">
-        <div class="fb-ico"><svg class="ico" width="22" height="22"><use href="#i-phone"/></svg></div>
-        <h3>Book a 15-min Call</h3>
-        <p>Tell us what's broken, what's missing, and what you'd pay for. We read every response and follow up personally on each one.</p>
-        <a href="#" class="fb-link">Book a feedback call <svg class="ico" width="12" height="12"><use href="#i-arrow-right"/></svg></a>
-      </div>
-      <div class="fb-item reveal d3">
         <div class="fb-ico"><svg class="ico" width="22" height="22"><use href="#i-message"/></svg></div>
-        <h3>Submit a Feature Request</h3>
-        <p>Have an idea we haven't thought of? Tell us in one sentence. We follow up on every submission without exception.</p>
-        <a href="#" class="fb-link">Submit a request <svg class="ico" width="12" height="12"><use href="#i-arrow-right"/></svg></a>
+        <h3>Use the product, then share feedback</h3>
+        <p>Sign in, try the dashboard, and submit your suggestions through the feedback form linked at the bottom of the dashboard page. Your feedback decides what ships next.</p>
+        <a href="/login" class="fb-link">Log in or sign up <svg class="ico" width="12" height="12"><use href="#i-arrow-right"/></svg></a>
+        <a href="https://docs.google.com/forms/d/e/1FAIpQLSf73_-TjhWiYXqOkHS1Pr1_sNZ__JrTz93O6fgUEUF_F-COhw/viewform" target="_blank" rel="noopener" class="fb-link">Open feedback form <svg class="ico" width="12" height="12"><use href="#i-arrow-right"/></svg></a>
       </div>
     </div>
     <div class="waitlist-box reveal">
       <h3>v2 is being built right now.</h3>
-      <p>Based on feedback from our first 30 users, v2 will include advanced segmentation, a multi-step visual flow builder, Slack alerts, and team collaboration. Join the waitlist and get early access + a founder discount.</p>
+      <p>Based on feedback from our initial users, v2 will include advanced segmentation, a multi-step visual flow builder, Slack alerts, and team collaboration. Join the waitlist and get early access + a founder discount.</p>
       <form class="wl-form" id="waitlistForm">
         <input id="waitlistEmail" name="email" type="email" class="wl-input" placeholder="your@email.com" aria-label="Email for v2 waitlist" required autocomplete="email"/>
         <button class="btn-primary" type="submit">Join v2 waitlist <svg class="ico" width="14" height="14"><use href="#i-arrow-right"/></svg></button>
@@ -1122,60 +1092,20 @@ const landingMarkup = String.raw`<!-- ══════════════
 </section>
 
 <!-- ══════════════════════════════════════════════════
-     PRICING
+     PRICING / CTA
 ══════════════════════════════════════════════════ -->
-<section id="pricing" aria-label="Pricing">
+<section id="pricing" aria-label="Free signup">
   <div class="container">
-    <div class="sec-hdr centered reveal">
-      <p class="sec-label">Pricing</p>
-      <h2 class="sec-title">Free to start.<br/><strong>No credit card required.</strong></h2>
-      <p class="sec-sub">Start free and scale when you're ready. No surprise charges, no trial expiry pressure.</p>
-    </div>
-    <div class="pricing-grid">
-      <div class="price-card featured reveal d1">
-        <span class="feat-badge">Developer SDK</span>
-        <div class="price-tier">Enterprise Tier</div>
-        <div class="price-num">$0 <span>/ month to start</span></div>
-        <div class="price-desc">For SaaS developers who want onboarding automation without building the infrastructure.</div>
-        <ul class="price-list">
-          <li><svg class="ico" width="16" height="16"><use href="#i-check"/></svg> Up to 50 tracked end users</li>
-          <li><svg class="ico" width="16" height="16"><use href="#i-check"/></svg> 20 emails / day · 300 / month</li>
-          <li><svg class="ico" width="16" height="16"><use href="#i-check"/></svg> npm SDK with full TypeScript</li>
-          <li><svg class="ico" width="16" height="16"><use href="#i-check"/></svg> Funnel breakdown dashboard</li>
-          <li><svg class="ico" width="16" height="16"><use href="#i-check"/></svg> Auto-detect stalled users</li>
-          <li><svg class="ico" width="16" height="16"><use href="#i-check"/></svg> Manual "Send Nudge" button</li>
-          <li><svg class="ico" width="16" height="16"><use href="#i-check"/></svg> Your own domain via email API</li>
-        </ul>
-        <a href="/login" class="btn-primary" style="display:flex;justify-content:center;width:100%">
-          Start free <svg class="ico" width="14" height="14"><use href="#i-arrow-right"/></svg>
+    <div class="cta-banner reveal">
+      <p class="cta-kicker">Free to start.</p>
+      <h2>Stop guessing.<br/><strong>Start recovering lost signups.</strong></h2>
+      <p>(No credit card required.)</p>
+      <div class="cta-btns">
+        <a href="/login" class="btn-white">
+          Start free — no credit card required
+          <svg class="ico" width="14" height="14"><use href="#i-arrow-right"/></svg>
         </a>
-        <p class="price-note">No credit card · Upgrade anytime</p>
       </div>
-      <div class="price-card reveal d2">
-        <div class="price-tier">Individual Tier</div>
-        <div class="price-num">$0 <span>/ month to start</span></div>
-        <div class="price-desc">For small businesses who need email campaigns without the complexity or cost of enterprise tools.</div>
-        <ul class="price-list">
-          <li><svg class="ico" width="16" height="16"><use href="#i-check"/></svg> 3 email lists</li>
-          <li><svg class="ico" width="16" height="16"><use href="#i-check"/></svg> 10 contacts per list</li>
-          <li><svg class="ico" width="16" height="16"><use href="#i-check"/></svg> 1 campaign per list</li>
-          <li><svg class="ico" width="16" height="16"><use href="#i-check"/></svg> No-code dashboard</li>
-          <li><svg class="ico" width="16" height="16"><use href="#i-check"/></svg> Contact management</li>
-          <li><svg class="ico" width="16" height="16"><use href="#i-check"/></svg> Drip sequence builder</li>
-          <li><svg class="ico" width="16" height="16"><use href="#i-check"/></svg> No technical setup</li>
-        </ul>
-        <a href="/login" class="btn-outline" style="display:flex;justify-content:center;width:100%">
-          Start free <svg class="ico" width="14" height="14"><use href="#i-arrow-right"/></svg>
-        </a>
-        <p class="price-note">No credit card · Upgrade anytime</p>
-      </div>
-    </div>
-    <div style="text-align:center">
-      <a href="https://www.npmjs.com/package/onboardflow" class="npm-pill" target="_blank" rel="noopener">
-        <svg class="ico" width="14" height="14"><use href="#i-package"/></svg>
-        npm install onboardflow
-      </a>
-      <p style="font-size:.8rem;color:var(--text-subtle);margin-top:10px;transition:color .5s">Published on npm · CJS, ESM &amp; TypeScript declarations included</p>
     </div>
   </div>
 </section>
@@ -1219,28 +1149,6 @@ const landingMarkup = String.raw`<!-- ══════════════
 </section>
 
 <!-- ══════════════════════════════════════════════════
-     CTA BANNER
-══════════════════════════════════════════════════ -->
-<section style="padding:96px 0 0">
-  <div class="container">
-    <div class="cta-banner reveal">
-      <h2>Stop guessing.<br/><strong>Start recovering lost signups.</strong></h2>
-      <p>One npm install. Working drip automation. Free to start.</p>
-      <div class="cta-btns">
-        <a href="/login" class="btn-white">
-          Start free — no credit card
-          <svg class="ico" width="14" height="14"><use href="#i-arrow-right"/></svg>
-        </a>
-        <a href="https://www.npmjs.com/package/onboardflow" class="btn-outline-white" target="_blank" rel="noopener">
-          <svg class="ico" width="14" height="14"><use href="#i-package"/></svg>
-          View on npm
-        </a>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- ══════════════════════════════════════════════════
      FOOTER
 ══════════════════════════════════════════════════ -->
 <footer>
@@ -1260,7 +1168,6 @@ const landingMarkup = String.raw`<!-- ══════════════
           <li><a href="#how-it-works">How it works</a></li>
           <li><a href="#pricing">Pricing</a></li>
           <li><a href="https://www.npmjs.com/package/onboardflow" target="_blank" rel="noopener">npm SDK</a></li>
-          <li><a href="https://onboardflow.xyz/docs">Docs</a></li>
         </ul>
       </div>
       <div class="foot-col">
@@ -1268,7 +1175,7 @@ const landingMarkup = String.raw`<!-- ══════════════
         <ul>
           <li><a href="https://harshitshukla.codes" target="_blank" rel="noopener">About</a></li>
           <li><a href="#roadmap">Roadmap</a></li>
-          <li><a href="https://www.producthunt.com/posts/onboardflow" target="_blank" rel="noopener">Product Hunt</a></li>
+          <li><a href="https://www.producthunt.com/products/onboardflow-3" target="_blank" rel="noopener">Product Hunt</a></li>
           <li><a href="mailto:founder@onboardflow.xyz">Contact</a></li>
         </ul>
       </div>
@@ -1283,7 +1190,7 @@ const landingMarkup = String.raw`<!-- ══════════════
       </div>
     </div>
     <div class="foot-bot">
-      <p>© 2025 OnboardFlow · <a href="https://harshitshukla.codes" target="_blank" rel="noopener" style="color:inherit;text-decoration:none">Harshit Shukla</a> · onboardflow.xyz</p>
+      <p>© 2026 OnboardFlow · <a href="https://harshitshukla.codes" target="_blank" rel="noopener" style="color:inherit;text-decoration:none">Harshit Shukla</a> · harshitshukla.codes · onboardflow.xyz</p>
       <div class="foot-bot-links">
         <a href="https://onboardflow.xyz/privacy">Privacy</a>
         <a href="https://onboardflow.xyz/terms">Terms</a>
