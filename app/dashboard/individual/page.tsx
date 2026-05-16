@@ -471,7 +471,7 @@ export default async function IndividualDashboardPage() {
           <div>
             <p className="text-sm font-semibold text-foreground">Share your feedback</p>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Help us improve OnboardFlow — bugs, missing features, or anything else.
+              Help us improve Dripmetric — bugs, missing features, or anything else.
             </p>
           </div>
           

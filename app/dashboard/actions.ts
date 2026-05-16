@@ -29,7 +29,7 @@ export async function createCheckoutSession() {
       price_data: {
         currency: 'usd',
         product_data: {
-          name: 'OnboardFlow Lifetime License',
+          name: 'Dripmetric Lifetime License',
           description: 'Unlimited access to all features',
         },
         unit_amount: 4900, 

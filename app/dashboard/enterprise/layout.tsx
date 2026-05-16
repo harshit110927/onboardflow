@@ -26,7 +26,7 @@ export default async function EnterpriseLayout({
       <header className="app-shell-nav border-b sticky top-0 z-50">
         <div className="max-w-6xl mx-auto px-4 h-14 flex items-center justify-between gap-4">
           <Link href="/dashboard/enterprise" prefetch={false} className="font-medium tracking-tight text-base shrink-0">
-            OnboardFlow
+            Dripmetric
           </Link>
 
           <EnterpriseNavLinks />

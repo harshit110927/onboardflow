@@ -1,19 +1,19 @@
-# onboardflow
+# dripmetric
 
-Official SDK for [OnboardFlow](https://www.onboardflow.xyz) — track user onboarding steps and automate drip emails.
+Official SDK for [Dripmetric](https://www.dripmetric.com) — track user onboarding steps and automate drip emails.
 
 ## Install
 
 ```bash
-npm install onboardflow
+npm install dripmetric
 ```
 
 ## Usage
 
 ```ts
-import { OnboardFlow } from "onboardflow";
+import { Dripmetric } from "dripmetric";
 
-const onboard = new OnboardFlow("obf_live_your_api_key");
+const onboard = new Dripmetric("obf_live_your_api_key");
 
 // Call on signup or login
 await onboard.identify({
@@ -31,7 +31,7 @@ await onboard.track({
 
 ## Get your API key
 
-Sign up at [onboardflow.xyz](https://www.onboardflow.xyz) → choose Enterprise → copy your API key from the dashboard.
+Sign up at [dripmetric.com](https://www.dripmetric.com) → choose Enterprise → copy your API key from the dashboard.
 
 ## Rate Limits (Free Tier)
 

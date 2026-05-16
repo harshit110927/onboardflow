@@ -1,7 +1,7 @@
-# OnboardFlow Project Context (Single-File Handoff)
+# Dripmetric Project Context (Single-File Handoff)
 
 ## 1) What this repo is
-OnboardFlow is a Next.js 15 App Router SaaS app with two product tiers:
+Dripmetric is a Next.js 15 App Router SaaS app with two product tiers:
 - **Enterprise**: SDK/API-key based onboarding + event tracking + drip/webhook automation.
 - **Individual**: no-code email list/campaign product for small businesses.
 

@@ -36,7 +36,7 @@ export default async function IndividualLayout({
             prefetch={false}
             className="font-medium tracking-tight text-base shrink-0"
           >
-            OnboardFlow
+            Dripmetric
           </Link>
 
           {/* FIX — use client nav links for active route styling */}

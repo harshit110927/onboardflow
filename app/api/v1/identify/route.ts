@@ -81,7 +81,7 @@ export async function POST(req: Request) {
         : `Hey ${userName}, welcome! Complete your first step to get started.`;
 
       resend.emails.send({
-        from: "OnboardFlow <onboarding@resend.dev>",
+        from: "Dripmetric <hello@dripmetric.com>",
         to: email,
         subject: tenant.emailSubject || "Welcome — let's get you started",
         html: buildEmailHtml({ body: welcomeBody }),

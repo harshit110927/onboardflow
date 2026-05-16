@@ -1,14 +1,14 @@
 {
-  "name": "onboardflow",
+  "name": "dripmetric",
   "version": "1.0.4",
-  "description": "Official SDK for OnboardFlow — track user onboarding and automate drip emails.",
+  "description": "Official SDK for Dripmetric — track user onboarding and automate drip emails.",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
-  "homepage": "https://www.onboardflow.xyz",
+  "homepage": "https://www.dripmetric.com",
   "repository": {
     "type": "git",
-    "url": "https://github.com/harshit110927/onboardflow"
+    "url": "https://github.com/yourusername/dripmetric"
   },
   "exports": {
     ".": {
@@ -30,7 +30,7 @@
     "saas",
     "analytics"
   ],
-  "author": "OnboardFlow",
+  "author": "Dripmetric",
   "license": "MIT",
   "devDependencies": {
     "tsup": "^8.0.0",
