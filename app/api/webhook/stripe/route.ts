@@ -229,10 +229,10 @@ export async function POST(req: Request) {
         if (!tenant) break;
 
         await resend.emails.send({
-          from: "OnboardFlow <onboarding@resend.dev>",
+          from: "Dripmetric <hello@dripmetric.com>",
           to: tenant.email,
           subject: "Action required — payment failed",
-          text: `Hi,\n\nWe were unable to process your OnboardFlow subscription payment. Your premium access will remain active for now, but please update your payment method to avoid any interruption.\n\nManage your billing: ${process.env.NEXT_PUBLIC_BASE_URL}/dashboard/billing\n\nOnboardFlow`,
+          text: `Hi,\n\nWe were unable to process your Dripmetric subscription payment. Your premium access will remain active for now, but please update your payment method to avoid any interruption.\n\nManage your billing: ${process.env.NEXT_PUBLIC_BASE_URL}/dashboard/billing\n\nDripmetric`,
         });
 
         break;

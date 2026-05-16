@@ -1,10 +1,10 @@
-# OnboardFlow
+# Dripmetric
 
 A unified authentication and onboarding platform for developers and small businesses.
 
-OnboardFlow comes in two tiers — **Enterprise** for developers building SaaS products, and **Individual** for freelancers and small businesses who want email list management without writing code.
+Dripmetric comes in two tiers — **Enterprise** for developers building SaaS products, and **Individual** for freelancers and small businesses who want email list management without writing code.
 
-Live: <a href="https://onboardflow-three.vercel.app">onboardflow-three.vercel.app</a>
+Live: <a href="https://dripmetric-three.vercel.app">dripmetric-three.vercel.app</a>
 
 ---
 
@@ -52,11 +52,11 @@ No code required. Create email lists, manage contacts, build campaigns, and send
 
 Install the package via your preferred package manager:
 
-    npm install onboardflow
+    npm install dripmetric
 
 ### Configuration
 
-1. Sign up at onboardflow-three.vercel.app
+1. Sign up at dripmetric-three.vercel.app
 2. Choose the Enterprise tier
 3. Copy your API key from the dashboard
 4. Add to your .env.local file:
@@ -65,11 +65,11 @@ Install the package via your preferred package manager:
 
 ### Initialize the client
 
-Create a shared utility file at lib/onboardflow.ts:
+Create a shared utility file at lib/dripmetric.ts:
 
-    import { OnboardFlow } from 'onboardflow';
+    import { Dripmetric } from 'dripmetric';
     
-    export const onboard = new OnboardFlow(
+    export const onboard = new Dripmetric(
       process.env.NEXT_PUBLIC_ONBOARDFLOW_KEY!
     );
 
@@ -82,7 +82,7 @@ In your middleware.ts file:
 
 ### Access user sessions
 
-    import { onboard } from '@/lib/onboardflow';
+    import { onboard } from '@/lib/dripmetric';
 
     await onboard.identify({
       userId: "user_123",
@@ -120,6 +120,6 @@ Limits will increase when we launch a paid plan. You will be notified first.
 
 ## License
 
-MIT License — Copyright 2026 OnboardFlow
+MIT License — Copyright 2026 Dripmetric
 
 ---

@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 /**
- * End-to-end smoke + edge-case coverage for OnboardFlow (individual + enterprise tiers).
+ * End-to-end smoke + edge-case coverage for Dripmetric (individual + enterprise tiers).
  *
  * Usage:
- *   BASE_URL="https://www.onboardflow.xyz" \
+ *   BASE_URL="https://www.dripmetric.com" \
  *   INDIVIDUAL_STATE="./.auth/individual.json" \
  *   ENTERPRISE_STATE="./.auth/enterprise.json" \
  *   node tests.e2e.js

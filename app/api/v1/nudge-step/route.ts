@@ -42,7 +42,7 @@ function resolveEmailSender(tenant: {
   }
   return async ({ to, subject, html }) => {
     await resend.emails.send({
-      from: "OnboardFlow <onboarding@resend.dev>",
+      from: "Dripmetric <hello@dripmetric.com>",
       to: [to],
       subject,
       html,

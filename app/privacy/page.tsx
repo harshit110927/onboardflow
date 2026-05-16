@@ -6,7 +6,7 @@ export default function PrivacyPage() {
       <div className="max-w-3xl mx-auto px-4 py-16 flex flex-col gap-8">
         <div>
           <Link href="/" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-            ← Back to OnboardFlow
+            ← Back to Dripmetric
           </Link>
         </div>
 
@@ -28,7 +28,7 @@ export default function PrivacyPage() {
 
           <section className="flex flex-col gap-2">
             <h2 className="text-base font-semibold">3. Data Processors</h2>
-            <p>We use the following third-party services to operate OnboardFlow: Supabase (database and authentication), Resend (transactional email delivery), Stripe (payment processing), and Vercel (hosting). Each processor has their own privacy policy and data processing agreements.</p>
+            <p>We use the following third-party services to operate Dripmetric: Supabase (database and authentication), Resend (transactional email delivery), Stripe (payment processing), and Vercel (hosting). Each processor has their own privacy policy and data processing agreements.</p>
           </section>
 
           <section className="flex flex-col gap-2">
@@ -43,7 +43,7 @@ export default function PrivacyPage() {
 
           <section className="flex flex-col gap-2">
             <h2 className="text-base font-semibold">6. Your Rights (GDPR)</h2>
-            <p>If you are in the European Economic Area, you have the right to access, correct, or delete your personal data. You may also request data portability or object to processing. Contact us at support@onboardflow.xyz to exercise these rights.</p>
+            <p>If you are in the European Economic Area, you have the right to access, correct, or delete your personal data. You may also request data portability or object to processing. Contact us at support@dripmetric.com to exercise these rights.</p>
           </section>
 
           <section className="flex flex-col gap-2">
@@ -53,7 +53,7 @@ export default function PrivacyPage() {
 
           <section className="flex flex-col gap-2">
             <h2 className="text-base font-semibold">8. Contact</h2>
-            <p>For privacy questions or data deletion requests, contact us at support@onboardflow.xyz.</p>
+            <p>For privacy questions or data deletion requests, contact us at support@dripmetric.com.</p>
           </section>
         </div>
       </div>

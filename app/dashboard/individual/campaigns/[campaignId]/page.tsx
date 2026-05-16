@@ -136,11 +136,11 @@ async function sendCampaign(formData: FormData) {
         campaignId: campaign.id,
         contactEmail: contact.email,
         unsubscribeToken: unsubToken,
-        senderEmail: "onboarding@resend.dev",
+        senderEmail: "hello@dripmetric.com",
         trackingPixelUrl,
       });
       await resend.emails.send({
-        from: "OnboardFlow <onboarding@resend.dev>",
+        from: "Dripmetric <hello@dripmetric.com>",
         to: contact.email,
         subject: campaign.subject,
         html: htmlBody,
@@ -188,7 +188,7 @@ export default async function CampaignDetailPage({
 
   const sendingFrom = tenant.smtpVerified && tenant.smtpEmail
     ? tenant.smtpEmail
-    : "onboarding@resend.dev";
+    : "hello@dripmetric.com";
 
   const { campaignId } = await params;
   const id = Number(campaignId);

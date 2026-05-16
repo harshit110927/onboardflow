@@ -90,7 +90,7 @@ export default async function IndividualSettingsPage() {
 
             <div className="rounded-xl border border-border bg-card p-6">
               <h2 className="text-base font-semibold text-foreground mb-1">Session</h2>
-              <p className="text-sm text-muted-foreground mb-4">Sign out of your OnboardFlow account on this device.</p>
+              <p className="text-sm text-muted-foreground mb-4">Sign out of your Dripmetric account on this device.</p>
               <LogoutButton />
             </div>
           </div>

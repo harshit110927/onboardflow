@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * OnboardFlow integration test suite
+ * Dripmetric integration test suite
  *
  * SETUP — copy this block into .env.local (values already there will be reused):
  *
@@ -182,7 +182,7 @@ function isRedirect(status) {
 async function run() {
   await initDb();
 
-  console.log(`\nOnboardFlow Integration Tests`);
+  console.log(`\nDripmetric Integration Tests`);
   console.log(`Base URL    : ${BASE_URL}`);
   console.log(`API key     : ${API_KEY ? '✓ set' : '✗ missing'}`);
   console.log(`RZ secret   : ${RZ_SECRET ? '✓ set' : '✗ missing'}`);

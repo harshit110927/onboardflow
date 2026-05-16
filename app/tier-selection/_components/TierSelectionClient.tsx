@@ -33,7 +33,7 @@ export function TierSelectionClient() {
     <div className="w-full max-w-4xl mx-auto">
       <div className="text-center mb-10">
         <h1 className="text-3xl font-bold tracking-tight text-foreground">
-          Welcome to OnboardFlow
+          Welcome to Dripmetric
         </h1>
         <p className="mt-2 text-muted-foreground text-base">
           Choose how you&apos;ll use the platform

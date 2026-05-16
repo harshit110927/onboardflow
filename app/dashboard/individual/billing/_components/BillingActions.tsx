@@ -62,7 +62,7 @@ export function BillingActions({ plan, isCurrent }: Props) {
       const rz = new window.Razorpay({
         key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
         subscription_id: data.subscriptionId,
-        name: "OnboardFlow",
+        name: "Dripmetric",
         description: `${plan.label} subscription`,
         theme: { color: "#3d6b52" },
         handler: () => window.location.reload(),

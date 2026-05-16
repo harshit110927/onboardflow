@@ -21,7 +21,7 @@ export function CampaignComposer({
 }) {
   const [selectedListId, setSelectedListId] = useState<number>(lists[0]?.id ?? 0);
   const [subject, setSubject] = useState("Strategic Growth for Founders");
-  const [body, setBody] = useState(`Hi {name},\n\nThanks so much for responding — we're thrilled to hear you're interested.\n\nPlease schedule a call at your convenience here: [scheduling link]\n\nBest,\nThe OnboardFlow Team`);
+  const [body, setBody] = useState(`Hi {name},\n\nThanks so much for responding — we're thrilled to hear you're interested.\n\nPlease schedule a call at your convenience here: [scheduling link]\n\nBest,\nThe Dripmetric Team`);
   const [scheduledAt, setScheduledAt] = useState("");
 
   const selectedList = useMemo(
