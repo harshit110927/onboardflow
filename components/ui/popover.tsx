@@ -101,7 +101,7 @@ export function PopoverContent({ className, children }: { className?: string; ch
   return createPortal(
     <div
       ref={contentRef}
-      className={cn("fixed z-50 w-72 rounded-md border border-border bg-background p-3 shadow-lg", className)}
+      className={cn("fixed z-[9999] w-72 rounded-md border border-border bg-background p-3 shadow-lg", className)}
       style={{ top: position.top, left: position.left }}
     >
       {children}
