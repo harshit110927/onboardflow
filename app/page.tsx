@@ -490,6 +490,9 @@ section{padding:96px 0;}
 .wl-input::placeholder{color:var(--placeholder);}
 .wl-input:focus{border-color:var(--primary);}
 .wl-note{font-size:.73rem;color:var(--text-subtle);margin-top:9px;transition:color .5s;}
+.wl-message{font-size:.78rem;margin-top:10px;min-height:1.2em;color:var(--text-muted);transition:color .2s;}
+.wl-message.ok{color:var(--emerald);}
+.wl-message.error{color:var(--red);}
 
 /* ═══════════════════════════════════════════
    PRICING
@@ -1108,11 +1111,12 @@ const landingMarkup = String.raw`<!-- ══════════════
     <div class="waitlist-box reveal">
       <h3>v2 is being built right now.</h3>
       <p>Based on feedback from our first 30 users, v2 will include advanced segmentation, a multi-step visual flow builder, Slack alerts, and team collaboration. Join the waitlist and get early access + a founder discount.</p>
-      <div class="wl-form">
-        <input type="email" class="wl-input" placeholder="your@email.com" aria-label="Email for v2 waitlist"/>
-        <button class="btn-primary" type="button">Join v2 waitlist <svg class="ico" width="14" height="14"><use href="#i-arrow-right"/></svg></button>
-      </div>
+      <form class="wl-form" id="waitlistForm">
+        <input id="waitlistEmail" name="email" type="email" class="wl-input" placeholder="your@email.com" aria-label="Email for v2 waitlist" required autocomplete="email"/>
+        <button class="btn-primary" type="submit">Join v2 waitlist <svg class="ico" width="14" height="14"><use href="#i-arrow-right"/></svg></button>
+      </form>
       <p class="wl-note">No spam. One email when v2 ships.</p>
+      <p class="wl-message" id="waitlistMessage" role="status" aria-live="polite"></p>
     </div>
   </div>
 </section>

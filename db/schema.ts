@@ -214,6 +214,21 @@ export const campaignEvents = pgTable("campaign_events", {
   occurredAt: timestamp("occurred_at").defaultNow(),
 });
 
+
+export const waitlistEntries = pgTable(
+  "waitlist_entries",
+  {
+    id: serial("id").primaryKey(),
+    email: varchar("email", { length: 255 }).notNull(),
+    source: varchar("source", { length: 100 }).notNull().default("v2_landing"),
+    userAgent: text("user_agent"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    emailUnique: uniqueIndex("waitlist_entries_email_idx").on(table.email),
+  }),
+);
+
 export const dripSteps = pgTable("drip_steps", {
   id: serial("id").primaryKey(),
   tenantId: uuid("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),

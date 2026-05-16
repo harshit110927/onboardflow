@@ -25,6 +25,54 @@ export function LandingPageEffects({ rootId }: LandingPageEffectsProps) {
     window.addEventListener("scroll", handleScroll, { passive: true });
     handleScroll();
 
+    const waitlistForm = root.querySelector<HTMLFormElement>("#waitlistForm");
+    const waitlistEmail = root.querySelector<HTMLInputElement>("#waitlistEmail");
+    const waitlistMessage = root.querySelector<HTMLElement>("#waitlistMessage");
+    const waitlistButton = waitlistForm?.querySelector<HTMLButtonElement>('button[type="submit"]');
+
+    const setWaitlistMessage = (message: string, state: "ok" | "error" | "idle" = "idle") => {
+      if (!waitlistMessage) return;
+      waitlistMessage.textContent = message;
+      waitlistMessage.classList.toggle("ok", state === "ok");
+      waitlistMessage.classList.toggle("error", state === "error");
+    };
+
+    const handleWaitlistSubmit = async (event: SubmitEvent) => {
+      event.preventDefault();
+
+      const email = waitlistEmail?.value.trim() ?? "";
+      if (!email) {
+        setWaitlistMessage("Enter your email to join the waitlist.", "error");
+        return;
+      }
+
+      if (waitlistButton) waitlistButton.disabled = true;
+      setWaitlistMessage("Joining…");
+
+      try {
+        const response = await fetch("/api/waitlist", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email }),
+        });
+        const payload = (await response.json().catch(() => ({}))) as { message?: string; error?: string };
+
+        if (!response.ok) {
+          setWaitlistMessage(payload.error ?? "Unable to join right now. Please try again.", "error");
+          return;
+        }
+
+        setWaitlistMessage(payload.message ?? "You are on the waitlist.", "ok");
+        waitlistForm?.reset();
+      } catch {
+        setWaitlistMessage("Unable to join right now. Please try again.", "error");
+      } finally {
+        if (waitlistButton) waitlistButton.disabled = false;
+      }
+    };
+
+    waitlistForm?.addEventListener("submit", handleWaitlistSubmit);
+
     const revealEls = Array.from(root.querySelectorAll<HTMLElement>(".reveal, .reveal-l, .reveal-r"));
     const revealObserver = new IntersectionObserver(
       (entries) => {
@@ -105,6 +153,7 @@ export function LandingPageEffects({ rootId }: LandingPageEffectsProps) {
     if (codeBlock) codeObserver.observe(codeBlock);
 
     return () => {
+      waitlistForm?.removeEventListener("submit", handleWaitlistSubmit);
       window.removeEventListener("scroll", handleScroll);
       revealObserver.disconnect();
       funnelObserver.disconnect();
