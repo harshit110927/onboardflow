@@ -36,6 +36,9 @@ export const metadata: Metadata = {
     index: true,
     follow: true,
   },
+  alternates: {
+    canonical: "https://www.dripmetric.com",
+  },
 };
 
 export default function RootLayout({
