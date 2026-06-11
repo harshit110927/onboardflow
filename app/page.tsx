@@ -753,7 +753,7 @@ const landingMarkup = String.raw`<!-- ══════════════
       <ul class="nav-links" role="list">
         <li><a href="#features">Features</a></li>
         <li><a href="#how-it-works">How it works</a></li>
-        <li><a href="#pricing">Pricing</a></li>
+        <li><a href="/pricing">Pricing</a></li>
         <li><a href="#faq">FAQ</a></li>
       </ul>
       <div class="nav-right">
@@ -1165,7 +1165,7 @@ const landingMarkup = String.raw`<!-- ══════════════
         <ul>
           <li><a href="#features">Features</a></li>
           <li><a href="#how-it-works">How it works</a></li>
-          <li><a href="#pricing">Pricing</a></li>
+          <li><a href="/pricing">Pricing</a></li>
           <li><a href="https://www.npmjs.com/package/dripmetric" target="_blank" rel="noopener">npm SDK</a></li>
         </ul>
       </div>
