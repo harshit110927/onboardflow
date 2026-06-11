@@ -48,6 +48,7 @@ Enterprise users get:
 
 - `/dashboard/enterprise` overview dashboard.
 - API key card and nudge controls.
+- `/dashboard/enterprise/users` Users CRM screen with paginated end-user table, status tabs, email search, sortable columns, CSV export, and a disabled per-user nudge placeholder.
 - Analytics powered by `/api/v1/analytics-data`.
 - Automation settings powered by `/api/v1/settings` and dashboard settings pages.
 - Configurable drip steps through `/dashboard/enterprise/drip-steps` and `/api/individual/drip-steps` despite the confusing route prefix.
@@ -60,6 +61,8 @@ Enterprise users get:
   - `/api/v1/settings`
   - `/api/v1/analytics-data`
   - `/api/v1/nudge-step`
+  - `/api/v1/users`
+  - `/api/v1/users/[userId]`
 
 ### 2.3 Individual Product
 
@@ -637,7 +640,32 @@ Logic:
 
 No data is written by these endpoints.
 
-### 9.6 Enterprise config flow
+### 9.6 Enterprise Users CRM dashboard flow
+
+Page: `app/dashboard/enterprise/users/page.tsx`.
+Client component: `app/dashboard/enterprise/users/UsersClient.tsx`.
+Loading route: `app/dashboard/enterprise/users/loading.tsx`.
+Nav: `app/dashboard/enterprise/_components/NavLinks.tsx`.
+
+Flow:
+
+1. The route is a server component that authenticates with the same `getSession()` helper used by the Enterprise overview page.
+2. It loads the tenant by email with `getTenant()`, requires `tenant.tier === "enterprise"`, and redirects non-Enterprise users away.
+3. It passes `tenant.apiKey` into the client component as a prop, matching the existing dashboard pattern used by `ApiKeyCard`.
+4. The client component fetches `GET /api/v1/users?page=<page>&limit=50` with the `x-api-key` header and renders a table with:
+   - Email.
+   - Customer type badge from `properties.customerType`.
+   - Plan summary from `properties.plan`, `properties.planValue`, and optional currency metadata.
+   - Current step from the last completed step string.
+   - Relative last active time from `lastSeenAt`.
+   - Computed API status badge.
+   - Email/nudge count from `automationsReceived.length`.
+   - Disabled `Send nudge` action placeholder because the current nudge endpoint only targets all eligible users by step.
+5. Client-side controls provide status tabs, case-insensitive email search, sortable table headers, default status ordering of stalled -> at-risk -> activated -> churned, and 50-row page navigation.
+6. The CSV export button fetches `GET /api/v1/users?limit=200` and downloads a client-generated CSV with `email`, `customerType`, `plan`, `planValue`, `currentStep`, `lastSeenAt`, `status`, and `emailsSent`.
+7. No backend `/api/v1/users` behavior is changed by this dashboard page.
+
+### 9.7 Enterprise config flow
 
 Endpoint: `app/api/v1/config/route.ts`.
 
@@ -655,7 +683,7 @@ Logic:
 
 This is a lightweight API for integrators to set the first activation step code.
 
-### 9.7 Enterprise check-auth flow
+### 9.8 Enterprise check-auth flow
 
 Endpoint: `app/api/v1/check-auth/route.ts`.
 
@@ -671,7 +699,7 @@ Logic:
 
 This is useful for CLI setup or SDK validation.
 
-### 9.8 Enterprise analytics data flow
+### 9.9 Enterprise analytics data flow
 
 Endpoint: `app/api/v1/analytics-data/route.ts`.
 
@@ -694,11 +722,11 @@ Logic:
    - percent completion for each step relative to total users.
    - `funnelData` for charts.
    - last-30-day `trendData` for signups and activations.
-   - `recoveryData` based on users who completed step 1 and also have `lastEmailedAt`.
+   - `recoveryData` as a proxy based on users who completed step 1 and also have a non-null `lastEmailedAt`; this is not exact post-nudge attribution because step completions and nudge tags do not store per-step timestamps.
    - `userMatrix` for recent users and boolean step status.
 6. Returns JSON consumed by `app/dashboard/analytics/page.tsx`.
 
-### 9.9 Enterprise automation settings flow
+### 9.10 Enterprise automation settings flow
 
 Endpoint: `app/api/v1/settings/route.ts`.
 
@@ -722,7 +750,7 @@ POST:
 5. Empty `resendApiKey` clears key and from email.
 6. Updates the tenant by email.
 
-### 9.10 Manual nudge flow
+### 9.11 Manual nudge flow
 
 Endpoint: `app/api/v1/nudge-step/route.ts`.
 
@@ -755,10 +783,10 @@ Logic:
    - Personalize `{{name}}` and `{{email}}` in body.
    - Send email.
    - Increment email usage.
-   - Append automation tag and set `lastEmailedAt`.
+   - Append automation tag and set `lastEmailedAt` to the most recent email time; no per-step email timestamp is stored.
 7. Returns counts: sent, skipped, errors.
 
-### 9.11 Cron automation flow
+### 9.12 Cron automation flow
 
 Endpoint: `app/api/cron/route.ts`.
 
@@ -776,7 +804,7 @@ Logic includes three major jobs:
    - Checks whether user completed target event and whether prior automation was sent.
    - Sends email through tenant Resend, tenant SMTP, or shared fallback.
    - Increments email usage.
-   - Updates `endUsers.automationsReceived` and `lastEmailedAt`.
+   - Updates `endUsers.automationsReceived` and overwrites `lastEmailedAt`; no per-step email timestamp is stored.
 2. Individual scheduled campaign sequence processing:
    - Finds draft campaign steps with `sequenceId` and send timing rules.
    - Checks previous sequence step sent state and delay.
@@ -1607,7 +1635,7 @@ Landing/login -> Supabase magic link/OAuth -> auth callback -> tier selection ->
 ### 20.3 Enterprise automation lifecycle
 
 ```text
-Tenant configures activationStep/step2/step3 or dripSteps -> customer app identifies end user -> user remains incomplete after configured delay -> cron or manual nudge checks completedSteps + automationsReceived + unsubscribe + email limits -> sends email -> records automationsReceived + lastEmailedAt -> analytics can count recovered users
+Tenant configures activationStep/step2/step3 or dripSteps -> customer app identifies end user -> user remains incomplete after configured delay -> cron or manual nudge checks completedSteps + automationsReceived + unsubscribe + email limits -> sends email -> records automation tag strings in automationsReceived + overwrites lastEmailedAt -> analytics can only compute proxy recovery, not exact post-email attribution
 ```
 
 ### 20.4 Individual campaign lifecycle
