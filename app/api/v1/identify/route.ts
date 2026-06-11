@@ -4,11 +4,30 @@ import { eq, and } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { Resend } from "resend";
 import { checkApiRateLimit } from "@/lib/rate-limit/api";
+import { apiError } from "@/lib/api/errors";
 import { deliverWebhookEvent } from "@/lib/webhooks/deliver";
 import { buildEmailHtml } from "@/lib/email/templates";
 import { apiError } from "@/lib/api/errors";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
+
+type IdentifyProperties = {
+  plan?: string;
+  planValue?: number;
+  customerType?: string;
+  [key: string]: unknown;
+};
+
+type IdentifyRequestBody = {
+  email?: string;
+  userId?: string;
+  event?: string;
+  properties?: unknown;
+};
+
+function isPropertiesObject(value: unknown): value is IdentifyProperties {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
 
 export async function POST(req: Request) {
   try {
@@ -49,6 +68,12 @@ export async function POST(req: Request) {
       return apiError("MISSING_REQUIRED_FIELD", "email is required", 400);
     }
 
+    if (hasIncomingProperties && !isPropertiesObject(body.properties)) {
+      return apiError("MISSING_REQUIRED_FIELD", "properties must be an object", 400);
+    }
+
+    const incomingProperties = hasIncomingProperties ? body.properties : undefined;
+
     let user = await db.query.endUsers.findFirst({
       where: and(eq(endUsers.tenantId, tenant.id), eq(endUsers.email, email)),
     });
@@ -73,6 +98,14 @@ export async function POST(req: Request) {
         email,
         userId: email,
       }).catch((err) => console.error("Webhook delivery error:", err));
+    } else if (incomingProperties) {
+      const existingProperties = isPropertiesObject(user.properties) ? user.properties : {};
+      await db
+        .update(endUsers)
+        .set({
+          properties: { ...existingProperties, ...incomingProperties },
+        })
+        .where(eq(endUsers.id, user.id));
     }
 
     if (!isNewUser && user && properties && typeof properties === "object" && !Array.isArray(properties)) {

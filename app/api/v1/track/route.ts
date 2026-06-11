@@ -35,21 +35,18 @@ export async function POST(req: Request) {
   if (!userId || !stepCode)
     return apiError("MISSING_REQUIRED_FIELD", "userId and event or stepId are required", 400);
 
-  const user = await db.query.endUsers.findFirst({
-    where: and(
-      eq(endUsers.tenantId, tenant.id),
-      eq(endUsers.externalId, userId)
-    ),
-  });
+    if (!user) {
+      const currentCountResult = await db
+        .select({ total: count() })
+        .from(endUsers)
+        .where(eq(endUsers.tenantId, tenant.id));
 
-  if (!user) {
-    const currentCountResult = await db
-      .select({ total: count() })
-      .from(endUsers)
-      .where(eq(endUsers.tenantId, tenant.id));
+      const currentCount = currentCountResult[0]?.total ?? 0;
+      const limit = await checkEndUserLimit(tenant.id, currentCount);
 
-    const currentCount = currentCountResult[0]?.total ?? 0;
-    const limit = await checkEndUserLimit(tenant.id, currentCount);
+      if (!limit.allowed) {
+        return apiError("RATE_LIMIT_EXCEEDED", limit.reason, 429);
+      }
 
     if (!limit.allowed) {
       return apiError("INTERNAL_ERROR", limit.reason ?? "Plan limit exceeded", 403);
@@ -58,23 +55,25 @@ export async function POST(req: Request) {
     return apiError("USER_NOT_FOUND", "User not found. Call /identify first.", 404);
   }
 
-  const currentSteps = (user.completedSteps as string[]) || [];
+    if (!currentSteps.includes(stepCode)) {
+      const newSteps = [...currentSteps, stepCode];
 
-  if (!currentSteps.includes(stepCode)) {
-    const newSteps = [...currentSteps, stepCode];
+      await db
+        .update(endUsers)
+        .set({ completedSteps: newSteps, lastSeenAt: new Date() })
+        .where(eq(endUsers.id, user.id));
 
-    await db
-      .update(endUsers)
-      .set({ completedSteps: newSteps, lastSeenAt: new Date() })
-      .where(eq(endUsers.id, user.id));
+      // Fire webhook — non-blocking, never fail the request
+      deliverWebhookEvent(tenant.id, "user.activated", {
+        userId,
+        stepId: stepCode,
+        completedSteps: newSteps,
+      }).catch((err) => console.error("Webhook delivery error:", err));
+    }
 
-    // Fire webhook — non-blocking, never fail the request
-    deliverWebhookEvent(tenant.id, "user.activated", {
-      userId,
-      stepId: stepCode,
-      completedSteps: newSteps,
-    }).catch((err) => console.error("Webhook delivery error:", err));
+    return NextResponse.json({ success: true, step: stepCode });
+  } catch (error) {
+    console.error("Track error:", error);
+    return apiError("INTERNAL_ERROR", "Server Error", 500);
   }
-
-  return NextResponse.json({ success: true, step: stepCode });
 }

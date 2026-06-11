@@ -1,3 +1,19 @@
+type JsonPrimitive = string | number | boolean | null;
+type JsonValue = JsonPrimitive | JsonObject | JsonValue[];
+type JsonObject = { [key: string]: JsonValue | undefined };
+
+export interface IdentifyProperties extends JsonObject {
+  plan?: string;
+  planValue?: number;
+  customerType?: "free" | "paying" | "trial" | "churned";
+}
+
+export interface IdentifyParams {
+  userId: string;
+  email: string;
+  properties?: IdentifyProperties;
+}
+
 export class Dripmetric {
   private apiKey: string;
   private baseUrl: string;
@@ -11,10 +27,11 @@ export class Dripmetric {
    * Identify a user on signup or login.
    * Creates the user in your Dripmetric dashboard.
    */
-  async identify(user: { userId: string; email: string }): Promise<{ success: boolean }> {
+  async identify(user: IdentifyParams): Promise<{ success: boolean }> {
     return this._request("/identify", {
       userId: user.userId,
       email: user.email,
+      ...(user.properties !== undefined ? { properties: user.properties } : {}),
     });
   }
 
