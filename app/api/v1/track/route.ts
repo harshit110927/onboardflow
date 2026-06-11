@@ -5,34 +5,35 @@ import { NextResponse } from "next/server";
 import { checkEndUserLimit } from "@/lib/rate-limit/enterprise";
 import { deliverWebhookEvent } from "@/lib/webhooks/deliver";
 import { checkApiRateLimit } from "@/lib/rate-limit/api";
+import { apiError } from "@/lib/api/errors";
 
 export async function POST(req: Request) {
   const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
   const rateLimit = checkApiRateLimit(ip);
   if (!rateLimit.allowed) {
-    return NextResponse.json({ error: "Too many requests" }, { status: 429 });
+    return apiError("RATE_LIMIT_EXCEEDED", "Rate limit exceeded", 429);
   }
   const apiKey = req.headers.get("x-api-key");
   if (!apiKey)
-    return NextResponse.json({ error: "Missing API Key" }, { status: 401 });
+    return apiError("INVALID_API_KEY", "Missing API Key", 401);
 
   const tenant = await db.query.tenants.findFirst({
     where: eq(tenants.apiKey, apiKey),
   });
   if (!tenant)
-    return NextResponse.json({ error: "Invalid API Key" }, { status: 403 });
+    return apiError("INVALID_API_KEY", "Invalid API Key", 401);
 
   let body: { userId?: string; event?: string; stepId?: string };
   try {
     body = await req.json();
   } catch {
-    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+    return apiError("MISSING_REQUIRED_FIELD", "Request body must be valid JSON", 400);
   }
   const { userId, event, stepId } = body;
   const stepCode = stepId ?? event;
 
   if (!userId || !stepCode)
-    return NextResponse.json({ error: "Missing data" }, { status: 400 });
+    return apiError("MISSING_REQUIRED_FIELD", "userId and event or stepId are required", 400);
 
   const user = await db.query.endUsers.findFirst({
     where: and(
@@ -51,13 +52,10 @@ export async function POST(req: Request) {
     const limit = await checkEndUserLimit(tenant.id, currentCount);
 
     if (!limit.allowed) {
-      return NextResponse.json({ error: limit.reason }, { status: 403 });
+      return apiError("INTERNAL_ERROR", limit.reason ?? "Plan limit exceeded", 403);
     }
 
-    return NextResponse.json(
-      { error: "User not found. Call /identify first." },
-      { status: 404 }
-    );
+    return apiError("USER_NOT_FOUND", "User not found. Call /identify first.", 404);
   }
 
   const currentSteps = (user.completedSteps as string[]) || [];

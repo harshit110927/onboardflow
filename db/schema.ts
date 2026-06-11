@@ -70,6 +70,7 @@ export const endUsers = pgTable("end_users", {
   tenantId: uuid("tenant_id").references(() => tenants.id),
   externalId: text("external_id").notNull(),
   email: text("email"),
+  properties: jsonb("properties").$type<Record<string, unknown> | null>().default(null),
   completedSteps: jsonb("completed_steps").$type<string[]>().default([]),
   lastEmailedAt: timestamp("last_emailed_at"),
   automationsReceived: text("automations_received").array().default([]),

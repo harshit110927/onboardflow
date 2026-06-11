@@ -6,6 +6,7 @@ import { Resend } from "resend";
 import { checkApiRateLimit } from "@/lib/rate-limit/api";
 import { deliverWebhookEvent } from "@/lib/webhooks/deliver";
 import { buildEmailHtml } from "@/lib/email/templates";
+import { apiError } from "@/lib/api/errors";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -14,12 +15,12 @@ export async function POST(req: Request) {
     const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
     const rateLimit = checkApiRateLimit(ip);
     if (!rateLimit.allowed) {
-      return NextResponse.json({ error: "Too many requests" }, { status: 429 });
+      return apiError("RATE_LIMIT_EXCEEDED", "Rate limit exceeded", 429);
     }
 
     const apiKey = req.headers.get("x-api-key");
     if (!apiKey) {
-      return NextResponse.json({ error: "Missing API Key" }, { status: 401 });
+      return apiError("INVALID_API_KEY", "Missing API Key", 401);
     }
 
     const tenant = await db.query.tenants.findFirst({
@@ -27,25 +28,25 @@ export async function POST(req: Request) {
     });
 
     if (!tenant) {
-      return NextResponse.json({ error: "Invalid API Key" }, { status: 403 });
+      return apiError("INVALID_API_KEY", "Invalid API Key", 401);
     }
 
     const rawBody = await req.text();
     if (!rawBody) {
-      return NextResponse.json({ error: "Empty body" }, { status: 400 });
+      return apiError("MISSING_REQUIRED_FIELD", "Request body is required", 400);
     }
 
-    let body: { email?: string; userId?: string; event?: string };
+    let body: { email?: string; userId?: string; event?: string; properties?: Record<string, unknown> };
     try {
       body = JSON.parse(rawBody);
     } catch {
-      return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+      return apiError("MISSING_REQUIRED_FIELD", "Request body must be valid JSON", 400);
     }
 
-    const { email, event } = body;
+    const { email, event, properties } = body;
 
     if (!email) {
-      return NextResponse.json({ error: "email is required" }, { status: 400 });
+      return apiError("MISSING_REQUIRED_FIELD", "email is required", 400);
     }
 
     let user = await db.query.endUsers.findFirst({
@@ -61,6 +62,7 @@ export async function POST(req: Request) {
           tenantId: tenant.id,
           email,
           externalId: body.userId || email,
+          properties: properties && typeof properties === "object" && !Array.isArray(properties) ? properties : null,
           completedSteps: [],
           createdAt: new Date(),
           lastSeenAt: new Date(),
@@ -71,6 +73,13 @@ export async function POST(req: Request) {
         email,
         userId: email,
       }).catch((err) => console.error("Webhook delivery error:", err));
+    }
+
+    if (!isNewUser && user && properties && typeof properties === "object" && !Array.isArray(properties)) {
+      await db
+        .update(endUsers)
+        .set({ properties, lastSeenAt: new Date() })
+        .where(eq(endUsers.id, user.id));
     }
 
     // Send welcome email immediately for new users only
@@ -104,6 +113,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Identify error:", error);
-    return NextResponse.json({ error: "Server Error" }, { status: 500 });
+    return apiError("INTERNAL_ERROR", "Server Error", 500);
   }
 }
