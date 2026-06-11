@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
@@ -35,6 +36,7 @@ export default function PipelinePage() {
   const [error, setError] = useState<string | null>(null);
   const [selectedListId, setSelectedListId] = useState("");
   const [dragOverStage, setDragOverStage] = useState<Stage | null>(null);
+  const [expandedStages, setExpandedStages] = useState<Set<Stage>>(new Set(["new"]));
 
   useEffect(() => {
     const loadPipeline = async () => {
@@ -102,99 +104,119 @@ export default function PipelinePage() {
           {STAGES.map((stage) => (
             <div key={stage.key} className="flex-1 min-w-0">
               <div className="rounded-lg border border-border bg-card h-full">
-                <div className="px-3 py-2 border-b border-border flex items-center justify-between">
-                  <p className="text-sm font-medium">{stage.label}</p>
-                  <Badge variant="secondary">{data?.[stage.key].length ?? 0}</Badge>
-                </div>
-
                 <div
-                  className={`p-2 ${dragOverStage === stage.key ? "ring-2 ring-blue-400" : ""}`}
-                  style={{ maxHeight: "calc(100vh - 240px)", overflowY: "auto" }}
-                  onDragOver={(e) => {
-                    e.preventDefault();
-                    e.dataTransfer.dropEffect = "move";
-                  }}
-                  onDragEnter={(e) => {
-                    e.preventDefault();
-                    setDragOverStage(stage.key);
-                  }}
-                  onDragLeave={() => setDragOverStage(null)}
-                  onDrop={async (e) => {
-                    e.preventDefault();
-                    setDragOverStage(null);
-                    const raw = e.dataTransfer.getData("text/plain");
-                    if (!raw || !data) return;
-
-                    const { contactId, fromStage } = JSON.parse(raw) as { contactId: number; fromStage: Stage };
-                    const targetStage = stage.key;
-                    if (fromStage === targetStage) return;
-
-                    setData((prev) => {
-                      if (!prev) return prev;
-                      const contact = prev[fromStage].find((c) => c.id === contactId);
-                      if (!contact) return prev;
-                      return {
-                        ...prev,
-                        [fromStage]: prev[fromStage].filter((c) => c.id !== contactId),
-                        [targetStage]: [{ ...contact, pipelineStage: targetStage }, ...prev[targetStage]],
-                      };
-                    });
-
-                    try {
-                      const res = await fetch("/api/individual/pipeline", {
-                        method: "PATCH",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ contactId, stage: targetStage }),
+                  className="px-3 py-2 border-b border-border flex items-center justify-between cursor-pointer md:cursor-default"
+                  onClick={() => {
+                    if (window.innerWidth < 768) {
+                      setExpandedStages((prev) => {
+                        const next = new Set(prev);
+                        if (next.has(stage.key)) next.delete(stage.key);
+                        else next.add(stage.key);
+                        return next;
                       });
-                      if (!res.ok) throw new Error("Failed");
-                      toast.success("Pipeline stage updated");
-                    } catch {
-                      setData((prev) => {
-                        if (!prev) return prev;
-                        const contact = prev[targetStage].find((c) => c.id === contactId);
-                        if (!contact) return prev;
-                        return {
-                          ...prev,
-                          [targetStage]: prev[targetStage].filter((c) => c.id !== contactId),
-                          [fromStage]: [{ ...contact, pipelineStage: fromStage }, ...prev[fromStage]],
-                        };
-                      });
-                      toast.error("Failed to update pipeline stage");
                     }
                   }}
                 >
-                  {(data?.[stage.key] ?? []).map((contact) => (
-                    <div
-                      key={contact.id}
-                      draggable
-                      onDragStart={(e) => {
-                        e.dataTransfer.setData("text/plain", JSON.stringify({ contactId: contact.id, fromStage: stage.key }));
-                        e.dataTransfer.effectAllowed = "move";
-                      }}
-                      className="bg-white dark:bg-gray-800 shadow-sm rounded-md p-3 mb-2 cursor-grab"
-                    >
-                      <p className="font-medium text-sm">{contact.name}</p>
-                      {contact.customFields?.company ? <p className="text-xs text-muted-foreground">{contact.customFields.company}</p> : null}
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-medium">{stage.label}</p>
+                    <Badge variant="secondary">{data?.[stage.key].length ?? 0}</Badge>
+                  </div>
+                  <ChevronDown
+                    size={16}
+                    className={`md:hidden transition-transform ${expandedStages.has(stage.key) ? "rotate-180" : ""}`}
+                  />
+                </div>
 
-                      <div className="mt-1 flex flex-wrap gap-1">
-                        {contact.tags.map((tag) => (
-                          <span key={tag.id} style={{ backgroundColor: `${tag.color}33`, color: tag.color, fontSize: 11, padding: "2px 7px", borderRadius: 9999 }}>
-                            {tag.name}
-                          </span>
-                        ))}
-                      </div>
+                <div className={`md:block ${expandedStages.has(stage.key) ? "block" : "hidden"}`}>
+                  <div
+                    className={`p-2 ${dragOverStage === stage.key ? "ring-2 ring-blue-400" : ""}`}
+                    style={{ maxHeight: "calc(100vh - 240px)", overflowY: "auto" }}
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      e.dataTransfer.dropEffect = "move";
+                    }}
+                    onDragEnter={(e) => {
+                      e.preventDefault();
+                      setDragOverStage(stage.key);
+                    }}
+                    onDragLeave={() => setDragOverStage(null)}
+                    onDrop={async (e) => {
+                      e.preventDefault();
+                      setDragOverStage(null);
+                      const raw = e.dataTransfer.getData("text/plain");
+                      if (!raw || !data) return;
 
-                      {contact.followUpAt && !contact.followUpSent ? (
-                        <p className="text-xs text-amber-600 mt-1">
-                          🔔 {new Date(contact.followUpAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                      const { contactId, fromStage } = JSON.parse(raw) as { contactId: number; fromStage: Stage };
+                      const targetStage = stage.key;
+                      if (fromStage === targetStage) return;
+
+                      setData((prev) => {
+                        if (!prev) return prev;
+                        const contact = prev[fromStage].find((c) => c.id === contactId);
+                        if (!contact) return prev;
+                        return {
+                          ...prev,
+                          [fromStage]: prev[fromStage].filter((c) => c.id !== contactId),
+                          [targetStage]: [{ ...contact, pipelineStage: targetStage }, ...prev[targetStage]],
+                        };
+                      });
+
+                      try {
+                        const res = await fetch("/api/individual/pipeline", {
+                          method: "PATCH",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ contactId, stage: targetStage }),
+                        });
+                        if (!res.ok) throw new Error("Failed");
+                        toast.success("Pipeline stage updated");
+                      } catch {
+                        setData((prev) => {
+                          if (!prev) return prev;
+                          const contact = prev[targetStage].find((c) => c.id === contactId);
+                          if (!contact) return prev;
+                          return {
+                            ...prev,
+                            [targetStage]: prev[targetStage].filter((c) => c.id !== contactId),
+                            [fromStage]: [{ ...contact, pipelineStage: fromStage }, ...prev[fromStage]],
+                          };
+                        });
+                        toast.error("Failed to update pipeline stage");
+                      }
+                    }}
+                  >
+                    {(data?.[stage.key] ?? []).map((contact) => (
+                      <div
+                        key={contact.id}
+                        draggable
+                        onDragStart={(e) => {
+                          e.dataTransfer.setData("text/plain", JSON.stringify({ contactId: contact.id, fromStage: stage.key }));
+                          e.dataTransfer.effectAllowed = "move";
+                        }}
+                        className="bg-white dark:bg-gray-800 shadow-sm rounded-md p-3 mb-2 cursor-grab"
+                      >
+                        <p className="font-medium text-sm">{contact.name}</p>
+                        {contact.customFields?.company ? <p className="text-xs text-muted-foreground">{contact.customFields.company}</p> : null}
+
+                        <div className="mt-1 flex flex-wrap gap-1">
+                          {contact.tags.map((tag) => (
+                            <span key={tag.id} style={{ backgroundColor: `${tag.color}33`, color: tag.color, fontSize: 11, padding: "2px 7px", borderRadius: 9999 }}>
+                              {tag.name}
+                            </span>
+                          ))}
+                        </div>
+
+                        {contact.followUpAt && !contact.followUpSent ? (
+                          <p className="text-xs text-amber-600 mt-1">
+                            🔔 {new Date(contact.followUpAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                          </p>
+                        ) : null}
+
+                        <p className="text-xs text-muted-foreground text-right mt-2">
+                          {contact.lastActivity ? formatRelativeTime(new Date(contact.lastActivity)) : "No activity"}
                         </p>
-                      ) : null}
-
-                      <p className="text-xs text-muted-foreground text-right mt-2">
-                        {contact.lastActivity ? formatRelativeTime(new Date(contact.lastActivity)) : "No activity"}
-                      </p>
-                    </div>
-                  ))}
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
             </div>
