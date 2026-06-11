@@ -307,7 +307,7 @@ export function ContactsManager({
               <thead>
                 <tr className="border-b border-border bg-secondary/50">
                   <th className="text-left px-4 py-3 font-medium text-muted-foreground">Name</th>
-                  <th className="text-left px-4 py-3 font-medium text-muted-foreground">Email</th>
+                  <th className="text-left px-4 py-3 font-medium text-muted-foreground hidden md:table-cell">Email</th>
                   <th className="text-left px-4 py-3 font-medium text-muted-foreground hidden sm:table-cell">Added</th>
                   <th className="text-left px-4 py-3 font-medium text-muted-foreground">Reminder</th>
                   <th className="px-4 py-3" />
@@ -318,13 +318,18 @@ export function ContactsManager({
                   const engagement = engagementMap[contact.email];
                   const dotColor = engagement === "opened" ? "#10b981" : engagement === "sent" ? "#9ca3af" : null;
                   const reminder = reminderLabel(contact);
+                  const visibleTags = contact.tags.slice(0, 2);
+                  const extraCount = contact.tags.length - 2;
+                  const remainingTags = contact.tags.slice(2);
                   return (
                     <Fragment key={contact.id}>
                       <tr className="border-b border-border hover:bg-secondary/30 transition-colors">
                         <td className="px-4 py-3 font-medium text-foreground">
                           {dotColor ? <span style={{ display: "inline-block", width: 12, height: 12, borderRadius: "50%", background: dotColor, marginRight: 6 }} /> : null}
                           <span>{contact.name}</span>
-                          {contact.tags.map((tag) => (<span key={tag.id} className="ml-2" style={{ backgroundColor: `${tag.color}33`, color: tag.color, fontSize: 11, padding: "2px 7px", borderRadius: 9999 }}>{tag.name}</span>))}
+                          {visibleTags.map((tag) => (<span key={tag.id} className="ml-2" style={{ backgroundColor: `${tag.color}33`, color: tag.color, fontSize: 11, padding: "2px 7px", borderRadius: 9999 }}>{tag.name}</span>))}
+                          {extraCount > 0 ? <span className="ml-2 text-xs text-muted-foreground md:hidden">+{extraCount}</span> : null}
+                          <span className="hidden md:inline">{remainingTags.map((tag) => (<span key={tag.id} className="ml-2" style={{ backgroundColor: `${tag.color}33`, color: tag.color, fontSize: 11, padding: "2px 7px", borderRadius: 9999 }}>{tag.name}</span>))}</span>
                           <Popover open={popoverOpenFor === contact.id} onOpenChange={async (open) => { if (open) await fetchTags(); setPopoverOpenFor(open ? contact.id : null); }}>
                             <PopoverTrigger asChild><button type="button" className="ml-2 inline-flex items-center justify-center rounded border border-border h-5 w-5" title="Manage tags"><Plus className="h-3 w-3" /></button></PopoverTrigger>
                             <PopoverContent>
@@ -366,7 +371,7 @@ export function ContactsManager({
                             </PopoverContent>
                           </Popover>
                         </td>
-                        <td className="px-4 py-3 text-muted-foreground">{contact.email}</td>
+                        <td className="px-4 py-3 text-muted-foreground hidden md:table-cell">{contact.email}</td>
                         <td className="px-4 py-3 text-muted-foreground hidden sm:table-cell">{contact.createdAt ? new Date(contact.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "-"}</td>
                         <td className="px-4 py-3">
                           <button type="button" onClick={() => {
