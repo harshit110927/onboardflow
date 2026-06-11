@@ -8,40 +8,32 @@ import { checkApiRateLimit } from "@/lib/rate-limit/api";
 import { apiError } from "@/lib/api/errors";
 
 export async function POST(req: Request) {
+  const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+  const rateLimit = checkApiRateLimit(ip);
+  if (!rateLimit.allowed) {
+    return apiError("RATE_LIMIT_EXCEEDED", "Rate limit exceeded", 429);
+  }
+  const apiKey = req.headers.get("x-api-key");
+  if (!apiKey)
+    return apiError("INVALID_API_KEY", "Missing API Key", 401);
+
+  const tenant = await db.query.tenants.findFirst({
+    where: eq(tenants.apiKey, apiKey),
+  });
+  if (!tenant)
+    return apiError("INVALID_API_KEY", "Invalid API Key", 401);
+
+  let body: { userId?: string; event?: string; stepId?: string };
   try {
-    const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
-    const rateLimit = checkApiRateLimit(ip);
-    if (!rateLimit.allowed) {
-      return apiError("RATE_LIMIT_EXCEEDED", "Too many requests", 429);
-    }
-    const apiKey = req.headers.get("x-api-key");
-    if (!apiKey)
-      return apiError("INVALID_API_KEY", "Missing API Key", 401);
+    body = await req.json();
+  } catch {
+    return apiError("MISSING_REQUIRED_FIELD", "Request body must be valid JSON", 400);
+  }
+  const { userId, event, stepId } = body;
+  const stepCode = stepId ?? event;
 
-    const tenant = await db.query.tenants.findFirst({
-      where: eq(tenants.apiKey, apiKey),
-    });
-    if (!tenant)
-      return apiError("INVALID_API_KEY", "Invalid API Key", 401);
-
-    let body: { userId?: string; event?: string; stepId?: string };
-    try {
-      body = await req.json();
-    } catch {
-      return apiError("MISSING_REQUIRED_FIELD", "Valid JSON body is required", 400);
-    }
-    const { userId, event, stepId } = body;
-    const stepCode = stepId ?? event;
-
-    if (!userId || !stepCode)
-      return apiError("MISSING_REQUIRED_FIELD", "userId and stepId (or event) are required", 400);
-
-    const user = await db.query.endUsers.findFirst({
-      where: and(
-        eq(endUsers.tenantId, tenant.id),
-        eq(endUsers.externalId, userId)
-      ),
-    });
+  if (!userId || !stepCode)
+    return apiError("MISSING_REQUIRED_FIELD", "userId and event or stepId are required", 400);
 
     if (!user) {
       const currentCountResult = await db
@@ -56,10 +48,12 @@ export async function POST(req: Request) {
         return apiError("RATE_LIMIT_EXCEEDED", limit.reason, 429);
       }
 
-      return apiError("USER_NOT_FOUND", "User not found. Call /identify first.", 404);
+    if (!limit.allowed) {
+      return apiError("INTERNAL_ERROR", limit.reason ?? "Plan limit exceeded", 403);
     }
 
-    const currentSteps = (user.completedSteps as string[]) || [];
+    return apiError("USER_NOT_FOUND", "User not found. Call /identify first.", 404);
+  }
 
     if (!currentSteps.includes(stepCode)) {
       const newSteps = [...currentSteps, stepCode];

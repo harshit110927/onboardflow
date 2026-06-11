@@ -1,20 +1,20 @@
 import { db } from "@/db";
 import { endUsers, tenants } from "@/db/schema";
 import { apiError } from "@/lib/api/errors";
-import { formatApiUser } from "@/lib/api/users";
+import { serializeEndUser } from "@/lib/api/end-users";
 import { checkApiRateLimit } from "@/lib/rate-limit/api";
 import { and, eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
 export async function GET(
   req: Request,
-  context: { params: Promise<{ userId: string }> },
+  { params }: { params: Promise<{ userId: string }> },
 ) {
   try {
     const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
     const rateLimit = checkApiRateLimit(ip);
     if (!rateLimit.allowed) {
-      return apiError("RATE_LIMIT_EXCEEDED", "Too many requests", 429);
+      return apiError("RATE_LIMIT_EXCEEDED", "Rate limit exceeded", 429);
     }
 
     const apiKey = req.headers.get("x-api-key");
@@ -30,13 +30,9 @@ export async function GET(
       return apiError("INVALID_API_KEY", "Invalid API Key", 401);
     }
 
-    const { userId } = await context.params;
-    if (!userId) {
-      return apiError("MISSING_REQUIRED_FIELD", "userId is required", 400);
-    }
-
+    const { userId } = await params;
     const user = await db.query.endUsers.findFirst({
-      where: and(eq(endUsers.tenantId, tenant.id), eq(endUsers.externalId, decodeURIComponent(userId))),
+      where: and(eq(endUsers.tenantId, tenant.id), eq(endUsers.externalId, userId)),
     });
 
     if (!user) {
@@ -45,10 +41,10 @@ export async function GET(
 
     return NextResponse.json({
       success: true,
-      user: formatApiUser(user, tenant.activationStep),
+      user: serializeEndUser(user, tenant),
     });
   } catch (error) {
-    console.error("User detail error:", error);
+    console.error("User API error:", error);
     return apiError("INTERNAL_ERROR", "Server Error", 500);
   }
 }

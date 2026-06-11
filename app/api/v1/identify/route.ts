@@ -7,6 +7,7 @@ import { checkApiRateLimit } from "@/lib/rate-limit/api";
 import { apiError } from "@/lib/api/errors";
 import { deliverWebhookEvent } from "@/lib/webhooks/deliver";
 import { buildEmailHtml } from "@/lib/email/templates";
+import { apiError } from "@/lib/api/errors";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -33,7 +34,7 @@ export async function POST(req: Request) {
     const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
     const rateLimit = checkApiRateLimit(ip);
     if (!rateLimit.allowed) {
-      return apiError("RATE_LIMIT_EXCEEDED", "Too many requests", 429);
+      return apiError("RATE_LIMIT_EXCEEDED", "Rate limit exceeded", 429);
     }
 
     const apiKey = req.headers.get("x-api-key");
@@ -51,18 +52,17 @@ export async function POST(req: Request) {
 
     const rawBody = await req.text();
     if (!rawBody) {
-      return apiError("MISSING_REQUIRED_FIELD", "Valid JSON body is required", 400);
+      return apiError("MISSING_REQUIRED_FIELD", "Request body is required", 400);
     }
 
-    let body: IdentifyRequestBody;
+    let body: { email?: string; userId?: string; event?: string; properties?: Record<string, unknown> };
     try {
       body = JSON.parse(rawBody);
     } catch {
-      return apiError("MISSING_REQUIRED_FIELD", "Valid JSON body is required", 400);
+      return apiError("MISSING_REQUIRED_FIELD", "Request body must be valid JSON", 400);
     }
 
-    const { email, event } = body;
-    const hasIncomingProperties = Object.prototype.hasOwnProperty.call(body, "properties") && body.properties !== undefined;
+    const { email, event, properties } = body;
 
     if (!email) {
       return apiError("MISSING_REQUIRED_FIELD", "email is required", 400);
@@ -87,7 +87,7 @@ export async function POST(req: Request) {
           tenantId: tenant.id,
           email,
           externalId: body.userId || email,
-          properties: incomingProperties ?? null,
+          properties: properties && typeof properties === "object" && !Array.isArray(properties) ? properties : null,
           completedSteps: [],
           createdAt: new Date(),
           lastSeenAt: new Date(),
@@ -105,6 +105,13 @@ export async function POST(req: Request) {
         .set({
           properties: { ...existingProperties, ...incomingProperties },
         })
+        .where(eq(endUsers.id, user.id));
+    }
+
+    if (!isNewUser && user && properties && typeof properties === "object" && !Array.isArray(properties)) {
+      await db
+        .update(endUsers)
+        .set({ properties, lastSeenAt: new Date() })
         .where(eq(endUsers.id, user.id));
     }
 
