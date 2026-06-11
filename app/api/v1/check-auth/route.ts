@@ -2,6 +2,7 @@ import { db } from "@/db";
 import { tenants } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
+import { apiError } from "@/lib/api/errors";
 
 export async function GET(req: Request) {
   // 1. Get the API Key from the headers
@@ -9,7 +10,7 @@ export async function GET(req: Request) {
   const apiKey = req.headers.get("x-api-key");
 
   if (!apiKey) {
-    return NextResponse.json({ success: false, error: "Missing API Key" }, { status: 401 });
+    return apiError("INVALID_API_KEY", "Missing API Key", 401);
   }
 
   // 2. Check if this key exists in our DB
@@ -18,7 +19,7 @@ export async function GET(req: Request) {
   });
 
   if (!tenant) {
-    return NextResponse.json({ success: false, error: "Invalid API Key" }, { status: 403 });
+    return apiError("INVALID_API_KEY", "Invalid API Key", 401);
   }
 
   // 3. Return the tenant info (This is what the CLI needs to configure itself)
