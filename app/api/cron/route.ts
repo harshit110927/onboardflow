@@ -1,6 +1,6 @@
 // MODIFIED — added per-tenant email sender resolution (Resend key > SMTP > shared fallback)
 import { db } from "@/db";
-import { tenants, endUsers, individualCampaigns, individualLists, individualContacts, dripSteps, unsubscribedContacts } from "@/db/schema";
+import { tenants, endUsers, individualCampaigns, individualLists, individualContacts, dripSteps, unsubscribedContacts, suppressedEmails } from "@/db/schema";
 import { NextResponse } from "next/server";
 import { Resend } from "resend";
 import { subHours } from "date-fns";
@@ -179,6 +179,13 @@ export async function GET(req: Request) {
           const limit = await checkEmailRateLimit(tenant.id);
           if (!limit.allowed) {
             console.warn(`🚫 Rate limit hit for tenant ${tenant.email}: ${limit.reason}`);
+            await db.insert(suppressedEmails).values({
+              tenantId: tenant.id,
+              endUserId: user.id,
+              step: emailToSend.tag,
+              reason: "email_limit_reached",
+              suppressedAt: new Date(),
+            });
             emailsBlocked++;
             continue;
           }
