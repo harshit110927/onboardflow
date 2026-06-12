@@ -1,9 +1,13 @@
 import { db } from "@/db";
 import { tenants, endUsers } from "@/db/schema";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, count } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
 import { format, subDays, isSameDay } from "date-fns";
+import { checkEmailRateLimit } from "@/lib/rate-limit/enterprise";
+import { getMonthlyEmailUsage } from "@/lib/rate-limit/email-usage";
+import { getTenantPlan } from "@/lib/plans/get-tenant-plan";
+import { ENTERPRISE_LIMITS, type EnterprisePlanTier } from "@/lib/plans/limits";
 
 export async function GET(req: Request) {
   const supabase = await createClient();
@@ -22,6 +26,18 @@ export async function GET(req: Request) {
       orderBy: [desc(endUsers.createdAt)], // Newest first
       limit: 100 // Limit for the table view
   });
+
+  const [{ total: trackedUsers = 0 } = { total: 0 }] = await db
+    .select({ total: count() })
+    .from(endUsers)
+    .where(eq(endUsers.tenantId, tenant.id));
+
+  const { plan } = await getTenantPlan(tenant.id);
+  const enterprisePlan: EnterprisePlanTier =
+    plan === "basic" || plan === "advanced" || plan === "free" ? plan : "free";
+  const limits = ENTERPRISE_LIMITS[enterprisePlan];
+  const emailsSentThisMonth = await getMonthlyEmailUsage(tenant.id);
+  const emailLimit = await checkEmailRateLimit(tenant.id);
 
   // --- METRIC 1: TOTALS ---
   const totalUsers = allUsers.length;
@@ -88,6 +104,14 @@ export async function GET(req: Request) {
       funnelData,
       trendData,
       recoveryData: { recovered: recoveredCount, organic: step1Count - recoveredCount },
-      userMatrix // 👈 Sending the table data
+      userMatrix, // 👈 Sending the table data
+      usage: {
+        trackedUsers,
+        trackedUsersLimit: limits.maxTrackedUsers,
+        trackedUsersOverLimit: trackedUsers >= limits.maxTrackedUsers,
+        emailsSentThisMonth,
+        emailsMonthlyLimit: limits.maxEmailsPerMonth,
+        emailsOverLimit: !emailLimit.allowed,
+      }
   });
 }

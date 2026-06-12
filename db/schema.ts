@@ -251,6 +251,15 @@ export const webhooks = pgTable("webhooks", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+export const suppressedEmails = pgTable("suppressed_emails", {
+  id: serial("id").primaryKey(),
+  tenantId: uuid("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+  endUserId: uuid("end_user_id").notNull().references(() => endUsers.id, { onDelete: "cascade" }),
+  step: varchar("step", { length: 100 }).notNull(),
+  reason: varchar("reason", { length: 100 }).notNull(),
+  suppressedAt: timestamp("suppressed_at").defaultNow().notNull(),
+});
+
 export const webhookDeliveries = pgTable("webhook_deliveries", {
   id: serial("id").primaryKey(),
   webhookId: integer("webhook_id").notNull().references(() => webhooks.id, { onDelete: "cascade" }),
