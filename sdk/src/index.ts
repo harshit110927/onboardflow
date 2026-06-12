@@ -14,6 +14,26 @@ export interface IdentifyParams {
   properties?: IdentifyProperties;
 }
 
+export type DripmetricErrorCode =
+  | "INVALID_API_KEY"
+  | "MISSING_REQUIRED_FIELD"
+  | "USER_NOT_FOUND"
+  | "RATE_LIMIT_EXCEEDED"
+  | "INTERNAL_ERROR"
+  | "UNKNOWN_ERROR";
+
+export class DripmetricApiError extends Error {
+  readonly status: number;
+  readonly code: DripmetricErrorCode;
+
+  constructor(status: number, code: DripmetricErrorCode, message: string) {
+    super(`Dripmetric error (${status} ${code}): ${message}`);
+    this.name = "DripmetricApiError";
+    this.status = status;
+    this.code = code;
+  }
+}
+
 export class Dripmetric {
   private apiKey: string;
   private baseUrl: string;
@@ -57,8 +77,16 @@ export class Dripmetric {
     });
 
     if (!response.ok) {
-      const error = await response.json().catch(() => ({}));
-      throw new Error(`Dripmetric error (${response.status}): ${error?.error || "Unknown error"}`);
+      const payload = await response.json().catch(() => ({}));
+      const apiError = payload?.error;
+      const code = typeof apiError?.code === "string"
+        ? apiError.code as DripmetricErrorCode
+        : "UNKNOWN_ERROR";
+      const message = typeof apiError?.message === "string"
+        ? apiError.message
+        : "Unknown error";
+
+      throw new DripmetricApiError(response.status, code, message);
     }
 
     return response.json();
