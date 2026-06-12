@@ -51,9 +51,28 @@ await onboard.identify({
 
 Sign up at [dripmetric.com](https://www.dripmetric.com) → choose Enterprise → copy your API key from the dashboard.
 
+## Handling API errors
+
+The SDK throws `DripmetricApiError` when Dripmetric returns a non-2xx response. The error includes `status` and `code`, matching the REST API error shape.
+
+```ts
+import { Dripmetric, DripmetricApiError } from "dripmetric";
+
+try {
+  await onboard.track({
+    userId: "user_123",
+    stepId: "created_project",
+  });
+} catch (error) {
+  if (error instanceof DripmetricApiError) {
+    console.error(error.status, error.code, error.message);
+  }
+}
+```
+
 ## Rate Limits (Free Tier)
 
-- 20 emails/day, 300 emails/month
+- 300 recovery emails/month
 - 50 end users tracked
 
 Limits increase on paid plans.
