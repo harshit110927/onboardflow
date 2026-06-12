@@ -1,5 +1,5 @@
 import { db } from "@/db";
-import { tenants, endUsers, unsubscribedContacts } from "@/db/schema";
+import { tenants, endUsers, unsubscribedContacts, suppressedEmails } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
@@ -147,6 +147,14 @@ export async function POST(req: Request) {
       // Rate limit check
       const limit = await checkEmailRateLimit(tenant.id);
       if (!limit.allowed) {
+        await db.insert(suppressedEmails).values({
+          tenantId: tenant.id,
+          endUserId: user.id,
+          step: tag,
+          reason: "email_limit_reached",
+          suppressedAt: new Date(),
+        });
+
         return NextResponse.json({
           error: `Rate limit reached: ${limit.reason}`,
           sent,

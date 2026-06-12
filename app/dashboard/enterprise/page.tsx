@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { eq } from "drizzle-orm";
+import { count, eq } from "drizzle-orm";
 import { redirect } from "next/navigation";
 
 import { ApiKeyCard } from "@/app/dashboard/ApiKeyCard";
@@ -8,7 +8,11 @@ import { endUsers } from "@/db/schema";
 import { getSession } from "@/lib/auth/get-session";
 import { getTenant } from "@/lib/auth/get-tenant";
 import { getTenantPlan } from "@/lib/plans/get-tenant-plan";
+import { checkEmailRateLimit } from "@/lib/rate-limit/enterprise";
+import { getMonthlyEmailUsage } from "@/lib/rate-limit/email-usage";
+import { ENTERPRISE_LIMITS, type EnterprisePlanTier } from "@/lib/plans/limits";
 import { NudgeButton } from "./_components/NudgeButton";
+import { LimitBanners } from "./_components/LimitBanners";
 
 type StepMetric = {
   label: string;
@@ -28,6 +32,26 @@ export default async function EnterpriseDashboardPage() {
   if (tenant.tier !== "enterprise") redirect("/dashboard/individual");
 
   const planInfo = await getTenantPlan(tenant.id);
+  const enterprisePlan: EnterprisePlanTier =
+    planInfo.plan === "basic" || planInfo.plan === "advanced" || planInfo.plan === "free"
+      ? planInfo.plan
+      : "free";
+  const limits = ENTERPRISE_LIMITS[enterprisePlan];
+  const [{ total: trackedUsers = 0 } = { total: 0 }] = await db
+    .select({ total: count() })
+    .from(endUsers)
+    .where(eq(endUsers.tenantId, tenant.id));
+  const emailsSentThisMonth = await getMonthlyEmailUsage(tenant.id);
+  const emailLimit = await checkEmailRateLimit(tenant.id);
+  const usage = {
+    trackedUsers,
+    trackedUsersLimit: limits.maxTrackedUsers,
+    trackedUsersOverLimit: trackedUsers >= limits.maxTrackedUsers,
+    emailsSentThisMonth,
+    emailsMonthlyLimit: limits.maxEmailsPerMonth,
+    emailsOverLimit: !emailLimit.allowed,
+  };
+
   const allUsers = await db.query.endUsers.findMany({
     where: eq(endUsers.tenantId, tenant.id),
   });
@@ -104,6 +128,8 @@ export default async function EnterpriseDashboardPage() {
             </p>
           </div>
         </div>
+
+        <LimitBanners usage={usage} />
 
         {/* STAT CARDS */}
         <div className="grid gap-4 md:grid-cols-4">
