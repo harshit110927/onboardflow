@@ -6,7 +6,10 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "test:integration": "node tests.js",
+    "test:acceptance": "node tests.e2e.js",
+    "test:all": "npm run test:integration && npm run test:acceptance"
   },
   "dependencies": {
     "@clack/prompts": "^0.11.0",
