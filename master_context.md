@@ -1592,11 +1592,76 @@ This is not heavily wired into the current app code.
 
 ## 18. Tests and Local Verification Files
 
-- `tests.js` appears to be an integration-style HTTP test runner.
-- `tests.e2e.js` appears to be browser/e2e-style smoke helper.
-- The main package scripts do not define a dedicated test command.
+- `tests.js` is the integration-style HTTP test runner. It covers authentication boundaries, public and Enterprise APIs, Razorpay webhooks, tracking, cron authorization, plan gates, malformed payloads, rate limiting, and unauthenticated Individual API boundaries.
+- `tests.e2e.js` is the cleanup-safe real-user acceptance runner. It drives Chromium with anonymous, Individual, and Enterprise browser contexts; creates uniquely marked list/contact/campaign/CRM and Enterprise end-user data; verifies the primary dashboard screens and API lifecycles; and removes every seeded row from the database in a `finally` block.
+- `TESTING.md` contains the detailed testing setup, environment-variable reference, cleanup guarantees, and coverage checklist.
+- `package.json` provides:
+  - `npm run test:integration` → runs `tests.js`.
+  - `npm run test:acceptance` → runs `tests.e2e.js`.
+  - `npm run test:all` → runs integration and acceptance suites in order.
 - `npm run lint` maps to `next lint`, but with Next 15 this command may be unavailable/deprecated depending local Next behavior.
 - TypeScript checking can be done with `npx tsc --noEmit` if dependencies are installed.
+
+### 18.1 One-time acceptance-test setup
+
+Install Playwright and its Chromium browser without changing the application dependency tree:
+
+```bash
+npm install --no-save playwright
+npx playwright install chromium
+```
+
+Create authenticated Playwright storage-state files for dedicated test accounts:
+
+- `.auth/individual.json` for a tenant whose tier is `individual`.
+- `.auth/enterprise.json` for a tenant whose tier is `enterprise`.
+
+Do not use production customer accounts. Set the following values in `.env.local`:
+
+```dotenv
+BASE_URL=http://localhost:3000
+DATABASE_URL=postgresql://...
+INDIVIDUAL_STATE=.auth/individual.json
+ENTERPRISE_STATE=.auth/enterprise.json
+TEST_INDIVIDUAL_TENANT_ID=<individual tenant uuid>
+TEST_ENTERPRISE_TENANT_ID=<enterprise tenant uuid>
+TEST_ENTERPRISE_API_KEY=<enterprise tenant x-api-key>
+RAZORPAY_WEBHOOK_SECRET=<test webhook secret>
+CRON_SECRET=<test cron secret>
+```
+
+The application server and the test process must use the same test environment and database.
+
+### 18.2 Running tests
+
+Start the application:
+
+```bash
+npm run dev
+```
+
+In another terminal, run the full test workflow:
+
+```bash
+npm run test:all
+```
+
+Suites can also be run independently:
+
+```bash
+npm run test:integration
+npm run test:acceptance
+```
+
+Run static verification separately:
+
+```bash
+npx tsc --noEmit
+npm run lint
+npm run build
+```
+
+Use a disposable/test database. The acceptance suite generates a unique `acceptance_*` marker for its data and cleans matching relational records in dependency-safe order, even when assertions fail. A hard process kill cannot execute JavaScript cleanup; after such a kill, manually remove records carrying the `acceptance_*` marker before rerunning.
 
 ---
 
