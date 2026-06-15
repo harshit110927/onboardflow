@@ -1,7 +1,6 @@
 import { createClient } from "@/utils/supabase/server";
 import { redirect } from "next/navigation";
 import { login, signInWithGoogle } from "@/app/actions";
-import { TierChips } from "@/app/_components/TierChips";
 
 // This page now owns the auth experience that used to live on the root landing route.
 // Keep the visual split-panel layout here so /login remains focused on conversion, while
@@ -142,18 +141,11 @@ export default async function LoginPage() {
                 ))}
               </div>
 
-              {/* Tier cards */}
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-                <div style={{ background: "rgba(129,140,248,0.06)", border: "0.5px solid rgba(129,140,248,0.14)", borderRadius: 9, padding: "12px 13px" }}>
-                  <span style={{ display: "inline-block", fontSize: 9.5, fontWeight: 500, letterSpacing: 0.5, textTransform: "uppercase", padding: "2px 7px", borderRadius: 20, marginBottom: 6, background: "rgba(129,140,248,0.18)", color: "#a5b4fc" }}>Enterprise</span>
-                  <p style={{ fontSize: 12, fontWeight: 500, color: "#c7d2fe", marginBottom: 3 }}>For developers &amp; teams</p>
-                  <span style={{ fontSize: 11, color: "#64748b", lineHeight: 1.5 }}>Full SDK, API access, webhooks, and a developer dashboard.</span>
-                </div>
-                <div style={{ background: "rgba(129,140,248,0.06)", border: "0.5px solid rgba(129,140,248,0.14)", borderRadius: 9, padding: "12px 13px" }}>
-                  <span style={{ display: "inline-block", fontSize: 9.5, fontWeight: 500, letterSpacing: 0.5, textTransform: "uppercase", padding: "2px 7px", borderRadius: 20, marginBottom: 6, background: "rgba(52,211,153,0.13)", color: "#34d399" }}>Individual</span>
-                  <p style={{ fontSize: 12, fontWeight: 500, color: "#c7d2fe", marginBottom: 3 }}>For small businesses</p>
-                  <span style={{ fontSize: 11, color: "#64748b", lineHeight: 1.5 }}>No code needed. Build lists, run campaigns, grow your audience.</span>
-                </div>
+              {/* Enterprise access */}
+              <div style={{ background: "rgba(129,140,248,0.06)", border: "0.5px solid rgba(129,140,248,0.14)", borderRadius: 9, padding: "12px 13px" }}>
+                <span style={{ display: "inline-block", fontSize: 9.5, fontWeight: 500, letterSpacing: 0.5, textTransform: "uppercase", padding: "2px 7px", borderRadius: 20, marginBottom: 6, background: "rgba(129,140,248,0.18)", color: "#a5b4fc" }}>Enterprise</span>
+                <p style={{ fontSize: 12, fontWeight: 500, color: "#c7d2fe", marginBottom: 3 }}>For developers &amp; SaaS teams</p>
+                <span style={{ fontSize: 11, color: "#64748b", lineHeight: 1.5 }}>Every new account now starts with full SDK access, API keys, onboarding automation, and a developer dashboard.</span>
               </div>
 
             </div>
@@ -183,8 +175,6 @@ export default async function LoginPage() {
 
           <h2 style={{ fontSize: 22, fontWeight: 500, color: "#1e1b4b", letterSpacing: -0.4, marginBottom: 5 }}>Welcome back</h2>
           <p style={{ fontSize: 13.5, color: "#64748b", marginBottom: 26 }}>Sign in to your Dripmetric account</p>
-
-          <TierChips />
 
           <form action={login} style={{ display: "flex", flexDirection: "column", gap: 13 }}>
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
