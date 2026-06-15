@@ -86,7 +86,7 @@ The initial landing page is the most important pre-auth brand reference. It is a
 Primary source files:
 
 - `app/page.tsx` contains the full pre-auth landing/login layout and most inline colors.
-- `app/_components/TierChips.tsx` renders the Enterprise/Individual selector chips on the landing page.
+- The login page no longer renders tier selector chips; new accounts are provisioned as Enterprise.
 - `app/globals.css` defines global theme tokens and imports `DM Sans`.
 
 ### Authenticated dashboard theme
@@ -264,14 +264,13 @@ File: `app/auth/callback/route.ts`
 - Redirects to `/dashboard` after successful exchange.
 - Redirects to `/` if no code is present.
 
-#### First-run tier selection
+#### Enterprise-only first run
 
 Files:
 
-- `app/tier-selection/page.tsx`: server page; requires authenticated user; if tenant already has tier, redirects to `/dashboard/{tier}`; otherwise renders client selector.
-- `app/tier-selection/layout.tsx`: centers tier selection.
-- `app/tier-selection/_components/TierSelectionClient.tsx`: two cards: Enterprise and Individual. Calls `setTier(tier)`.
-- `lib/actions/set-tier.ts`: validates tier, loads Supabase user, inserts or updates tenant, generates enterprise API key when needed, sends welcome email non-blocking, returns redirect path.
+- `app/tier-selection/page.tsx`: server page; requires authenticated user; existing tenants go to their current dashboard and new tenants are automatically provisioned as Enterprise.
+- `app/tier-selection/layout.tsx`: wraps the first-run redirect route.
+- `lib/actions/set-tier.ts`: accepts Enterprise for new accounts, loads the Supabase user, inserts or updates the tenant, generates an API key, sends the welcome email non-blocking, and returns the Enterprise dashboard path.
 
 #### Dashboard tier router
 
@@ -677,7 +676,7 @@ Location: `cli.js`
 - `components/analytics/FunnelChart.tsx`: Recharts funnel/analytics card.
 - `components/analytics/ChartWrapper.tsx`: dynamic import wrapper to avoid SSR chart issues.
 - `app/_components/PlanMeter.tsx`: plan usage meter with optional billing link.
-- `app/_components/TierChips.tsx`: pre-auth landing tier chip UI; visual only, not persisted.
+- The former pre-auth tier chip UI has been removed.
 
 ---
 
@@ -825,7 +824,7 @@ Notes:
 - Dashboard router → `/dashboard` → `app/dashboard/page.tsx` → `/dashboard/enterprise` or `/dashboard/individual`.
 - Enterprise shell → `app/dashboard/enterprise/layout.tsx` → child page.
 - Individual shell → `app/dashboard/individual/layout.tsx` → child page.
-- First-time user without tier → `/tier-selection` → `TierSelectionClient` → `setTier()` → tier dashboard.
+- First-time user without tier → `/tier-selection` → automatic `setTier("enterprise")` → Enterprise dashboard.
 - Enterprise SDK user → `sdk/src/index.ts` → `/api/v1/identify` and `/api/v1/track`.
 - Enterprise automation → dashboard settings/drip steps → `/api/v1/settings` or `/api/individual/drip-steps` → `/api/cron` sends nudges.
 - Individual marketer → lists/campaigns pages → `/api/individual/*` routes → campaign rows/contacts/email sends.

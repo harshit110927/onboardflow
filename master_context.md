@@ -38,7 +38,7 @@ The public app contains:
 - Auth callback at `app/auth/callback/route.ts`.
 - Check-email waiting page at `app/check-email/page.tsx`.
 - Public Enterprise pricing page at `app/pricing/page.tsx` with Free, Basic, and Advanced cards, monthly/annual pricing toggle, FAQ, Free CTA to `/login`, and placeholder paid CTAs pending a destination decision.
-- Tier selection at `app/tier-selection/page.tsx` and `app/tier-selection/_components/TierSelectionClient.tsx`.
+- Enterprise-only first-run provisioning at `app/tier-selection/page.tsx`; the route no longer renders tier-choice buttons and automatically creates an Enterprise tenant.
 - Legal/static pages: `app/privacy/page.tsx`, `app/terms/page.tsx`, `app/docs/page.tsx`.
 - SEO helpers: `app/sitemap.xml/route.ts`, `public/robots.txt`, `app/api/og/route.tsx`.
 
@@ -91,7 +91,7 @@ app/_components/             Shared landing-page-only components/effects
 app/(auth)/login/            Login page and login server action
 app/api/                     All HTTP API route handlers
 app/dashboard/               Authenticated dashboards and dashboard server actions
-app/tier-selection/          First-run tier selection page/client
+app/tier-selection/          Enterprise-only first-run provisioning redirect
 components/                  Shared UI and analytics components
 components/ui/               shadcn-style reusable primitives
 components/analytics/        Funnel/chart components used by analytics pages
@@ -403,24 +403,24 @@ Rules:
 3. Dashboard access without a selected tier redirects to `/tier-selection`.
 4. Visiting `/tier-selection` after tier is already selected redirects to `/dashboard/enterprise` or `/dashboard/individual`.
 
-### 7.4 Tenant creation and tier selection
+### 7.4 Tenant creation and Enterprise-only first run
 
-`lib/actions/set-tier.ts` is the key first-run server action.
+`lib/actions/set-tier.ts` is the key first-run server action. New accounts are currently restricted to Enterprise; existing Individual tenants continue to route to their existing dashboard.
 
 Input:
 
-- `tier: "enterprise" | "individual"`.
+- `tier: "enterprise"`; Individual input is rejected.
 
 Logic:
 
 1. Authenticates the Supabase user.
 2. Loads tenant by email.
-3. If selecting Enterprise, generates API key with prefix `obf_live_` and random hex bytes.
+3. Generates an Enterprise API key with prefix `obf_live_` and random hex bytes.
 4. If no tenant exists, inserts a new `tenants` row with email, default name `Founder`, tier, and optional API key.
 5. If tenant exists with `tier === null`, updates it.
 6. If tenant already has a tier, throws `Tier already set`.
 7. Sends a non-blocking welcome email through Resend.
-8. Returns redirect target based on tier.
+8. Returns `/dashboard/enterprise`.
 
 ### 7.5 Cached auth helpers
 
@@ -472,8 +472,10 @@ Individual paid plan cards:
 
 Enterprise paid plan cards:
 
-- `ent_basic` → `basic`
-- `ent_advanced` → `advanced`
+- `ent_basic` → `basic` at $79/month.
+- `ent_advanced` → `advanced` at $149/month.
+
+The public pricing page and authenticated Enterprise billing page both read the paid prices from `ENTERPRISE_PLANS`; Razorpay environment-variable names remain `RAZORPAY_PLAN_ENT_BASIC` and `RAZORPAY_PLAN_ENT_ADVANCED`.
 
 ### 8.4 Effective plan resolution
 
@@ -514,7 +516,7 @@ These are used by Individual campaign sending and billing UI logic.
 
 ### 9.1 API key generation
 
-1. User logs in and chooses Enterprise in tier selection.
+1. User logs in and is automatically provisioned as Enterprise on first dashboard access.
 2. `setTier("enterprise")` creates or updates a tenant.
 3. The tenant receives `apiKey = obf_live_<random>`.
 4. Dashboard displays the API key through components such as `app/dashboard/ApiKeyCard.tsx`.
@@ -1688,13 +1690,13 @@ The codebase has several naming leftovers and route-prefix inconsistencies:
 ### 20.1 New user becomes an Individual customer
 
 ```text
-Landing/login -> Supabase magic link/OAuth -> auth callback -> no tenant/tier -> tier selection -> setTier("individual") -> tenants row -> /dashboard/individual -> create list -> add/import contacts -> create campaign -> send -> campaignEvents/open/click -> dashboard stats
+Existing Individual tenant -> login -> auth callback -> /dashboard -> /dashboard/individual -> create list -> add/import contacts -> create campaign -> send -> campaignEvents/open/click -> dashboard stats
 ```
 
 ### 20.2 New user becomes an Enterprise customer
 
 ```text
-Landing/login -> Supabase magic link/OAuth -> auth callback -> tier selection -> setTier("enterprise") -> tenants row with API key -> dashboard shows API key -> customer installs SDK -> identify users -> track events -> endUsers.completedSteps -> analytics + automations + webhooks
+Landing/login -> Supabase magic link/OAuth -> auth callback -> /dashboard -> automatic setTier("enterprise") -> tenants row with API key -> dashboard shows API key -> customer installs SDK -> identify users -> track events -> endUsers.completedSteps -> analytics + automations + webhooks
 ```
 
 ### 20.3 Enterprise automation lifecycle

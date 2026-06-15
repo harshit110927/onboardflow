@@ -21,6 +21,10 @@ const paidPlanIdsByTier = Object.fromEntries(
   ENTERPRISE_PLANS.map((plan) => [plan.planTier, plan.id])
 ) as Partial<Record<EnterprisePlanTier, (typeof ENTERPRISE_PLANS)[number]["id"]>>;
 
+const paidPlanPricesByTier = Object.fromEntries(
+  ENTERPRISE_PLANS.map((plan) => [plan.planTier, plan.priceUsd])
+) as Partial<Record<EnterprisePlanTier, number>>;
+
 const pricingTiers: PricingTier[] = [
   {
     tier: "free",
@@ -32,7 +36,7 @@ const pricingTiers: PricingTier[] = [
   {
     tier: "basic",
     description: "A practical launch plan for early SaaS teams improving activation.",
-    monthlyPriceUsd: 79,
+    monthlyPriceUsd: paidPlanPricesByTier.basic!,
     ctaLabel: "Get started",
     // TODO: Wire paid tier CTAs after the destination is confirmed.
     ctaHref: "#",
@@ -41,7 +45,7 @@ const pricingTiers: PricingTier[] = [
   {
     tier: "advanced",
     description: "Scale onboarding automation with higher limits and richer insights.",
-    monthlyPriceUsd: 149,
+    monthlyPriceUsd: paidPlanPricesByTier.advanced!,
     ctaLabel: "Get started",
     // TODO: Wire paid tier CTAs after the destination is confirmed.
     ctaHref: "#",
