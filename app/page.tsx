@@ -958,23 +958,23 @@ const landingMarkup = String.raw`<!-- ══════════════
       </div>
       <div class="feat-card reveal d6">
         <div class="feat-ico"><svg class="ico" width="20" height="20"><use href="#i-package"/></svg></div>
-        <h3>Simple SDK installation and setup</h3>
-        <p>One command install. Full TypeScript support, CJS + ESM exports. Works with any Node.js framework — Next.js, Express, Hono, and more.</p>
+        <h3>Language agnostic API setup</h3>
+        <p>Works with any language capable of making HTTP requests. Use cURL, Node.js, Python, Go, PHP, Ruby, Java, or the lightweight Node.js wrapper.</p>
       </div>
     </div>
     <div class="feat-wide" style="margin-top:20px">
       <div class="feat-card-dark reveal d1">
         <div class="feat-ico"><svg class="ico" width="20" height="20"><use href="#i-building"/></svg></div>
         <div>
-          <h3>Enterprise Tier — For Developers</h3>
-          <p>Install the npm SDK, call <code style="font-family:'DM Mono',monospace;font-size:.85em;background:rgba(255,255,255,.08);padding:2px 6px;border-radius:4px;color:var(--accent-soft)">identify()</code> on signup and <code style="font-family:'DM Mono',monospace;font-size:.85em;background:rgba(255,255,255,.08);padding:2px 6px;border-radius:4px;color:var(--accent-soft)">track()</code> on step completion. Dripmetric detects stalled users and fires drip emails automatically. Dashboard shows your full funnel.</p>
+          <h3>API Platform — For SaaS Teams</h3>
+          <p>Send HTTP requests or use the npm wrapper, call <code style="font-family:'DM Mono',monospace;font-size:.85em;background:rgba(255,255,255,.08);padding:2px 6px;border-radius:4px;color:var(--accent-soft)">identify()</code> on signup and <code style="font-family:'DM Mono',monospace;font-size:.85em;background:rgba(255,255,255,.08);padding:2px 6px;border-radius:4px;color:var(--accent-soft)">track()</code> on step completion. Dripmetric detects stalled users and fires drip emails automatically. Dashboard shows your full funnel.</p>
         </div>
       </div>
       <div class="feat-card-dark reveal d2">
         <div class="feat-ico" style="color:var(--emerald)"><svg class="ico" width="20" height="20"><use href="#i-store"/></svg></div>
         <div>
-          <h3>Individual Tier — No-Code Dashboard</h3>
-          <p>Manage email lists, add contacts, build drip sequences, and send campaigns directly from the browser. No SDK, no API keys, no technical setup required. Perfect for 1–3 person teams.</p>
+          <h3>SaaS onboarding dashboard</h3>
+          <p>Manage onboarding automation from the browser after connecting your public API integration. Your team can update steps, emails, and reporting without redeploying.</p>
         </div>
       </div>
     </div>
@@ -995,7 +995,7 @@ const landingMarkup = String.raw`<!-- ══════════════
       <div class="step reveal d1">
         <div class="step-num">01</div>
         <h3>Install &amp; Initialize</h3>
-        <p>Run <code>npm install dripmetric</code>, add your API key from the dashboard, and initialize the client in your backend. Any Node.js framework works.</p>
+        <p>Add your API key from the dashboard and call the public API from your backend. Works with any language capable of making HTTP requests.</p>
       </div>
       <div class="step reveal d2">
         <div class="step-num">02</div>

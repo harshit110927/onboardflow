@@ -11,6 +11,7 @@ export interface IdentifyProperties extends JsonObject {
 export interface IdentifyParams {
   userId: string;
   email: string;
+  metadata?: IdentifyProperties;
   properties?: IdentifyProperties;
 }
 
@@ -40,7 +41,7 @@ export class Dripmetric {
 
   constructor(apiKey: string, options?: { baseUrl?: string }) {
     this.apiKey = apiKey;
-    this.baseUrl = options?.baseUrl || "https://www.dripmetric.com/api/v1";
+    this.baseUrl = options?.baseUrl || "https://www.dripmetric.com/api/public";
   }
 
   /**
@@ -51,7 +52,7 @@ export class Dripmetric {
     return this._request("/identify", {
       userId: user.userId,
       email: user.email,
-      ...(user.properties !== undefined ? { properties: user.properties } : {}),
+      ...((user.metadata ?? user.properties) !== undefined ? { metadata: user.metadata ?? user.properties } : {}),
     });
   }
 
@@ -59,10 +60,12 @@ export class Dripmetric {
    * Track a completed onboarding step.
    * stepId must match the Event Name (Code) set in your dashboard.
    */
-  async track(data: { userId: string; stepId: string }): Promise<{ success: boolean; step: string }> {
+  async track(data: { userId: string; eventName?: string; stepId?: string; properties?: JsonObject; timestamp?: string }): Promise<{ success: boolean; eventName: string; duplicate: boolean }> {
     return this._request("/track", {
       userId: data.userId,
-      stepId: data.stepId,
+      eventName: data.eventName ?? data.stepId,
+      ...(data.properties !== undefined ? { properties: data.properties } : {}),
+      ...(data.timestamp !== undefined ? { timestamp: data.timestamp } : {}),
     });
   }
 
