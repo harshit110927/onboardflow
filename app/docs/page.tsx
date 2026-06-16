@@ -34,7 +34,7 @@ export default function DocsPage() {
             <Terminal className="h-6 w-6 text-blue-600" />
             <h2 className="text-2xl font-bold">Quick Start</h2>
           </div>
-          <p className="text-slate-600">Install the SDK and initialize it with your API key from the dashboard.</p>
+          <p className="text-slate-600">Use the public HTTP API from any backend. Works with any language capable of making HTTP requests. The Node.js package is a lightweight wrapper around these endpoints.</p>
           <div className="bg-slate-950 rounded-lg p-4 text-slate-50 overflow-x-auto shadow-xl">
             <code className="font-mono text-sm">npm install dripmetric</code>
           </div>
@@ -220,9 +220,9 @@ Your users will now receive emails from your domain.`}</pre>
           <p className="text-slate-600">If you prefer direct HTTP calls over the SDK, use these endpoints.</p>
 
           <div className="space-y-4">
-            <h3 className="text-lg font-semibold">POST /api/v1/identify</h3>
+            <h3 className="text-lg font-semibold">POST /api/public/identify</h3>
             <div className="bg-slate-900 rounded-md p-4 overflow-x-auto">
-<pre className="text-sm font-mono text-blue-300">{`POST /api/v1/identify
+<pre className="text-sm font-mono text-blue-300">{`POST /api/public/identify
 Headers: {
   "x-api-key": "obf_live_...",
   "Content-Type": "application/json"
@@ -235,9 +235,9 @@ Body: {
           </div>
 
           <div className="space-y-4">
-            <h3 className="text-lg font-semibold">POST /api/v1/track</h3>
+            <h3 className="text-lg font-semibold">POST /api/public/track</h3>
             <div className="bg-slate-900 rounded-md p-4 overflow-x-auto">
-<pre className="text-sm font-mono text-blue-300">{`POST /api/v1/track
+<pre className="text-sm font-mono text-blue-300">{`POST /api/public/track
 Headers: {
   "x-api-key": "obf_live_...",
   "Content-Type": "application/json"
@@ -259,8 +259,8 @@ Body: {
                 <tr className="border-b">
                   <th className="py-3 pr-6 font-semibold text-slate-700">Limit</th>
                   <th className="py-3 pr-6 font-semibold text-slate-700">Free</th>
-                  <th className="py-3 pr-6 font-semibold text-slate-700">Basic</th>
-                  <th className="py-3 font-semibold text-slate-700">Advanced</th>
+                  <th className="py-3 pr-6 font-semibold text-slate-700">Startup</th>
+                  <th className="py-3 font-semibold text-slate-700">Growth</th>
                 </tr>
               </thead>
               <tbody className="text-slate-600">

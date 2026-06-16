@@ -111,8 +111,8 @@ export const INDIVIDUAL_PLANS = [
 export const ENTERPRISE_PLANS = [
   {
     id: "ent_basic",
-    label: "Basic",
-    priceUsd: 79,
+    label: "Startup",
+    priceUsd: 25,
     priceInr: 6600,
     amountInPaise: 660000,
     planTier: "basic" as EnterprisePlanTier,
@@ -120,8 +120,8 @@ export const ENTERPRISE_PLANS = [
   },
   {
     id: "ent_advanced",
-    label: "Advanced",
-    priceUsd: 149,
+    label: "Growth",
+    priceUsd: 50,
     priceInr: 12400,
     amountInPaise: 1240000,
     planTier: "advanced" as EnterprisePlanTier,
