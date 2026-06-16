@@ -74,7 +74,7 @@ function formatNumber(value: number) {
   return value.toLocaleString("en-US");
 }
 
-function formatPrice(monthlyPriceUsd: number) {
+function formatUsd(monthlyPriceUsd: number) {
   if (monthlyPriceUsd === 0) return "$0";
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(monthlyPriceUsd);
 }
@@ -99,7 +99,8 @@ export default function PricingPage() {
         return {
           ...plan,
           paidPlanId,
-          price: formatPrice(plan.launchPriceUsd),
+          launchPrice: formatUsd(plan.launchPriceUsd),
+          regularPrice: formatUsd(plan.regularPriceUsd),
           limits,
           features: [
             `${formatNumber(limits.maxTrackedUsers)} tracked users`,
@@ -162,17 +163,24 @@ export default function PricingPage() {
               </div>
 
               <div className="mt-8">
-                <div className="flex items-end gap-2">
-                  <span className="text-5xl font-semibold tracking-[-0.05em] text-[#1e1b4b]">{plan.price}</span>
-                  <span className="pb-2 text-sm font-medium text-[#64748b]">/month</span>
-                </div>
                 {plan.regularPriceUsd > plan.launchPriceUsd ? (
-                  <div className="mt-2 space-y-1 text-sm">
-                    <p className="text-[#64748b]"><span className="line-through">${plan.regularPriceUsd}/month</span></p>
-                    <p className="font-semibold text-[#4338ca]">Launch Month Discount</p>
+                  <div className="space-y-3">
+                    <p className="text-lg font-semibold text-[#64748b]">
+                      <span className="line-through decoration-2">{plan.regularPrice}/month</span>
+                    </p>
+                    <div className="flex items-end gap-2">
+                      <span className="text-5xl font-semibold tracking-[-0.05em] text-[#1e1b4b]">{plan.launchPrice}</span>
+                      <span className="pb-2 text-sm font-medium text-[#64748b]">/month</span>
+                    </div>
+                    <span className="inline-flex rounded-full bg-[#e0e7ff] px-3 py-1 text-xs font-bold uppercase tracking-[0.12em] text-[#4338ca]">
+                      Launch Month Discount
+                    </span>
                   </div>
                 ) : (
-                  <p className="mt-2 text-sm text-[#64748b]">Free to start.</p>
+                  <div className="flex items-end gap-2">
+                    <span className="text-5xl font-semibold tracking-[-0.05em] text-[#1e1b4b]">{plan.launchPrice}</span>
+                    <span className="pb-2 text-sm font-medium text-[#64748b]">/month</span>
+                  </div>
                 )}
               </div>
 

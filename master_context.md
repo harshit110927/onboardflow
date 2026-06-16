@@ -37,7 +37,7 @@ The public app contains:
 - Login pages and server actions under `app/(auth)/login/*` and `app/actions.ts`.
 - Auth callback at `app/auth/callback/route.ts`.
 - Check-email waiting page at `app/check-email/page.tsx`.
-- Public Enterprise pricing page at `app/pricing/page.tsx` with Free, Basic, and Advanced cards, monthly/annual pricing toggle, FAQ, Free CTA to `/login`, and placeholder paid CTAs pending a destination decision.
+- Public Enterprise pricing page at `app/pricing/page.tsx` with Free, Startup, and Growth cards, launch pricing ($25/$50) with struck-through original prices ($60/$120), FAQ, Free CTA to `/login`, and placeholder paid CTAs pending a destination decision.
 - Enterprise-only first-run provisioning at `app/tier-selection/page.tsx`; the route no longer renders tier-choice buttons and automatically creates an Enterprise tenant.
 - Legal/static pages: `app/privacy/page.tsx`, `app/terms/page.tsx`, `app/docs/page.tsx`.
 - SEO helpers: `app/sitemap.xml/route.ts`, `public/robots.txt`, `app/api/og/route.tsx`.
@@ -467,8 +467,8 @@ Individual paid plan cards:
 ### 8.3 Enterprise limits
 
 - Free: 50 tracked users, 300 emails/month, 3 drip steps, no webhooks, no advanced analytics.
-- Basic: 500 tracked users, 3,000 emails/month, 3 drip steps, no webhooks, no advanced analytics.
-- Advanced: 2,000 tracked users, 10,000 emails/month, unlimited drip steps, webhooks enabled, advanced analytics enabled.
+- Startup: 500 tracked users, 3,000 emails/month, 3 drip steps, no webhooks, no advanced analytics.
+- Growth: 2,000 tracked users, 10,000 emails/month, unlimited drip steps, webhooks enabled, advanced analytics enabled.
 
 Enterprise paid plan cards:
 

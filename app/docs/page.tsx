@@ -259,8 +259,8 @@ Body: {
                 <tr className="border-b">
                   <th className="py-3 pr-6 font-semibold text-slate-700">Limit</th>
                   <th className="py-3 pr-6 font-semibold text-slate-700">Free</th>
-                  <th className="py-3 pr-6 font-semibold text-slate-700">Basic</th>
-                  <th className="py-3 font-semibold text-slate-700">Advanced</th>
+                  <th className="py-3 pr-6 font-semibold text-slate-700">Startup</th>
+                  <th className="py-3 font-semibold text-slate-700">Growth</th>
                 </tr>
               </thead>
               <tbody className="text-slate-600">

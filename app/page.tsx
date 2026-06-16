@@ -1099,6 +1099,20 @@ const landingMarkup = String.raw`<!-- ══════════════
     <div class="cta-banner reveal">
       <p class="cta-kicker">Free to start.</p>
       <h2>Stop guessing.<br/><strong>Start recovering lost signups.</strong></h2>
+      <div class="pricing-grid" style="margin:24px auto 28px;max-width:720px">
+        <div class="pricing-card" style="background:rgba(255,255,255,.10);border-color:rgba(255,255,255,.22)">
+          <h3>Startup</h3>
+          <p><span style="text-decoration:line-through;color:var(--on-deep-muted)">$60/month</span></p>
+          <p style="font-size:2rem;font-weight:700;color:#fff">$25/month</p>
+          <p class="tag" style="display:inline-flex;margin-top:8px">Launch Month Discount</p>
+        </div>
+        <div class="pricing-card" style="background:rgba(255,255,255,.10);border-color:rgba(255,255,255,.22)">
+          <h3>Growth</h3>
+          <p><span style="text-decoration:line-through;color:var(--on-deep-muted)">$120/month</span></p>
+          <p style="font-size:2rem;font-weight:700;color:#fff">$50/month</p>
+          <p class="tag" style="display:inline-flex;margin-top:8px">Launch Month Discount</p>
+        </div>
+      </div>
       <div class="cta-btns">
         <a href="/login" class="btn-white">
           Start free — no credit card required
@@ -1121,7 +1135,7 @@ const landingMarkup = String.raw`<!-- ══════════════
     <div class="faq-list">
       <details open class="reveal d1">
         <summary>What is Dripmetric?<span class="sum-arrow"><svg class="ico" width="14" height="14"><use href="#i-chevron-down"/></svg></span></summary>
-        <div class="faq-ans">Dripmetric is a multi-tenant SaaS platform for onboarding automation and email campaign management. It has two tiers — an <strong>Enterprise tier</strong> with an npm SDK for developers, and an <strong>Individual tier</strong> with a no-code dashboard for small businesses. Both are free to start, no credit card required.</div>
+        <div class="faq-ans">Dripmetric is a SaaS onboarding automation platform for identifying users, tracking activation events, detecting stalls, and sending configured lifecycle nudges. It is free to start, no credit card required.</div>
       </details>
       <details class="reveal d2">
         <summary>How do I integrate Dripmetric into my SaaS?<span class="sum-arrow"><svg class="ico" width="14" height="14"><use href="#i-chevron-down"/></svg></span></summary>
