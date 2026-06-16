@@ -125,7 +125,7 @@ export const ENTERPRISE_PLANS = [
     priceInr: 12400,
     amountInPaise: 1240000,
     planTier: "advanced" as EnterprisePlanTier,
-    highlights: ["10,000 emails/month", "2,000 tracked users", "Unlimited drip steps", "Webhooks", "Advanced analytics"],
+    highlights: ["10,000 emails/month", "2,000 tracked users", "Unlimited drip steps"],
   },
 ] as const;
 
