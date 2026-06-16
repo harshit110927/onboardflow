@@ -275,3 +275,30 @@ export const unsubscribedContacts = pgTable("unsubscribed_contacts", {
   email: varchar("email", { length: 255 }).notNull().unique(),
   unsubscribedAt: timestamp("unsubscribed_at").defaultNow(),
 });
+
+export const consentRecords = pgTable("consent_records", {
+  id: serial("id").primaryKey(),
+  email: varchar("email", { length: 255 }).notNull(),
+  consentType: varchar("consent_type", { length: 100 }).notNull(),
+  consented: boolean("consented").notNull().default(false),
+  source: varchar("source", { length: 100 }).notNull().default("web"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const auditLogs = pgTable("audit_logs", {
+  id: serial("id").primaryKey(),
+  tenantId: uuid("tenant_id").references(() => tenants.id, { onDelete: "set null" }),
+  action: varchar("action", { length: 100 }).notNull(),
+  actorEmail: varchar("actor_email", { length: 255 }),
+  metadata: jsonb("metadata").$type<Record<string, unknown>>().default({}),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const dataRequests = pgTable("data_requests", {
+  id: serial("id").primaryKey(),
+  email: varchar("email", { length: 255 }).notNull(),
+  requestType: varchar("request_type", { length: 20 }).notNull(),
+  status: varchar("status", { length: 20 }).notNull().default("pending"),
+  details: text("details"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});

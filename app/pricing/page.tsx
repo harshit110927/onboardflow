@@ -1,17 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { ENTERPRISE_LIMITS, ENTERPRISE_PLANS, type EnterprisePlanTier } from "@/lib/plans/limits";
 
-const ANNUAL_DISCOUNT_RATE = 0.2;
 
-type BillingCycle = "monthly" | "annual";
 
 type PricingTier = {
   tier: EnterprisePlanTier;
   description: string;
-  monthlyPriceUsd: number;
+  launchPriceUsd: number;
+  regularPriceUsd: number;
+  label: string;
   ctaLabel: string;
   ctaHref: string;
   isPopular?: boolean;
@@ -21,22 +21,22 @@ const paidPlanIdsByTier = Object.fromEntries(
   ENTERPRISE_PLANS.map((plan) => [plan.planTier, plan.id])
 ) as Partial<Record<EnterprisePlanTier, (typeof ENTERPRISE_PLANS)[number]["id"]>>;
 
-const paidPlanPricesByTier = Object.fromEntries(
-  ENTERPRISE_PLANS.map((plan) => [plan.planTier, plan.priceUsd])
-) as Partial<Record<EnterprisePlanTier, number>>;
-
 const pricingTiers: PricingTier[] = [
   {
     tier: "free",
     description: "Explore Dripmetric with a lightweight onboarding automation setup.",
-    monthlyPriceUsd: 0,
+    launchPriceUsd: 0,
+    regularPriceUsd: 0,
+    label: "Free",
     ctaLabel: "Start free",
     ctaHref: "/login",
   },
   {
     tier: "basic",
+    label: "Startup",
     description: "A practical launch plan for early SaaS teams improving activation.",
-    monthlyPriceUsd: paidPlanPricesByTier.basic!,
+    launchPriceUsd: 25,
+    regularPriceUsd: 60,
     ctaLabel: "Get started",
     // TODO: Wire paid tier CTAs after the destination is confirmed.
     ctaHref: "#",
@@ -44,8 +44,10 @@ const pricingTiers: PricingTier[] = [
   },
   {
     tier: "advanced",
+    label: "Growth",
     description: "Scale onboarding automation with higher limits and richer insights.",
-    monthlyPriceUsd: paidPlanPricesByTier.advanced!,
+    launchPriceUsd: 50,
+    regularPriceUsd: 120,
     ctaLabel: "Get started",
     // TODO: Wire paid tier CTAs after the destination is confirmed.
     ctaHref: "#",
@@ -72,16 +74,9 @@ function formatNumber(value: number) {
   return value.toLocaleString("en-US");
 }
 
-function formatPrice(monthlyPriceUsd: number, billingCycle: BillingCycle) {
-  const effectivePrice = billingCycle === "annual" ? monthlyPriceUsd * (1 - ANNUAL_DISCOUNT_RATE) : monthlyPriceUsd;
-
-  if (effectivePrice === 0) return "$0";
-
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    maximumFractionDigits: Number.isInteger(effectivePrice) ? 0 : 2,
-  }).format(effectivePrice);
+function formatUsd(monthlyPriceUsd: number) {
+  if (monthlyPriceUsd === 0) return "$0";
+  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(monthlyPriceUsd);
 }
 
 function formatDripSteps(maxDripSteps: number) {
@@ -93,7 +88,7 @@ function formatBooleanFeature(enabled: boolean, enabledLabel: string, disabledLa
 }
 
 export default function PricingPage() {
-  const [billingCycle, setBillingCycle] = useState<BillingCycle>("monthly");
+  
 
   const planCards = useMemo(
     () =>
@@ -104,7 +99,8 @@ export default function PricingPage() {
         return {
           ...plan,
           paidPlanId,
-          price: formatPrice(plan.monthlyPriceUsd, billingCycle),
+          launchPrice: formatUsd(plan.launchPriceUsd),
+          regularPrice: formatUsd(plan.regularPriceUsd),
           limits,
           features: [
             `${formatNumber(limits.maxTrackedUsers)} tracked users`,
@@ -119,7 +115,7 @@ export default function PricingPage() {
           ],
         };
       }),
-    [billingCycle]
+    []
   );
 
   return (
@@ -147,27 +143,6 @@ export default function PricingPage() {
           </p>
         </div>
 
-        <div className="mx-auto flex rounded-full border border-[#d7d2f4] bg-white p-1 shadow-sm" aria-label="Billing cycle toggle">
-          <button
-            type="button"
-            onClick={() => setBillingCycle("monthly")}
-            className={`rounded-full px-5 py-2 text-sm font-semibold transition ${
-              billingCycle === "monthly" ? "bg-[#4338ca] text-white shadow" : "text-[#64748b] hover:text-[#1e1b4b]"
-            }`}
-          >
-            Monthly
-          </button>
-          <button
-            type="button"
-            onClick={() => setBillingCycle("annual")}
-            className={`rounded-full px-5 py-2 text-sm font-semibold transition ${
-              billingCycle === "annual" ? "bg-[#4338ca] text-white shadow" : "text-[#64748b] hover:text-[#1e1b4b]"
-            }`}
-          >
-            Annual <span className="ml-1 text-xs opacity-80">Save 20%</span>
-          </button>
-        </div>
-
         <div className="grid gap-6 lg:grid-cols-3">
           {planCards.map((plan) => (
             <article
@@ -183,19 +158,29 @@ export default function PricingPage() {
               ) : null}
 
               <div className="pr-28 lg:pr-0 xl:pr-24">
-                <h2 className="text-2xl font-semibold capitalize text-[#1e1b4b]">{plan.tier}</h2>
+                <h2 className="text-2xl font-semibold text-[#1e1b4b]">{plan.label}</h2>
                 <p className="mt-3 min-h-14 text-sm leading-6 text-[#64748b]">{plan.description}</p>
               </div>
 
               <div className="mt-8">
-                <div className="flex items-end gap-2">
-                  <span className="text-5xl font-semibold tracking-[-0.05em] text-[#1e1b4b]">{plan.price}</span>
-                  <span className="pb-2 text-sm font-medium text-[#64748b]">/month</span>
-                </div>
-                {billingCycle === "annual" ? (
-                  <p className="mt-2 text-sm text-[#64748b]">Billed annually as a 20% discounted monthly equivalent.</p>
+                {plan.regularPriceUsd > plan.launchPriceUsd ? (
+                  <div className="space-y-3">
+                    <p className="text-lg font-semibold text-[#64748b]">
+                      <span className="line-through decoration-2">{plan.regularPrice}/month</span>
+                    </p>
+                    <div className="flex items-end gap-2">
+                      <span className="text-5xl font-semibold tracking-[-0.05em] text-[#1e1b4b]">{plan.launchPrice}</span>
+                      <span className="pb-2 text-sm font-medium text-[#64748b]">/month</span>
+                    </div>
+                    <span className="inline-flex rounded-full bg-[#e0e7ff] px-3 py-1 text-xs font-bold uppercase tracking-[0.12em] text-[#4338ca]">
+                      Launch Month Discount
+                    </span>
+                  </div>
                 ) : (
-                  <p className="mt-2 text-sm text-[#64748b]">Monthly billing with no annual commitment.</p>
+                  <div className="flex items-end gap-2">
+                    <span className="text-5xl font-semibold tracking-[-0.05em] text-[#1e1b4b]">{plan.launchPrice}</span>
+                    <span className="pb-2 text-sm font-medium text-[#64748b]">/month</span>
+                  </div>
                 )}
               </div>
 
