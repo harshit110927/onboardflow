@@ -86,14 +86,14 @@ export function LimitBanners({ usage }: { usage: Usage }) {
       {showUserLimit && (
         <LimitBanner
           type="users"
-          message={`You have ${untrackedUsers} users Dripmetric is not fully tracking because you are on the free plan. Upgrade to Basic to track up to 500 users.`}
+          message={`You have ${untrackedUsers} users Dripmetric is not fully tracking because you are on the free plan. Upgrade to Startup to track up to 500 users.`}
           onDismiss={dismissUserLimit}
         />
       )}
       {showEmailLimit && (
         <LimitBanner
           type="emails"
-          message={`${suppressedEmails} recovery emails were not sent this month because you have reached your free plan limit. Upgrade to Basic to send up to 3,000 emails per month.`}
+          message={`${suppressedEmails} recovery emails were not sent this month because you have reached your free plan limit. Upgrade to Startup to send up to 3,000 emails per month.`}
           onDismiss={dismissEmailLimit}
         />
       )}

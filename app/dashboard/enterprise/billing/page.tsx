@@ -1,10 +1,15 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { ENTERPRISE_PLANS } from "@/lib/plans/limits";
+import { ENTERPRISE_PLANS, type EnterprisePlanTier } from "@/lib/plans/limits";
 import { getSession } from "@/lib/auth/get-session";
 import { getTenant } from "@/lib/auth/get-tenant";
 import { getTenantPlan } from "@/lib/plans/get-tenant-plan";
 import { BillingActions } from "../../individual/billing/_components/BillingActions";
+
+const ENTERPRISE_LAUNCH_PRICES: Partial<Record<EnterprisePlanTier, { regularUsd: number; launchUsd: number; badge: string }>> = {
+  basic: { regularUsd: 60, launchUsd: 25, badge: "Launch Month Discount" },
+  advanced: { regularUsd: 120, launchUsd: 50, badge: "Launch Month Discount" },
+};
 
 export default async function EnterpriseBillingPage() {
   const { user } = await getSession();
@@ -40,7 +45,12 @@ export default async function EnterpriseBillingPage() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {ENTERPRISE_PLANS.map((plan) => (
-            <BillingActions key={plan.id} plan={plan} isCurrent={planInfo.plan === plan.planTier} />
+            <BillingActions
+              key={plan.id}
+              plan={plan}
+              isCurrent={planInfo.plan === plan.planTier}
+              launchPriceDisplay={ENTERPRISE_LAUNCH_PRICES[plan.planTier]}
+            />
           ))}
         </div>
 

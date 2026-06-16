@@ -107,8 +107,8 @@ export default async function EnterpriseDashboardPage() {
     planInfo.plan === "free"
       ? "Free"
       : planInfo.plan === "basic"
-        ? "Basic"
-        : "Advanced";
+        ? "Startup"
+        : "Growth";
 
   const stuckCount = totalUsers - step1Count;
   const completionRate = totalUsers > 0 ? Math.round((step1Count / totalUsers) * 100) : 0;
