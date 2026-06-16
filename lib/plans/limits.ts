@@ -73,7 +73,7 @@ export const ENTERPRISE_LIMITS: Record<EnterprisePlanTier, EnterpriseLimits> = {
     maxTrackedUsers: 2000,
     maxEmailsPerMonth: 10000,
     maxDripSteps: Infinity,
-    webhooksEnabled: true,
+    webhooksEnabled: false,
     advancedAnalyticsEnabled: true,
   },
 };
