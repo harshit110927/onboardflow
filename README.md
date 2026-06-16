@@ -1,125 +1,44 @@
 # Dripmetric
 
-A unified authentication and onboarding platform for developers and small businesses.
+Works with any language capable of making HTTP requests.
 
-Dripmetric comes in two tiers — **Enterprise** for developers building SaaS products, and **Individual** for freelancers and small businesses who want email list management without writing code.
+Dripmetric is a SaaS onboarding automation platform: identify users, track onboarding events, detect stalled users, and send configured drip emails from your dashboard.
 
-Live: <a href="https://dripmetric-three.vercel.app">dripmetric-three.vercel.app</a>
+## Public API Platform
 
----
+Use the public API from any backend language, or use the lightweight Node.js wrapper in `sdk/`.
 
-## What it does
+- `POST /api/public/identify`
+- `POST /api/public/track`
+- `GET /api/public/health`
+- `GET /api/public/version`
 
-### Enterprise Tier — For Developers
-Drop-in authentication and onboarding automation for your SaaS product. Install the SDK, get magic link auth, automated drip emails, and a developer dashboard — without building any of it from scratch.
+See `API.md` for cURL, Node.js, Python, Go, PHP, Ruby, and Java examples.
 
-### Individual Tier — For Small Businesses
-No code required. Create email lists, manage contacts, build campaigns, and send emails directly from the dashboard. Free to start.
+## Pricing
 
----
+- Startup launch pricing: `$25/month` with regular `$60/month` shown as struck-through in the pricing UI.
+- Growth launch pricing: `$50/month` with regular `$120/month` shown as struck-through in the pricing UI.
 
-## Enterprise — Key Features
+## Compliance routes
 
-- **Magic Link Authentication** — Passwordless, secure login flows
-- **Automated Onboarding Emails** — Drip sequences triggered by user behaviour (step completion, inactivity nudges)
-- **Smart Nudges** — Re-engage users who haven't activated after 1 hour or 24 hours
-- **Developer Dashboard** — Manage API keys, view user analytics, configure automation steps
-- **Type-Safe SDK** — Full TypeScript support
+- `/privacy`
+- `/terms`
+- `/cookies`
+- `/data-export`
+- `/data-deletion`
+- `/unsubscribe`
 
-## Individual — Key Features
+See `COMPLIANCE.md` and `SCHEMA_CHANGES.sql` for infrastructure and manual Supabase SQL.
 
-- **Email Lists** — Create and manage up to 3 lists
-- **Contact Management** — Add and remove contacts (up to 10 per list)
-- **Email Campaigns** — Write, schedule, and send campaigns via Resend
-- **Basic Analytics** — Track campaign status (draft, scheduled, sent)
+## Development
 
----
+```bash
+npm install
+npm run dev
+npm run test:full
+```
 
-## Tech Stack
+## Testing data modes
 
-- **Framework**: Next.js 15 (App Router, TypeScript)
-- **Database**: PostgreSQL via Supabase + Drizzle ORM
-- **Auth**: Supabase Auth (Magic Link + Google OAuth)
-- **Email**: Resend
-- **Payments**: Stripe (coming soon)
-- **Hosting**: Vercel
-
----
-
-## Enterprise SDK — Quick Start
-
-### Installation
-
-Install the package via your preferred package manager:
-
-    npm install dripmetric
-
-### Configuration
-
-1. Sign up at dripmetric-three.vercel.app
-2. Choose the Enterprise tier
-3. Copy your API key from the dashboard
-4. Add to your .env.local file:
-
-    NEXT_PUBLIC_ONBOARDFLOW_KEY=obf_live_xxxxxxxxxxxxx
-
-### Initialize the client
-
-Create a shared utility file at lib/dripmetric.ts:
-
-    import { Dripmetric } from 'dripmetric';
-    
-    export const onboard = new Dripmetric(
-      process.env.NEXT_PUBLIC_ONBOARDFLOW_KEY!
-    );
-
-### Protect routes
-
-In your middleware.ts file:
-
-    // Middleware helper is not available yet.
-    // Use your existing app auth middleware and call onboard.identify/track from your app code.
-
-### Access user sessions
-
-    import { onboard } from '@/lib/dripmetric';
-
-    await onboard.identify({
-      userId: "user_123",
-      email: "alice@example.com"
-    });
-
-### Track onboarding events
-
-    await onboard.track({
-      userId: "user_123",
-      eventName: "feature_used",
-    });
-
----
-
-## Rate Limits (Free Tier)
-
-Enterprise: 20 emails per day, 300 emails per month, 50 end users tracked
-Individual: 3 email lists, 10 contacts per list, 1 campaign per list
-
-Limits will increase when we launch a paid plan. You will be notified first.
-
----
-
-## Roadmap
-
-- Stripe payment gating for Enterprise
-- Campaign scheduling execution via cron
-- Advanced analytics including open rates and click rates
-- Bulk CSV contact import
-- Premium Individual tier
-- Custom domain support
-
----
-
-## License
-
-MIT License — Copyright 2026 Dripmetric
-
----
+Set `USE_EXISTING_TEST_DATA=true` to use permanent Supabase test records and skip seeding/cleanup. Set `USE_EXISTING_TEST_DATA=false` to enable generated fixture mode; generated records must use the configured test marker and cleanup only touches marked records.
