@@ -7,27 +7,35 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import Link from "next/link";
 import { ArrowLeft, Loader2, CheckCircle2, Circle } from "lucide-react";
 import { 
-  BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, LabelList 
+  BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, LabelList,
+  AreaChart, Area, Legend
 } from "recharts";
 
 export default function AnalyticsPage() {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<any>(null);
+  const [overviewData, setOverviewData] = useState<any>(null);
 
   useEffect(() => {
     const fetchData = async () => {
-      const res = await fetch("/api/v1/analytics-data");
-      const json = await res.json();
+      const [resData, resOverview] = await Promise.all([
+        fetch("/api/v1/analytics-data"),
+        fetch("/api/v1/analytics/overview")
+      ]);
+      const json = await resData.json();
+      const overviewJson = await resOverview.json();
       setData(json);
+      setOverviewData(overviewJson);
       setLoading(false);
     };
     fetchData();
   }, []);
 
   if (loading) return <div className="h-screen flex items-center justify-center"><Loader2 className="animate-spin text-primary" /></div>;
-  if (!data) return <div>Error loading data</div>;
+  if (!data || !overviewData) return <div>Error loading data</div>;
 
-  const { funnelData, activeUsers, userMatrix, totalUsers } = data;
+  const { funnelData, totalUsers } = data;
+  const { activationRate, rescueRate, revenueAtRisk, riskTrendData } = overviewData;
 
   // Calculate "Stuck" counts based on the funnel data
   // Index 0: Signup, Index 1: Step 1, Index 2: Step 2, Index 3: Step 3
@@ -50,7 +58,75 @@ export default function AnalyticsPage() {
             </Link>
         </div>
 
-        {/* ... (Metrics Cards remain the same) ... */}
+        <div className="grid gap-4 md:grid-cols-3">
+            <Card>
+                <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Activation Rate</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <div className="text-3xl font-bold text-emerald-600">{activationRate}%</div>
+                    <p className="text-xs text-muted-foreground mt-1">Users who reached Step 1</p>
+                </CardContent>
+            </Card>
+            <Card>
+                <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Revenue at Risk</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <div className="text-3xl font-bold text-red-600">${revenueAtRisk.toLocaleString()}</div>
+                    <p className="text-xs text-muted-foreground mt-1">Sum of MRR in Cooling or Stall</p>
+                </CardContent>
+            </Card>
+            <Card>
+                <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Rescue Rate</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <div className="text-3xl font-bold text-primary">{rescueRate}%</div>
+                    <p className="text-xs text-muted-foreground mt-1">Users returned &lt;72hr post-nudge</p>
+                </CardContent>
+            </Card>
+        </div>
+
+        {/* RISK DISTRIBUTION OVER TIME */}
+        <Card className="shadow-sm">
+            <CardHeader>
+                <CardTitle>Risk Distribution Over Time</CardTitle>
+                <CardDescription>30-day trailing heuristic assessment of user drop-off segments.</CardDescription>
+            </CardHeader>
+            <CardContent>
+                <div className="h-[300px] mt-4">
+                    <ResponsiveContainer width="100%" height="100%">
+                        <AreaChart data={riskTrendData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                            <defs>
+                                <linearGradient id="colorGoneDark" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="5%" stopColor="#dc2626" stopOpacity={0.8}/>
+                                    <stop offset="95%" stopColor="#dc2626" stopOpacity={0}/>
+                                </linearGradient>
+                                <linearGradient id="colorCooling" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="5%" stopColor="#d97706" stopOpacity={0.8}/>
+                                    <stop offset="95%" stopColor="#d97706" stopOpacity={0}/>
+                                </linearGradient>
+                                <linearGradient id="colorPre" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="5%" stopColor="#eab308" stopOpacity={0.8}/>
+                                    <stop offset="95%" stopColor="#eab308" stopOpacity={0}/>
+                                </linearGradient>
+                            </defs>
+                            <XAxis dataKey="date" tick={{fontSize: 12}} />
+                            <YAxis tick={{fontSize: 12}} />
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                            <RechartsTooltip />
+                            <Legend verticalAlign="top" height={36} wrapperStyle={{ fontSize: '12px' }}/>
+                            <Area type="monotone" name="Gone Dark" dataKey="GONE_DARK" stackId="1" stroke="#dc2626" fill="url(#colorGoneDark)" />
+                            <Area type="monotone" name="Cooling" dataKey="COOLING" stackId="1" stroke="#d97706" fill="url(#colorCooling)" />
+                            <Area type="monotone" name="Pre-Activation Stall" dataKey="PRE_ACTIVATION_STALL" stackId="1" stroke="#eab308" fill="url(#colorPre)" />
+                            <Area type="monotone" name="Post-Activation Stall" dataKey="POST_ACTIVATION_STALL" stackId="1" stroke="#64748b" fill="#94a3b8" />
+                            <Area type="monotone" name="Never Started" dataKey="NEVER_STARTED" stackId="1" stroke="#b91c1c" fill="#f87171" />
+                        </AreaChart>
+                    </ResponsiveContainer>
+                </div>
+            </CardContent>
+        </Card>
 
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-7">
             
@@ -110,42 +186,6 @@ export default function AnalyticsPage() {
                 </CardContent>
             </Card>
 
-            {/* ... (User Matrix Card remains the same) ... */}
-            
-             <Card className="col-span-3">
-                <CardHeader>
-                    <CardTitle>User Progress Matrix</CardTitle>
-                    <CardDescription>Real-time status of your 20 most recent users.</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead>User Email</TableHead>
-                                <TableHead className="text-center w-[60px]">S1</TableHead>
-                                <TableHead className="text-center w-[60px]">S2</TableHead>
-                                <TableHead className="text-center w-[60px]">S3</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {userMatrix.map((u: any, i: number) => (
-                                <TableRow key={i}>
-                                    <TableCell className="font-medium text-xs truncate max-w-[120px]" title={u.email}>{u.email}</TableCell>
-                                    <TableCell className="text-center">
-                                        {u.step1 ? <CheckCircle2 className="mx-auto h-4 w-4 text-emerald-600" /> : <Circle className="mx-auto h-4 w-4 text-muted-foreground/40" />}
-                                    </TableCell>
-                                    <TableCell className="text-center">
-                                        {u.step2 === null ? <span className="text-muted-foreground/60">-</span> : (u.step2 ? <CheckCircle2 className="mx-auto h-4 w-4 text-primary" /> : <Circle className="mx-auto h-4 w-4 text-muted-foreground/40" />)}
-                                    </TableCell>
-                                    <TableCell className="text-center">
-                                        {u.step3 === null ? <span className="text-muted-foreground/60">-</span> : (u.step3 ? <CheckCircle2 className="mx-auto h-4 w-4 text-primary" /> : <Circle className="mx-auto h-4 w-4 text-muted-foreground/40" />)}
-                                    </TableCell>
-                                </TableRow>
-                            ))}
-                        </TableBody>
-                    </Table>
-                </CardContent>
-            </Card>
         </div>
       </div>
     </div>
