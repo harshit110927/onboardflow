@@ -302,3 +302,13 @@ export const dataRequests = pgTable("data_requests", {
   details: text("details"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
+
+export const riskSnapshots = pgTable("risk_snapshots", {
+  id: serial("id").primaryKey(),
+  tenantId: uuid("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+  endUserId: uuid("end_user_id").notNull().references(() => endUsers.id, { onDelete: "cascade" }),
+  primaryRiskLabel: varchar("primary_risk_label", { length: 50 }).notNull(),
+  riskScore: integer("risk_score").notNull(),
+  matchedReasons: jsonb("matched_reasons").$type<string[]>().default([]),
+  capturedAt: timestamp("captured_at").defaultNow().notNull(),
+});

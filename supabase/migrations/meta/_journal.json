@@ -8,6 +8,13 @@
       "when": 1776327222868,
       "tag": "0000_slimy_arclight",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1781716398979,
+      "tag": "0001_famous_hex",
+      "breakpoints": true
     }
   ]
 }
