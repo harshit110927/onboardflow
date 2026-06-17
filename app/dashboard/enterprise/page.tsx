@@ -46,10 +46,13 @@ export default async function EnterpriseDashboardPage() {
   const usage = {
     trackedUsers,
     trackedUsersLimit: limits.maxTrackedUsers,
+    trackedUsersApproaching: trackedUsers >= Math.floor(limits.maxTrackedUsers * 0.9) && trackedUsers < limits.maxTrackedUsers,
     trackedUsersOverLimit: trackedUsers >= limits.maxTrackedUsers,
     emailsSentThisMonth,
     emailsMonthlyLimit: limits.maxEmailsPerMonth,
+    emailsApproaching: emailsSentThisMonth >= Math.floor(limits.maxEmailsPerMonth * 0.9) && emailLimit.allowed,
     emailsOverLimit: !emailLimit.allowed,
+    plan: enterprisePlan,
   };
 
   const allUsers = await db.query.endUsers.findMany({
@@ -224,12 +227,13 @@ export default async function EnterpriseDashboardPage() {
                   >
                     Drip Steps
                   </Link>
-                  <Link
+                  {/* Future Upgrade: Webhooks */}
+                  {/* <Link
                     href="/dashboard/enterprise/webhooks"
                     className="rounded-md border border-border px-3 py-1.5 text-sm transition-colors hover:bg-secondary"
                   >
                     Webhooks
-                  </Link>
+                  </Link> */}
                 </>
               )}
             </div>
