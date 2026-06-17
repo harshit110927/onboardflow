@@ -1099,19 +1099,46 @@ const landingMarkup = String.raw`<!-- ══════════════
     <div class="cta-banner reveal">
       <p class="cta-kicker">Free to start.</p>
       <h2>Stop guessing.<br/><strong>Start recovering lost signups.</strong></h2>
-      <div class="pricing-grid" style="margin:24px auto 28px;max-width:720px">
-        <div class="pricing-card" style="background:rgba(255,255,255,.10);border-color:rgba(255,255,255,.22)">
-          <h3>Startup</h3>
-          <p><span style="text-decoration:line-through;color:var(--on-deep-muted)">$60/month</span></p>
-          <p style="font-size:2rem;font-weight:700;color:#fff">$25/month</p>
-          <p class="tag" style="display:inline-flex;margin-top:8px">Launch Month Discount</p>
+      <div class="pricing-grid" style="margin:40px auto 40px;max-width:1000px;grid-template-columns:repeat(auto-fit, minmax(280px, 1fr))">
+        
+        <div class="price-card" style="background:rgba(255,255,255,.03);border-color:rgba(255,255,255,.12);text-align:left">
+          <h3 style="color:#fff;font-size:1.5rem;font-weight:600;margin-bottom:8px">Free</h3>
+          <p style="font-size:2.5rem;font-weight:700;color:#fff;margin-bottom:24px;line-height:1">$0<span style="font-size:1rem;color:var(--on-deep-sub);font-weight:400">/month</span></p>
+          <ul class="price-list" style="margin-bottom:0">
+            <li style="color:var(--on-deep-sub)"><svg class="ico" width="16" height="16" style="color:var(--emerald)"><use href="#i-check"/></svg> 50 tracked users</li>
+            <li style="color:var(--on-deep-sub)"><svg class="ico" width="16" height="16" style="color:var(--emerald)"><use href="#i-check"/></svg> 300 emails/month</li>
+            <li style="color:var(--on-deep-sub)"><svg class="ico" width="16" height="16" style="color:var(--emerald)"><use href="#i-check"/></svg> 3 drip steps</li>
+            <li style="color:var(--on-deep-sub)"><svg class="ico" width="16" height="16" style="color:var(--emerald)"><use href="#i-check"/></svg> No webhooks</li>
+          </ul>
         </div>
-        <div class="pricing-card" style="background:rgba(255,255,255,.10);border-color:rgba(255,255,255,.22)">
-          <h3>Growth</h3>
-          <p><span style="text-decoration:line-through;color:var(--on-deep-muted)">$120/month</span></p>
-          <p style="font-size:2rem;font-weight:700;color:#fff">$50/month</p>
-          <p class="tag" style="display:inline-flex;margin-top:8px">Launch Month Discount</p>
+
+        <div class="price-card featured" style="background:rgba(255,255,255,.08);text-align:left">
+          <div class="feat-badge">Most Popular</div>
+          <h3 style="color:#fff;font-size:1.5rem;font-weight:600;margin-bottom:8px">Startup</h3>
+          <p style="color:var(--on-deep-muted);text-decoration:line-through;margin-bottom:0;line-height:1">$60/month</p>
+          <p style="font-size:2.5rem;font-weight:700;color:#fff;margin-bottom:8px;line-height:1">$25<span style="font-size:1rem;color:var(--on-deep-sub);font-weight:400">/month</span></p>
+          <p class="tag" style="display:inline-flex;margin-bottom:24px;background:var(--primary);color:#fff;border-color:transparent">Launch Month Discount</p>
+          <ul class="price-list" style="margin-bottom:0">
+            <li style="color:var(--on-deep-sub)"><svg class="ico" width="16" height="16" style="color:var(--emerald)"><use href="#i-check"/></svg> 500 tracked users</li>
+            <li style="color:var(--on-deep-sub)"><svg class="ico" width="16" height="16" style="color:var(--emerald)"><use href="#i-check"/></svg> 3,000 emails/month</li>
+            <li style="color:var(--on-deep-sub)"><svg class="ico" width="16" height="16" style="color:var(--emerald)"><use href="#i-check"/></svg> 10 drip steps</li>
+            <li style="color:var(--on-deep-sub)"><svg class="ico" width="16" height="16" style="color:var(--emerald)"><use href="#i-check"/></svg> Webhooks enabled</li>
+          </ul>
         </div>
+
+        <div class="price-card" style="background:rgba(255,255,255,.03);border-color:rgba(255,255,255,.12);text-align:left">
+          <h3 style="color:#fff;font-size:1.5rem;font-weight:600;margin-bottom:8px">Growth</h3>
+          <p style="color:var(--on-deep-muted);text-decoration:line-through;margin-bottom:0;line-height:1">$120/month</p>
+          <p style="font-size:2.5rem;font-weight:700;color:#fff;margin-bottom:8px;line-height:1">$50<span style="font-size:1rem;color:var(--on-deep-sub);font-weight:400">/month</span></p>
+          <p class="tag" style="display:inline-flex;margin-bottom:24px;background:var(--primary);color:#fff;border-color:transparent">Launch Month Discount</p>
+          <ul class="price-list" style="margin-bottom:0">
+            <li style="color:var(--on-deep-sub)"><svg class="ico" width="16" height="16" style="color:var(--emerald)"><use href="#i-check"/></svg> 2,500 tracked users</li>
+            <li style="color:var(--on-deep-sub)"><svg class="ico" width="16" height="16" style="color:var(--emerald)"><use href="#i-check"/></svg> 15,000 emails/month</li>
+            <li style="color:var(--on-deep-sub)"><svg class="ico" width="16" height="16" style="color:var(--emerald)"><use href="#i-check"/></svg> Unlimited drip steps</li>
+            <li style="color:var(--on-deep-sub)"><svg class="ico" width="16" height="16" style="color:var(--emerald)"><use href="#i-check"/></svg> Advanced Analytics</li>
+          </ul>
+        </div>
+
       </div>
       <div class="cta-btns">
         <a href="/login" class="btn-white">
@@ -1151,11 +1178,11 @@ const landingMarkup = String.raw`<!-- ══════════════
       </details>
       <details class="reveal d5">
         <summary>Is Dripmetric only for developers?<span class="sum-arrow"><svg class="ico" width="14" height="14"><use href="#i-chevron-down"/></svg></span></summary>
-        <div class="faq-ans">No. The Individual tier is a fully no-code dashboard for small businesses to manage email lists, add contacts, build drip sequences, and send campaigns — no technical setup, no SDK, no API keys required. Just sign up and go.</div>
+        <div class="faq-ans">Yes, currently Dripmetric is focused on helping SaaS founders and developers automate their onboarding flows using our drop-in SDK.</div>
       </details>
       <details class="reveal d6">
         <summary>What is the free tier exactly?<span class="sum-arrow"><svg class="ico" width="14" height="14"><use href="#i-chevron-down"/></svg></span></summary>
-        <div class="faq-ans">The free Enterprise tier includes up to 50 tracked end users, 20 emails per day, and 300 emails per month. The free Individual tier includes 3 email lists, 10 contacts per list, and 1 campaign per list. Both are genuinely functional — not 7-day trials.</div>
+        <div class="faq-ans">The free plan includes up to 50 tracked end users, 20 emails per day, and 300 emails per month. It is genuinely functional and free forever — not a 7-day trial.</div>
       </details>
     </div>
   </div>
