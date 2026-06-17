@@ -16,6 +16,7 @@ export default function AnalyticsPage() {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<any>(null);
   const [overviewData, setOverviewData] = useState<any>(null);
+  const [popoverOpen, setPopoverOpen] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -94,7 +95,7 @@ export default function AnalyticsPage() {
             <CardHeader>
                 <div className="flex items-center gap-2">
                     <CardTitle>Risk Distribution Over Time</CardTitle>
-                    <Popover>
+                    <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
                         <PopoverTrigger asChild>
                             <Button variant="ghost" size="icon" className="h-6 w-6 rounded-full text-muted-foreground hover:text-foreground">
                                 <Info className="h-4 w-4" />
