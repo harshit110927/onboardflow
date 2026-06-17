@@ -102,7 +102,7 @@ export default function AnalyticsPage() {
                                 <span className="sr-only">Interpreting User Health</span>
                             </Button>
                         </PopoverTrigger>
-                        <PopoverContent className="w-80" align="start">
+                        <PopoverContent className="w-80">
                             <div className="space-y-2">
                                 <h4 className="font-medium leading-none">Interpreting User Health</h4>
                                 <p className="text-sm text-muted-foreground">
