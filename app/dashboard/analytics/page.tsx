@@ -5,7 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import Link from "next/link";
-import { ArrowLeft, Loader2, CheckCircle2, Circle } from "lucide-react";
+import { ArrowLeft, Loader2, CheckCircle2, Circle, Info } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { 
   BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, LabelList,
   AreaChart, Area, Legend
@@ -91,7 +92,31 @@ export default function AnalyticsPage() {
         {/* RISK DISTRIBUTION OVER TIME */}
         <Card className="shadow-sm">
             <CardHeader>
-                <CardTitle>Risk Distribution Over Time</CardTitle>
+                <div className="flex items-center gap-2">
+                    <CardTitle>Risk Distribution Over Time</CardTitle>
+                    <Popover>
+                        <PopoverTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-6 w-6 rounded-full text-muted-foreground hover:text-foreground">
+                                <Info className="h-4 w-4" />
+                                <span className="sr-only">Interpreting User Health</span>
+                            </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-80" align="start">
+                            <div className="space-y-2">
+                                <h4 className="font-medium leading-none">Interpreting User Health</h4>
+                                <p className="text-sm text-muted-foreground">
+                                    This chart shows the daily composition of your user base by risk level.
+                                </p>
+                                <ul className="text-sm text-muted-foreground list-disc pl-4 space-y-1">
+                                    <li>The vertical axis shows the total number of users.</li>
+                                    <li>Each color layer represents a risk category.</li>
+                                    <li>Look for trends: A thickening &quot;Gone Dark&quot; (bottom) layer suggests increasing churn, while a thicker top layer suggests high engagement.</li>
+                                    <li>Use this to spot when your onboarding or retention efforts are effectively shifting users from &quot;At Risk&quot; to &quot;Healthy&quot; states.</li>
+                                </ul>
+                            </div>
+                        </PopoverContent>
+                    </Popover>
+                </div>
                 <CardDescription>30-day trailing heuristic assessment of user drop-off segments.</CardDescription>
             </CardHeader>
             <CardContent>
