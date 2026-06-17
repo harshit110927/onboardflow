@@ -72,7 +72,26 @@ export function BillingActions({ plan, isCurrent, launchPriceDisplay }: Props) {
         name: "Dripmetric",
         description: `${plan.label} subscription`,
         theme: { color: "#3d6b52" },
-        handler: () => window.location.reload(),
+        handler: async (response: { razorpay_payment_id: string; razorpay_subscription_id: string; razorpay_signature: string }) => {
+          try {
+            setLoading(true);
+            const verifyRes = await fetch("/api/razorpay/verify-subscription", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_subscription_id: response.razorpay_subscription_id,
+                razorpay_signature: response.razorpay_signature,
+                planId: plan.id,
+              }),
+            });
+            if (!verifyRes.ok) throw new Error("Payment verification failed");
+            window.location.reload();
+          } catch (error) {
+            alert("Payment verification failed. Please contact support if your money was deducted.");
+            setLoading(false);
+          }
+        },
         modal: { ondismiss: () => setLoading(false) },
       });
 

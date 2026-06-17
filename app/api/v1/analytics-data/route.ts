@@ -108,10 +108,13 @@ export async function GET(req: Request) {
       usage: {
         trackedUsers,
         trackedUsersLimit: limits.maxTrackedUsers,
+        trackedUsersApproaching: trackedUsers >= Math.floor(limits.maxTrackedUsers * 0.9) && trackedUsers < limits.maxTrackedUsers,
         trackedUsersOverLimit: trackedUsers >= limits.maxTrackedUsers,
         emailsSentThisMonth,
         emailsMonthlyLimit: limits.maxEmailsPerMonth,
+        emailsApproaching: emailsSentThisMonth >= Math.floor(limits.maxEmailsPerMonth * 0.9) && emailLimit.allowed,
         emailsOverLimit: !emailLimit.allowed,
+        plan: enterprisePlan,
       }
   });
 }
