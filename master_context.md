@@ -32,12 +32,13 @@ The repository name and some older artifacts still use the previous **OnboardFlo
 
 The public app contains:
 
-- Landing page at `app/page.tsx`.
+- Landing page at `app/page.tsx`, whose main nav and footer link to the public pricing page.
 - Waitlist endpoint at `app/api/waitlist/route.ts`.
 - Login pages and server actions under `app/(auth)/login/*` and `app/actions.ts`.
 - Auth callback at `app/auth/callback/route.ts`.
 - Check-email waiting page at `app/check-email/page.tsx`.
-- Tier selection at `app/tier-selection/page.tsx` and `app/tier-selection/_components/TierSelectionClient.tsx`.
+- Public Enterprise pricing page at `app/pricing/page.tsx` with Free, Startup, and Growth cards, launch pricing ($25/$50) with struck-through original prices ($60/$120), FAQ, Free CTA to `/login`, and placeholder paid CTAs pending a destination decision.
+- Enterprise-only first-run provisioning at `app/tier-selection/page.tsx`; the route no longer renders tier-choice buttons and automatically creates an Enterprise tenant.
 - Legal/static pages: `app/privacy/page.tsx`, `app/terms/page.tsx`, `app/docs/page.tsx`.
 - SEO helpers: `app/sitemap.xml/route.ts`, `public/robots.txt`, `app/api/og/route.tsx`.
 
@@ -47,6 +48,7 @@ Enterprise users get:
 
 - `/dashboard/enterprise` overview dashboard.
 - API key card and nudge controls.
+- `/dashboard/enterprise/users` Users CRM screen with paginated end-user table, status tabs, email search, sortable columns, CSV export, and a disabled per-user nudge placeholder.
 - Analytics powered by `/api/v1/analytics-data`.
 - Automation settings powered by `/api/v1/settings` and dashboard settings pages.
 - Configurable drip steps through `/dashboard/enterprise/drip-steps` and `/api/individual/drip-steps` despite the confusing route prefix.
@@ -59,6 +61,8 @@ Enterprise users get:
   - `/api/v1/settings`
   - `/api/v1/analytics-data`
   - `/api/v1/nudge-step`
+  - `/api/v1/users`
+  - `/api/v1/users/[userId]`
 
 ### 2.3 Individual Product
 
@@ -87,7 +91,7 @@ app/_components/             Shared landing-page-only components/effects
 app/(auth)/login/            Login page and login server action
 app/api/                     All HTTP API route handlers
 app/dashboard/               Authenticated dashboards and dashboard server actions
-app/tier-selection/          First-run tier selection page/client
+app/tier-selection/          Enterprise-only first-run provisioning redirect
 components/                  Shared UI and analytics components
 components/ui/               shadcn-style reusable primitives
 components/analytics/        Funnel/chart components used by analytics pages
@@ -99,6 +103,7 @@ utils/supabase/              Browser/server/middleware Supabase clients
 public/                      Static public files
 cli.js                       Local setup wizard for integrators
 README.md                    Product README
+API.md                       Public REST API reference with curl, Python, Ruby, and Node examples
 context.md                   Older handoff/context file
 master_context.md            This generated complete context document
 ```
@@ -201,6 +206,20 @@ Stripe and Razorpay routes expect standard secrets/IDs, including:
 
 `db/schema.ts` is the canonical TypeScript schema for most application tables. Some raw SQL code also references an `email_usage` table that is not represented as a Drizzle `pgTable` in this file, so migrations must contain it separately for email usage features to work.
 
+### 6.2.1 Manual schema changes to apply when not running Drizzle migrations
+
+When applying database changes by copy-pasting SQL instead of running Drizzle migrations, apply every schema change listed here in order:
+
+1. `supabase/migrations/0002_add_end_users_properties.sql` adds customer-supplied identify metadata to Enterprise end users:
+
+```sql
+ALTER TABLE "end_users" ADD COLUMN IF NOT EXISTS "properties" jsonb;
+```
+
+This column is nullable, has no default, and is intentionally additive/safe for a live database.
+
+No database schema change was added for the public `/api/v1/users` endpoints; they read existing `end_users` and `tenants` data only.
+
 ### 6.3 Tables and relationships
 
 #### `tenants`
@@ -227,6 +246,7 @@ Important columns:
 - `tenantId` references `tenants.id`.
 - `externalId` is the customer application's user ID.
 - `email` is optional but required for email automations.
+- `properties` is nullable JSONB metadata supplied by the customer backend through identify calls, commonly containing plan/payment state such as `plan`, `planValue`, and `customerType`; public user listing/detail APIs return this field as `object | null`.
 - `completedSteps` is JSON string array of event/step codes.
 - `lastEmailedAt` records latest automation email.
 - `automationsReceived` is an array of tags such as `nudge_step1`.
@@ -383,24 +403,24 @@ Rules:
 3. Dashboard access without a selected tier redirects to `/tier-selection`.
 4. Visiting `/tier-selection` after tier is already selected redirects to `/dashboard/enterprise` or `/dashboard/individual`.
 
-### 7.4 Tenant creation and tier selection
+### 7.4 Tenant creation and Enterprise-only first run
 
-`lib/actions/set-tier.ts` is the key first-run server action.
+`lib/actions/set-tier.ts` is the key first-run server action. New accounts are currently restricted to Enterprise; existing Individual tenants continue to route to their existing dashboard.
 
 Input:
 
-- `tier: "enterprise" | "individual"`.
+- `tier: "enterprise"`; Individual input is rejected.
 
 Logic:
 
 1. Authenticates the Supabase user.
 2. Loads tenant by email.
-3. If selecting Enterprise, generates API key with prefix `obf_live_` and random hex bytes.
+3. Generates an Enterprise API key with prefix `obf_live_` and random hex bytes.
 4. If no tenant exists, inserts a new `tenants` row with email, default name `Founder`, tier, and optional API key.
 5. If tenant exists with `tier === null`, updates it.
 6. If tenant already has a tier, throws `Tier already set`.
 7. Sends a non-blocking welcome email through Resend.
-8. Returns redirect target based on tier.
+8. Returns `/dashboard/enterprise`.
 
 ### 7.5 Cached auth helpers
 
@@ -447,13 +467,15 @@ Individual paid plan cards:
 ### 8.3 Enterprise limits
 
 - Free: 50 tracked users, 300 emails/month, 3 drip steps, no webhooks, no advanced analytics.
-- Basic: 500 tracked users, 3,000 emails/month, 3 drip steps, no webhooks, no advanced analytics.
-- Advanced: 2,000 tracked users, 10,000 emails/month, unlimited drip steps, webhooks enabled, advanced analytics enabled.
+- Startup: 500 tracked users, 3,000 emails/month, 3 drip steps, no webhooks, no advanced analytics.
+- Growth: 2,000 tracked users, 10,000 emails/month, unlimited drip steps, webhooks enabled, advanced analytics enabled.
 
 Enterprise paid plan cards:
 
-- `ent_basic` → `basic`
-- `ent_advanced` → `advanced`
+- `ent_basic` → `basic` at $79/month.
+- `ent_advanced` → `advanced` at $149/month.
+
+The public pricing page and authenticated Enterprise billing page both read the paid prices from `ENTERPRISE_PLANS`; Razorpay environment-variable names remain `RAZORPAY_PLAN_ENT_BASIC` and `RAZORPAY_PLAN_ENT_ADVANCED`.
 
 ### 8.4 Effective plan resolution
 
@@ -494,7 +516,7 @@ These are used by Individual campaign sending and billing UI logic.
 
 ### 9.1 API key generation
 
-1. User logs in and chooses Enterprise in tier selection.
+1. User logs in and is automatically provisioned as Enterprise on first dashboard access.
 2. `setTier("enterprise")` creates or updates a tenant.
 3. The tenant receives `apiKey = obf_live_<random>`.
 4. Dashboard displays the API key through components such as `app/dashboard/ApiKeyCard.tsx`.
@@ -516,7 +538,7 @@ Defaults:
 
 Methods:
 
-- `identify({ userId, email })` → POST `/identify` with `x-api-key`.
+- `identify({ userId, email, properties? })` → POST `/identify` with `x-api-key`; when `properties` is omitted the SDK sends the same body as before.
 - `track({ userId, stepId })` → POST `/track` with `x-api-key`.
 
 Each request:
@@ -533,7 +555,7 @@ Endpoint: `app/api/v1/identify/route.ts`.
 Input:
 
 - Header `x-api-key`.
-- Body: `{ email, userId?, event? }`.
+- Body: `{ email, userId?, event?, properties? }`, where `properties` is an optional object for customer-supplied metadata such as plan/payment state.
 
 Logic:
 
@@ -543,15 +565,16 @@ Logic:
 4. Requires `email`.
 5. Looks up `endUsers` by `(tenantId, email)`.
 6. If no user exists:
-   - Inserts `endUsers` with tenant ID, email, external ID = `userId || email`, empty `completedSteps`, and timestamps.
+   - Inserts `endUsers` with tenant ID, email, external ID = `userId || email`, optional `properties` or `null`, empty `completedSteps`, and timestamps.
    - Fires non-blocking outgoing webhook event `user.identified`.
-7. If new user exists and this was a new user:
+7. If a user already exists and `properties` is provided, merges incoming properties over existing `endUsers.properties` so new keys overwrite matches and missing keys are preserved.
+8. If this was a new user:
    - Sends an immediate welcome email via shared Resend sender.
    - Uses `tenant.emailSubject` and `tenant.emailBody` as the welcome copy if present.
-8. If `event` is included:
+9. If `event` is included:
    - Adds it to `completedSteps` if not already present.
    - Updates `lastSeenAt`.
-9. Returns `{ success: true }`.
+10. Returns `{ success: true }`.
 
 Data written:
 
@@ -583,7 +606,8 @@ Logic:
    - Appends `stepCode` into `completedSteps`.
    - Updates `lastSeenAt`.
    - Fires non-blocking webhook event `user.activated` with user ID, step ID, and completed steps.
-9. Returns `{ success: true, step: stepCode }`.
+9. Error responses use the standard public API shape `{ success: false, error: { code, message } }`.
+10. Returns `{ success: true, step: stepCode }`.
 
 Data written:
 
@@ -591,7 +615,59 @@ Data written:
 - `endUsers.lastSeenAt`
 - `webhookDeliveries` asynchronously when matching webhooks exist.
 
-### 9.5 Enterprise config flow
+### 9.5 Enterprise users API flow
+
+List endpoint: `app/api/v1/users/route.ts`.
+Detail endpoint: `app/api/v1/users/[userId]/route.ts`.
+Shared helpers: `lib/api/users.ts` and `lib/api/errors.ts`.
+
+Input:
+
+- Header `x-api-key`.
+- `GET /api/v1/users` query parameters: optional `status` (`stalled`, `activated`, `at_risk`, `churned`), optional `page` defaulting to 1, and optional `limit` defaulting to 50 with a max clamp of 200.
+- `GET /api/v1/users/[userId]` path parameter: `userId`, matched against `endUsers.externalId`.
+
+Logic:
+
+1. Applies the same per-IP API rate limit helper used by identify/track.
+2. Validates API key against `tenants.apiKey`.
+3. Reads end users for the authenticated tenant.
+4. Computes status at request time without storing it:
+   - `churned` if `properties.customerType === "churned"`.
+   - `at_risk` if the user has at least one automation tag, `lastSeenAt` is more than 14 days ago, and the user is paying (`properties.customerType === "paying"` or `properties.planValue > 0`).
+   - `stalled` if the tenant has an `activationStep` and the user has not completed it, or if no activation step is configured and the user has no completed steps.
+   - `activated` if the user completed the tenant activation step, or if no activation step is configured and the user has any completed step.
+5. The list endpoint filters by computed status server-side, paginates after filtering, and returns `success`, `users`, `total`, `page`, and `limit`.
+6. The detail endpoint returns one formatted user or a standard `USER_NOT_FOUND` error.
+
+No data is written by these endpoints.
+
+### 9.6 Enterprise Users CRM dashboard flow
+
+Page: `app/dashboard/enterprise/users/page.tsx`.
+Client component: `app/dashboard/enterprise/users/UsersClient.tsx`.
+Loading route: `app/dashboard/enterprise/users/loading.tsx`.
+Nav: `app/dashboard/enterprise/_components/NavLinks.tsx`.
+
+Flow:
+
+1. The route is a server component that authenticates with the same `getSession()` helper used by the Enterprise overview page.
+2. It loads the tenant by email with `getTenant()`, requires `tenant.tier === "enterprise"`, and redirects non-Enterprise users away.
+3. It passes `tenant.apiKey` into the client component as a prop, matching the existing dashboard pattern used by `ApiKeyCard`.
+4. The client component fetches `GET /api/v1/users?page=<page>&limit=50` with the `x-api-key` header and renders a table with:
+   - Email.
+   - Customer type badge from `properties.customerType`.
+   - Plan summary from `properties.plan`, `properties.planValue`, and optional currency metadata.
+   - Current step from the last completed step string.
+   - Relative last active time from `lastSeenAt`.
+   - Computed API status badge.
+   - Email/nudge count from `automationsReceived.length`.
+   - Disabled `Send nudge` action placeholder because the current nudge endpoint only targets all eligible users by step.
+5. Client-side controls provide status tabs, case-insensitive email search, sortable table headers, default status ordering of stalled -> at-risk -> activated -> churned, and 50-row page navigation.
+6. The CSV export button fetches `GET /api/v1/users?limit=200` and downloads a client-generated CSV with `email`, `customerType`, `plan`, `planValue`, `currentStep`, `lastSeenAt`, `status`, and `emailsSent`.
+7. No backend `/api/v1/users` behavior is changed by this dashboard page.
+
+### 9.7 Enterprise config flow
 
 Endpoint: `app/api/v1/config/route.ts`.
 
@@ -609,7 +685,7 @@ Logic:
 
 This is a lightweight API for integrators to set the first activation step code.
 
-### 9.6 Enterprise check-auth flow
+### 9.8 Enterprise check-auth flow
 
 Endpoint: `app/api/v1/check-auth/route.ts`.
 
@@ -625,7 +701,7 @@ Logic:
 
 This is useful for CLI setup or SDK validation.
 
-### 9.7 Enterprise analytics data flow
+### 9.9 Enterprise analytics data flow
 
 Endpoint: `app/api/v1/analytics-data/route.ts`.
 
@@ -648,11 +724,11 @@ Logic:
    - percent completion for each step relative to total users.
    - `funnelData` for charts.
    - last-30-day `trendData` for signups and activations.
-   - `recoveryData` based on users who completed step 1 and also have `lastEmailedAt`.
+   - `recoveryData` as a proxy based on users who completed step 1 and also have a non-null `lastEmailedAt`; this is not exact post-nudge attribution because step completions and nudge tags do not store per-step timestamps.
    - `userMatrix` for recent users and boolean step status.
 6. Returns JSON consumed by `app/dashboard/analytics/page.tsx`.
 
-### 9.8 Enterprise automation settings flow
+### 9.10 Enterprise automation settings flow
 
 Endpoint: `app/api/v1/settings/route.ts`.
 
@@ -676,7 +752,7 @@ POST:
 5. Empty `resendApiKey` clears key and from email.
 6. Updates the tenant by email.
 
-### 9.9 Manual nudge flow
+### 9.11 Manual nudge flow
 
 Endpoint: `app/api/v1/nudge-step/route.ts`.
 
@@ -709,10 +785,10 @@ Logic:
    - Personalize `{{name}}` and `{{email}}` in body.
    - Send email.
    - Increment email usage.
-   - Append automation tag and set `lastEmailedAt`.
+   - Append automation tag and set `lastEmailedAt` to the most recent email time; no per-step email timestamp is stored.
 7. Returns counts: sent, skipped, errors.
 
-### 9.10 Cron automation flow
+### 9.12 Cron automation flow
 
 Endpoint: `app/api/cron/route.ts`.
 
@@ -730,7 +806,7 @@ Logic includes three major jobs:
    - Checks whether user completed target event and whether prior automation was sent.
    - Sends email through tenant Resend, tenant SMTP, or shared fallback.
    - Increments email usage.
-   - Updates `endUsers.automationsReceived` and `lastEmailedAt`.
+   - Updates `endUsers.automationsReceived` and overwrites `lastEmailedAt`; no per-step email timestamp is stored.
 2. Individual scheduled campaign sequence processing:
    - Finds draft campaign steps with `sequenceId` and send timing rules.
    - Checks previous sequence step sent state and delay.
@@ -1295,6 +1371,22 @@ Razorpay webhook route:
 
 ## 15. Public API and Route Inventory
 
+The root `API.md` documents the public REST API for non-JavaScript integrators. It covers authentication, base URL, `/identify`, `/track`, `/users`, `/users/:userId`, curl/Python/Ruby/Node examples, standard error responses, and rate-limit reference.
+
+Public REST/API-key endpoints should return errors as:
+
+```json
+{
+  "success": false,
+  "error": {
+    "code": "INVALID_API_KEY",
+    "message": "Invalid API Key"
+  }
+}
+```
+
+Current standard public API error codes are `INVALID_API_KEY`, `MISSING_REQUIRED_FIELD`, `USER_NOT_FOUND`, `RATE_LIMIT_EXCEEDED`, and `INTERNAL_ERROR`.
+
 ### 15.1 Enterprise/developer API
 
 | Route | Method | Purpose | Auth |
@@ -1302,6 +1394,8 @@ Razorpay webhook route:
 | `/api/v1/check-auth` | GET | Validate API key and return tenant info | `x-api-key` |
 | `/api/v1/identify` | POST | Create/find Enterprise end user and optionally mark an event | `x-api-key` |
 | `/api/v1/track` | POST | Mark onboarding step complete for an identified end user | `x-api-key` |
+| `/api/v1/users` | GET | List tracked Enterprise end users with computed status, metadata, pagination, and optional status filter | `x-api-key` |
+| `/api/v1/users/[userId]` | GET | Fetch one tracked Enterprise end user by external ID with computed status | `x-api-key` |
 | `/api/v1/config` | POST | Set tenant activation step | `x-api-key` |
 | `/api/v1/settings` | GET/POST | Dashboard automation/settings read/write | Supabase session |
 | `/api/v1/analytics-data` | GET | Enterprise analytics JSON | Supabase session |
@@ -1470,7 +1564,7 @@ Files:
 - `sdk/README.md` — installation and usage docs.
 - `sdk/tsconfig.json` — SDK TypeScript build config.
 
-The SDK is small and only wraps identify/track calls.
+The SDK is small and only wraps identify/track calls. Its README includes an example of forwarding Razorpay webhook-derived plan data through `identify({ properties })`; Dripmetric does not directly integrate with the customer payment processor for this metadata path.
 
 ### 17.2 CLI
 
@@ -1500,11 +1594,76 @@ This is not heavily wired into the current app code.
 
 ## 18. Tests and Local Verification Files
 
-- `tests.js` appears to be an integration-style HTTP test runner.
-- `tests.e2e.js` appears to be browser/e2e-style smoke helper.
-- The main package scripts do not define a dedicated test command.
+- `tests.js` is the integration-style HTTP test runner. It covers authentication boundaries, public and Enterprise APIs, Razorpay webhooks, tracking, cron authorization, plan gates, malformed payloads, rate limiting, and unauthenticated Individual API boundaries.
+- `tests.e2e.js` is the cleanup-safe real-user acceptance runner. It drives Chromium with anonymous, Individual, and Enterprise browser contexts; creates uniquely marked list/contact/campaign/CRM and Enterprise end-user data; verifies the primary dashboard screens and API lifecycles; and removes every seeded row from the database in a `finally` block.
+- `TESTING.md` contains the detailed testing setup, environment-variable reference, cleanup guarantees, and coverage checklist.
+- `package.json` provides:
+  - `npm run test:integration` → runs `tests.js`.
+  - `npm run test:acceptance` → runs `tests.e2e.js`.
+  - `npm run test:all` → runs integration and acceptance suites in order.
 - `npm run lint` maps to `next lint`, but with Next 15 this command may be unavailable/deprecated depending local Next behavior.
 - TypeScript checking can be done with `npx tsc --noEmit` if dependencies are installed.
+
+### 18.1 One-time acceptance-test setup
+
+Install Playwright and its Chromium browser without changing the application dependency tree:
+
+```bash
+npm install --no-save playwright
+npx playwright install chromium
+```
+
+Create authenticated Playwright storage-state files for dedicated test accounts:
+
+- `.auth/individual.json` for a tenant whose tier is `individual`.
+- `.auth/enterprise.json` for a tenant whose tier is `enterprise`.
+
+Do not use production customer accounts. Set the following values in `.env.local`:
+
+```dotenv
+BASE_URL=http://localhost:3000
+DATABASE_URL=postgresql://...
+INDIVIDUAL_STATE=.auth/individual.json
+ENTERPRISE_STATE=.auth/enterprise.json
+TEST_INDIVIDUAL_TENANT_ID=<individual tenant uuid>
+TEST_ENTERPRISE_TENANT_ID=<enterprise tenant uuid>
+TEST_ENTERPRISE_API_KEY=<enterprise tenant x-api-key>
+RAZORPAY_WEBHOOK_SECRET=<test webhook secret>
+CRON_SECRET=<test cron secret>
+```
+
+The application server and the test process must use the same test environment and database.
+
+### 18.2 Running tests
+
+Start the application:
+
+```bash
+npm run dev
+```
+
+In another terminal, run the full test workflow:
+
+```bash
+npm run test:all
+```
+
+Suites can also be run independently:
+
+```bash
+npm run test:integration
+npm run test:acceptance
+```
+
+Run static verification separately:
+
+```bash
+npx tsc --noEmit
+npm run lint
+npm run build
+```
+
+Use a disposable/test database. The acceptance suite generates a unique `acceptance_*` marker for its data and cleans matching relational records in dependency-safe order, even when assertions fail. A hard process kill cannot execute JavaScript cleanup; after such a kill, manually remove records carrying the `acceptance_*` marker before rerunning.
 
 ---
 
@@ -1531,19 +1690,19 @@ The codebase has several naming leftovers and route-prefix inconsistencies:
 ### 20.1 New user becomes an Individual customer
 
 ```text
-Landing/login -> Supabase magic link/OAuth -> auth callback -> no tenant/tier -> tier selection -> setTier("individual") -> tenants row -> /dashboard/individual -> create list -> add/import contacts -> create campaign -> send -> campaignEvents/open/click -> dashboard stats
+Existing Individual tenant -> login -> auth callback -> /dashboard -> /dashboard/individual -> create list -> add/import contacts -> create campaign -> send -> campaignEvents/open/click -> dashboard stats
 ```
 
 ### 20.2 New user becomes an Enterprise customer
 
 ```text
-Landing/login -> Supabase magic link/OAuth -> auth callback -> tier selection -> setTier("enterprise") -> tenants row with API key -> dashboard shows API key -> customer installs SDK -> identify users -> track events -> endUsers.completedSteps -> analytics + automations + webhooks
+Landing/login -> Supabase magic link/OAuth -> auth callback -> /dashboard -> automatic setTier("enterprise") -> tenants row with API key -> dashboard shows API key -> customer installs SDK -> identify users -> track events -> endUsers.completedSteps -> analytics + automations + webhooks
 ```
 
 ### 20.3 Enterprise automation lifecycle
 
 ```text
-Tenant configures activationStep/step2/step3 or dripSteps -> customer app identifies end user -> user remains incomplete after configured delay -> cron or manual nudge checks completedSteps + automationsReceived + unsubscribe + email limits -> sends email -> records automationsReceived + lastEmailedAt -> analytics can count recovered users
+Tenant configures activationStep/step2/step3 or dripSteps -> customer app identifies end user -> user remains incomplete after configured delay -> cron or manual nudge checks completedSteps + automationsReceived + unsubscribe + email limits -> sends email -> records automation tag strings in automationsReceived + overwrites lastEmailedAt -> analytics can only compute proxy recovery, not exact post-email attribution
 ```
 
 ### 20.4 Individual campaign lifecycle

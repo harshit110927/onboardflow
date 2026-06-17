@@ -1,41 +1,27 @@
-# dripmetric
+# Dripmetric SDK
 
-Official SDK for [Dripmetric](https://www.dripmetric.com) — track user onboarding steps and automate drip emails.
-
-## Install
+Lightweight TypeScript wrapper for the Dripmetric public API. Works with any language capable of making HTTP requests; this package is only a convenience wrapper for Node.js/TypeScript users.
 
 ```bash
 npm install dripmetric
 ```
 
-## Usage
-
 ```ts
 import { Dripmetric } from "dripmetric";
 
-const onboard = new Dripmetric("obf_live_your_api_key");
+const dripmetric = new Dripmetric(process.env.DRIPMETRIC_API_KEY!);
 
-// Call on signup or login
-await onboard.identify({
+await dripmetric.identify({
   userId: "user_123",
   email: "alice@example.com",
+  metadata: { plan: "startup" },
 });
 
-// Call when a user completes an onboarding step
-// stepId must match the Event Name (Code) in your dashboard
-await onboard.track({
+await dripmetric.track({
   userId: "user_123",
-  stepId: "created_project",
+  eventName: "created_project",
+  properties: { source: "app" },
 });
 ```
 
-## Get your API key
-
-Sign up at [dripmetric.com](https://www.dripmetric.com) → choose Enterprise → copy your API key from the dashboard.
-
-## Rate Limits (Free Tier)
-
-- 20 emails/day, 300 emails/month
-- 50 end users tracked
-
-Limits increase on paid plans.
+The SDK sends HTTP requests to `/api/public/identify` and `/api/public/track`; it does not bypass the public API.

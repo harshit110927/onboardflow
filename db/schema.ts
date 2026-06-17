@@ -70,6 +70,7 @@ export const endUsers = pgTable("end_users", {
   tenantId: uuid("tenant_id").references(() => tenants.id),
   externalId: text("external_id").notNull(),
   email: text("email"),
+  properties: jsonb('properties'),
   completedSteps: jsonb("completed_steps").$type<string[]>().default([]),
   lastEmailedAt: timestamp("last_emailed_at"),
   automationsReceived: text("automations_received").array().default([]),
@@ -250,6 +251,15 @@ export const webhooks = pgTable("webhooks", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+export const suppressedEmails = pgTable("suppressed_emails", {
+  id: serial("id").primaryKey(),
+  tenantId: uuid("tenant_id").notNull().references(() => tenants.id),
+  endUserId: uuid("end_user_id").notNull().references(() => endUsers.id),
+  step: varchar("step", { length: 100 }).notNull(),
+  reason: varchar("reason", { length: 100 }).notNull(),
+  suppressedAt: timestamp("suppressed_at").defaultNow().notNull(),
+});
+
 export const webhookDeliveries = pgTable("webhook_deliveries", {
   id: serial("id").primaryKey(),
   webhookId: integer("webhook_id").notNull().references(() => webhooks.id, { onDelete: "cascade" }),
@@ -264,4 +274,31 @@ export const unsubscribedContacts = pgTable("unsubscribed_contacts", {
   id: serial("id").primaryKey(),
   email: varchar("email", { length: 255 }).notNull().unique(),
   unsubscribedAt: timestamp("unsubscribed_at").defaultNow(),
+});
+
+export const consentRecords = pgTable("consent_records", {
+  id: serial("id").primaryKey(),
+  email: varchar("email", { length: 255 }).notNull(),
+  consentType: varchar("consent_type", { length: 100 }).notNull(),
+  consented: boolean("consented").notNull().default(false),
+  source: varchar("source", { length: 100 }).notNull().default("web"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const auditLogs = pgTable("audit_logs", {
+  id: serial("id").primaryKey(),
+  tenantId: uuid("tenant_id").references(() => tenants.id, { onDelete: "set null" }),
+  action: varchar("action", { length: 100 }).notNull(),
+  actorEmail: varchar("actor_email", { length: 255 }),
+  metadata: jsonb("metadata").$type<Record<string, unknown>>().default({}),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const dataRequests = pgTable("data_requests", {
+  id: serial("id").primaryKey(),
+  email: varchar("email", { length: 255 }).notNull(),
+  requestType: varchar("request_type", { length: 20 }).notNull(),
+  status: varchar("status", { length: 20 }).notNull().default("pending"),
+  details: text("details"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
 });

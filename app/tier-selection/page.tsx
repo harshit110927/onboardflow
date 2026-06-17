@@ -5,8 +5,7 @@ import { redirect } from "next/navigation";
 import { db } from "@/db";
 import { tenants } from "@/db/schema";
 import { createClient } from "@/utils/supabase/server";
-
-import { TierSelectionClient } from "./_components/TierSelectionClient";
+import { setTier } from "@/lib/actions/set-tier";
 
 export default async function TierSelectionPage() {
   const supabase = await createClient();
@@ -30,5 +29,6 @@ export default async function TierSelectionPage() {
     redirect(`/dashboard/${tier}`);
   }
 
-  return <TierSelectionClient />;
+  const result = await setTier("enterprise");
+  redirect(result.redirectTo);
 }

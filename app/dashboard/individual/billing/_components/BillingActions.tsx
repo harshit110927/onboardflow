@@ -10,9 +10,16 @@ type PlanCard = {
   highlights: readonly string[];
 };
 
+type LaunchPriceDisplay = {
+  regularUsd: number;
+  launchUsd: number;
+  badge: string;
+};
+
 type Props = {
   plan: PlanCard;
   isCurrent: boolean;
+  launchPriceDisplay?: LaunchPriceDisplay;
 };
 
 declare global {
@@ -41,7 +48,7 @@ function loadRazorpayScript() {
   return razorpayScriptPromise;
 }
 
-export function BillingActions({ plan, isCurrent }: Props) {
+export function BillingActions({ plan, isCurrent, launchPriceDisplay }: Props) {
   const [loading, setLoading] = useState(false);
 
   async function handleSubscribe() {
@@ -65,7 +72,26 @@ export function BillingActions({ plan, isCurrent }: Props) {
         name: "Dripmetric",
         description: `${plan.label} subscription`,
         theme: { color: "#3d6b52" },
-        handler: () => window.location.reload(),
+        handler: async (response: { razorpay_payment_id: string; razorpay_subscription_id: string; razorpay_signature: string }) => {
+          try {
+            setLoading(true);
+            const verifyRes = await fetch("/api/razorpay/verify-subscription", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_subscription_id: response.razorpay_subscription_id,
+                razorpay_signature: response.razorpay_signature,
+                planId: plan.id,
+              }),
+            });
+            if (!verifyRes.ok) throw new Error("Payment verification failed");
+            window.location.reload();
+          } catch (error) {
+            alert("Payment verification failed. Please contact support if your money was deducted.");
+            setLoading(false);
+          }
+        },
         modal: { ondismiss: () => setLoading(false) },
       });
 
@@ -85,9 +111,21 @@ export function BillingActions({ plan, isCurrent }: Props) {
       )}
       <div>
         <h3 className="text-lg font-semibold text-foreground">{plan.label}</h3>
-        <p className="text-sm text-muted-foreground mt-1">
-          ₹{plan.priceInr.toLocaleString("en-IN")} / ${plan.priceUsd} per month
-        </p>
+        {launchPriceDisplay ? (
+          <div className="mt-2 space-y-2">
+            <p className="text-sm font-medium text-muted-foreground">
+              <span className="line-through decoration-2">${launchPriceDisplay.regularUsd}/month</span>
+            </p>
+            <p className="text-3xl font-bold text-foreground">${launchPriceDisplay.launchUsd}/month</p>
+            <span className="inline-flex rounded-full bg-secondary px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-foreground">
+              {launchPriceDisplay.badge}
+            </span>
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground mt-1">
+            ₹{plan.priceInr.toLocaleString("en-IN")} / ${plan.priceUsd} per month
+          </p>
+        )}
       </div>
 
       <ul className="text-sm text-muted-foreground space-y-1">

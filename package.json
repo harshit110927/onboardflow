@@ -6,7 +6,13 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "test:integration": "node tests.js",
+    "test:acceptance": "node tests.e2e.js",
+    "test:all": "npm run test:integration && npm run test:acceptance",
+    "test:full": "npm run seed:test-data && npm run test:integration && npm run test:acceptance && npm run cleanup:test-data",
+    "seed:test-data": "node scripts/test-data.js seed",
+    "cleanup:test-data": "node scripts/test-data.js cleanup"
   },
   "dependencies": {
     "@clack/prompts": "^0.11.0",

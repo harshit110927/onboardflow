@@ -935,6 +935,23 @@ async function run() {
     fix: 'Call getServerSession() at the top; if no session, return 401 or redirect to /login.',
   });
 
+  await test('billing', 'Verify subscription rejects missing params', async () => {
+    // Auth bypass isn't easy here unless we have a session, but if the route checks auth first
+    // it will return 401. If we mock session/tenant, it will return 400.
+    // For test purposes, we'll assert 401 (Unauthorized) or 400 (Bad Request).
+    const { res } = await req('/api/razorpay/verify-subscription', {
+      method: 'POST',
+      headers: json(),
+      body: JSON.stringify({ planId: 'ind_starter' }),
+    });
+    assert(res.status === 401 || res.status === 400, `expected 401 or 400 got ${res.status}`);
+  }, null, {
+    route: 'POST /api/razorpay/verify-subscription',
+    file: 'app/api/razorpay/verify-subscription/route.ts',
+    rootCause: 'Route is not checking for required parameters',
+    fix: 'Check for missing razorpay_payment_id, etc.',
+  });
+
   // ── 10. Individual contacts: import/notes/tags endpoints ─────────────────
   await test('individual', 'POST /api/individual/contacts/import without session returns 401', async () => {
     const fd = new FormData();

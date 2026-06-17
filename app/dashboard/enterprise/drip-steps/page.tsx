@@ -32,15 +32,15 @@ export default async function DripStepsPage() {
           </Link>
           <div className="rounded-lg border border-border bg-card p-8 text-center flex flex-col gap-4">
             <p className="text-2xl">🔒</p>
-            <h1 className="text-xl font-bold text-foreground">Unlimited Drip Steps — Advanced Feature</h1>
+            <h1 className="text-xl font-bold text-foreground">Unlimited Drip Steps — Growth Feature</h1>
             <p className="text-sm text-muted-foreground">
-              Free plan supports 3 hardcoded steps. Upgrade to Advanced for unlimited steps with full control.
+              Free plan supports 3 hardcoded steps. Upgrade to Growth for unlimited steps with full control.
             </p>
             <Link
               href="/dashboard/enterprise/billing"
               className="self-center text-sm rounded-md bg-primary text-primary-foreground px-4 py-2 hover:opacity-90 transition-opacity"
             >
-              Upgrade to Advanced
+              Upgrade to Growth
             </Link>
           </div>
         </div>

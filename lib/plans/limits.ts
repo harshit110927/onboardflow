@@ -73,7 +73,7 @@ export const ENTERPRISE_LIMITS: Record<EnterprisePlanTier, EnterpriseLimits> = {
     maxTrackedUsers: 2000,
     maxEmailsPerMonth: 10000,
     maxDripSteps: Infinity,
-    webhooksEnabled: true,
+    webhooksEnabled: false,
     advancedAnalyticsEnabled: true,
   },
 };
@@ -111,21 +111,21 @@ export const INDIVIDUAL_PLANS = [
 export const ENTERPRISE_PLANS = [
   {
     id: "ent_basic",
-    label: "Basic",
+    label: "Startup",
     priceUsd: 25,
-    priceInr: 2100,
-    amountInPaise: 210000,
+    priceInr: 6600,
+    amountInPaise: 660000,
     planTier: "basic" as EnterprisePlanTier,
     highlights: ["3,000 emails/month", "500 tracked users", "3 drip steps"],
   },
   {
     id: "ent_advanced",
-    label: "Advanced",
+    label: "Growth",
     priceUsd: 50,
-    priceInr: 4200,
-    amountInPaise: 420000,
+    priceInr: 12400,
+    amountInPaise: 1240000,
     planTier: "advanced" as EnterprisePlanTier,
-    highlights: ["10,000 emails/month", "2,000 tracked users", "Unlimited drip steps", "Webhooks", "Advanced analytics"],
+    highlights: ["10,000 emails/month", "2,000 tracked users", "Unlimited drip steps"],
   },
 ] as const;
 
