@@ -8,6 +8,7 @@ const links = [
   { href: "/dashboard/enterprise", label: "Dashboard" },
   { href: "/dashboard/enterprise/billing", label: "Billing" },
   { href: "/dashboard/settings", label: "Settings" },
+  { href: "/dashboard/enterprise/drip-steps", label: "Drip Steps" },
   { href: "/dashboard/analytics", label: "Analytics" },
   { href: "/dashboard/enterprise/users", label: "Users" },
   { href: "/docs", label: "Docs" },
