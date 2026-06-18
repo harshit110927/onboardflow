@@ -4,11 +4,22 @@
  */
 
 const API_KEY = process.env.DRIPMETRIC_INTERNAL_API_KEY;
-// If deployed, use NEXT_PUBLIC_BASE_URL. If local, use localhost:3000
-const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
+
+function getBaseUrl() {
+  if (process.env.NEXT_PUBLIC_BASE_URL) return process.env.NEXT_PUBLIC_BASE_URL;
+  if (process.env.VERCEL_PROJECT_PRODUCTION_URL) return `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`;
+  if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`;
+  if (process.env.NODE_ENV === "production") return "https://www.dripmetric.com";
+  return "http://localhost:3000";
+}
+
+const BASE_URL = getBaseUrl();
 
 export async function dogfoodIdentify(userId: string, email: string) {
-  if (!API_KEY) return;
+  if (!API_KEY) {
+    console.warn("dogfoodIdentify skipped: DRIPMETRIC_INTERNAL_API_KEY is not set.");
+    return;
+  }
   try {
     await fetch(`${BASE_URL}/api/public/identify`, {
       method: "POST",
@@ -24,7 +35,10 @@ export async function dogfoodIdentify(userId: string, email: string) {
 }
 
 export async function dogfoodTrack(userId: string, stepId: string) {
-  if (!API_KEY) return;
+  if (!API_KEY) {
+    console.warn("dogfoodTrack skipped: DRIPMETRIC_INTERNAL_API_KEY is not set.");
+    return;
+  }
   try {
     await fetch(`${BASE_URL}/api/public/track`, {
       method: "POST",
