@@ -1,5 +1,6 @@
 import { createClient } from "@/utils/supabase/server";
 import { NextResponse } from "next/server";
+import { dogfoodIdentify } from "@/lib/tracking/dogfood";
 
 export async function GET(request: Request) {
   // 1. Get the URL info
@@ -15,6 +16,12 @@ export async function GET(request: Request) {
     const { error } = await supabase.auth.exchangeCodeForSession(code);
     
     if (!error) {
+      // Dogfood tracking
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user?.email) {
+        dogfoodIdentify(user.id, user.email).catch(console.error);
+      }
+
       // Forward the user to the Dashboard
       return NextResponse.redirect(`${origin}${next}`);
     }

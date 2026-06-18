@@ -79,20 +79,21 @@ const onboard = new Dripmetric("obf_live_your_api_key");`}</pre>
 
           {/* track */}
           <div className="space-y-4">
-            <h3 className="text-lg font-semibold">onboard.track()</h3>
+            <h3 className="text-lg font-semibold flex items-center gap-2">onboard.track() <Badge variant="secondary" className="font-normal">Schema-less</Badge></h3>
             <p className="text-slate-600">
-              Call this whenever a user completes an onboarding step. The <code>stepId</code> must exactly match the <b>Event Name (Code)</b> you configured in your Automation Workflow settings.
+              Call this whenever a user completes an onboarding step. Dripmetric uses <b>Schema-less Ingestion</b> — this means you do NOT need to pre-create events in your dashboard before tracking them. Your codebase dictates what gets tracked.
             </p>
             <div className="bg-slate-900 rounded-md p-4 overflow-x-auto">
 <pre className="text-sm font-mono text-blue-300">{`await onboard.track({
   userId: "user_123",
-  stepId: "created_project"  // must match dashboard Event Name exactly
+  stepId: "created_first_project"  // Use any custom string you want!
 });`}</pre>
             </div>
             <ul className="text-sm text-slate-600 space-y-1 list-disc list-inside">
+              <li>Just make up a string (like <code>connected_repo</code> or <code>invited_team</code>) and send it. Dripmetric will record it.</li>
+              <li>Once your code sends the event, it will automatically appear in your Automation Settings dropdowns for you to trigger emails from.</li>
               <li>Call <code>identify()</code> before <code>track()</code> — tracking an unknown user returns a 404.</li>
               <li>Tracking the same step twice is safe — it is stored only once (idempotent).</li>
-              <li><code>stepId</code> is case-sensitive. <code>"Created_Project"</code> and <code>"created_project"</code> are treated as different steps.</li>
             </ul>
           </div>
         </section>
@@ -322,14 +323,14 @@ Body: {
             <h2 className="text-2xl font-bold">AI Integration Prompt</h2>
           </div>
           <p className="text-slate-600">
-            Building your app with Cursor, GitHub Copilot, or another AI coding assistant? Copy and paste this prompt directly into your AI to have it integrate Dripmetric for you instantly.
+            Building your app with Cursor, GitHub Copilot, or another AI coding assistant? <b>Before copying the prompt below</b>, replace the bracketed placeholders like <code>[YOUR_API_KEY]</code> and <code>[STEP_NAME]</code> with your actual details. Then paste it into your AI to have it integrate Dripmetric instantly.
           </p>
           <div className="bg-slate-900 rounded-md p-4 overflow-x-auto relative group">
             <pre className="text-sm font-mono text-slate-300 whitespace-pre-wrap">{`You are an expert full-stack developer. I need you to integrate the 'dripmetric' Node SDK into our backend to track user onboarding.
 
 1. Install the SDK: \`npm install dripmetric\`
 
-2. Initialize it in our backend utility or service layer using the API key from our environment variables:
+2. Initialize it in our backend utility or service layer using the API key from our environment variables. Please add \`DRIPMETRIC_API_KEY=[YOUR_API_KEY]\` to our .env files.
    \`\`\`ts
    import { Dripmetric } from "dripmetric";
    export const onboard = new Dripmetric(process.env.DRIPMETRIC_API_KEY!);
@@ -337,7 +338,7 @@ Body: {
 
 3. Locate our user SIGNUP and LOGIN logic. At the end of a successful authentication flow, call \`await onboard.identify({ userId: user.id, email: user.email })\` server-side. Do NOT call this from the client-side browser.
 
-4. Locate our core onboarding step completion logic (e.g., when a user connects a repository or creates their first project). Add a tracking call server-side right after it succeeds: \`await onboard.track({ userId: user.id, stepId: "ENTER_STEP_NAME_HERE" })\`.
+4. Locate our core onboarding step completion logic. Specifically, find where the user does the following action: "[DESCRIBE_THE_ACTION_THEY_TAKE]". Add a tracking call server-side right after that action succeeds: \`await onboard.track({ userId: user.id, stepId: "[STEP_NAME]" })\`.
 
 Please find those authentication and onboarding execution points in our codebase now, and add these snippets. Ensure the API key is never exposed to the frontend.`}</pre>
           </div>
