@@ -259,8 +259,8 @@ Body: {
                 <tr className="border-b">
                   <th className="py-3 pr-6 font-semibold text-slate-700">Limit</th>
                   <th className="py-3 pr-6 font-semibold text-slate-700">Free</th>
-                  <th className="py-3 pr-6 font-semibold text-slate-700">Startup</th>
-                  <th className="py-3 font-semibold text-slate-700">Growth</th>
+                  <th className="py-3 pr-6 font-semibold text-slate-700">Starter</th>
+                  <th className="py-3 font-semibold text-slate-700">Growth / Pro</th>
                 </tr>
               </thead>
               <tbody className="text-slate-600">
@@ -313,6 +313,34 @@ Body: {
               </ul>
             </CardContent>
           </Card>
+        </section>
+
+        {/* AI PROMPT FOR AGENTS */}
+        <section id="ai-prompt" className="space-y-6">
+          <div className="flex items-center gap-2 pb-2 border-b">
+            <Zap className="h-6 w-6 text-blue-600" />
+            <h2 className="text-2xl font-bold">AI Integration Prompt</h2>
+          </div>
+          <p className="text-slate-600">
+            Building your app with Cursor, GitHub Copilot, or another AI coding assistant? Copy and paste this prompt directly into your AI to have it integrate Dripmetric for you instantly.
+          </p>
+          <div className="bg-slate-900 rounded-md p-4 overflow-x-auto relative group">
+            <pre className="text-sm font-mono text-slate-300 whitespace-pre-wrap">{`You are an expert full-stack developer. I need you to integrate the 'dripmetric' Node SDK into our backend to track user onboarding.
+
+1. Install the SDK: \`npm install dripmetric\`
+
+2. Initialize it in our backend utility or service layer using the API key from our environment variables:
+   \`\`\`ts
+   import { Dripmetric } from "dripmetric";
+   export const onboard = new Dripmetric(process.env.DRIPMETRIC_API_KEY!);
+   \`\`\`
+
+3. Locate our user SIGNUP and LOGIN logic. At the end of a successful authentication flow, call \`await onboard.identify({ userId: user.id, email: user.email })\` server-side. Do NOT call this from the client-side browser.
+
+4. Locate our core onboarding step completion logic (e.g., when a user connects a repository or creates their first project). Add a tracking call server-side right after it succeeds: \`await onboard.track({ userId: user.id, stepId: "ENTER_STEP_NAME_HERE" })\`.
+
+Please find those authentication and onboarding execution points in our codebase now, and add these snippets. Ensure the API key is never exposed to the frontend.`}</pre>
+          </div>
         </section>
 
       </main>
