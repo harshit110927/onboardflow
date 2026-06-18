@@ -19,6 +19,7 @@ export default function SettingsPage() {
   const [savingEmail, setSavingEmail] = useState(false);
   const [savingWhatsapp, setSavingWhatsapp] = useState(false);
   const [fetching, setFetching] = useState(true);
+  const [eventsList, setEventsList] = useState<string[]>([]);
 
   const [formData, setFormData] = useState({
     activationStep: "connect_repo",
@@ -63,6 +64,14 @@ export default function SettingsPage() {
             hasExistingKey: !!data.resendApiKey,
           });
           setWhatsappTemplate(data.whatsappTemplate || "Hi {name}, ");
+        }
+        
+        const eventsRes = await fetch("/api/v1/events");
+        if (eventsRes.ok) {
+          const eventsData = await eventsRes.json();
+          if (eventsData.all) {
+            setEventsList(eventsData.all);
+          }
         }
       } catch (e) {
         console.error(e);
@@ -249,6 +258,147 @@ export default function SettingsPage() {
                 </div>
               </div>
             </CardHeader>
+          </Card>
+
+          {/* AUTOMATION STEPS */}
+          <Card className="border-border bg-card">
+            <CardHeader>
+              <CardTitle>Automation Steps</CardTitle>
+              <CardDescription>
+                Select the exact events your codebase is sending. 
+                (If you haven't sent data yet, pick a standard template below to generate your AI prompt).
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* Step 1 */}
+              <div className="space-y-3 p-4 border rounded-lg bg-secondary/10">
+                <div className="flex items-center gap-2">
+                  <div className="h-6 w-6 rounded-full bg-primary text-primary-foreground text-xs font-bold flex items-center justify-center shrink-0">1</div>
+                  <h3 className="font-semibold text-foreground">Activation Step (Step 1)</h3>
+                </div>
+                <div className="grid gap-3 pl-8">
+                  <div className="space-y-1">
+                    <Label>Event Name</Label>
+                    <Input
+                      list="events-list"
+                      placeholder="e.g. connected_repo"
+                      value={formData.activationStep}
+                      onChange={(e) => handleChange("activationStep", e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Email Subject</Label>
+                    <Input
+                      placeholder="Subject line"
+                      value={formData.emailSubject}
+                      onChange={(e) => handleChange("emailSubject", e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Email Body</Label>
+                    <Textarea
+                      placeholder="Email body..."
+                      value={formData.emailBody}
+                      onChange={(e) => handleChange("emailBody", e.target.value)}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Step 2 */}
+              <div className="space-y-3 p-4 border rounded-lg bg-secondary/10">
+                <div className="flex items-center gap-2">
+                  <div className="h-6 w-6 rounded-full bg-primary text-primary-foreground text-xs font-bold flex items-center justify-center shrink-0">2</div>
+                  <h3 className="font-semibold text-foreground">Step 2 (Optional)</h3>
+                </div>
+                <div className="grid gap-3 pl-8">
+                  <div className="space-y-1">
+                    <Label>Event Name</Label>
+                    <Input
+                      list="events-list"
+                      placeholder="e.g. invited_team"
+                      value={formData.step2}
+                      onChange={(e) => handleChange("step2", e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Email Subject</Label>
+                    <Input
+                      placeholder="Subject line"
+                      value={formData.emailSubject2}
+                      onChange={(e) => handleChange("emailSubject2", e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Email Body</Label>
+                    <Textarea
+                      placeholder="Email body..."
+                      value={formData.emailBody2}
+                      onChange={(e) => handleChange("emailBody2", e.target.value)}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Step 3 */}
+              <div className="space-y-3 p-4 border rounded-lg bg-secondary/10">
+                <div className="flex items-center gap-2">
+                  <div className="h-6 w-6 rounded-full bg-primary text-primary-foreground text-xs font-bold flex items-center justify-center shrink-0">3</div>
+                  <h3 className="font-semibold text-foreground">Step 3 (Optional)</h3>
+                </div>
+                <div className="grid gap-3 pl-8">
+                  <div className="space-y-1">
+                    <Label>Event Name</Label>
+                    <Input
+                      list="events-list"
+                      placeholder="e.g. upgraded_plan"
+                      value={formData.step3}
+                      onChange={(e) => handleChange("step3", e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Email Subject</Label>
+                    <Input
+                      placeholder="Subject line"
+                      value={formData.emailSubject3}
+                      onChange={(e) => handleChange("emailSubject3", e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Email Body</Label>
+                    <Textarea
+                      placeholder="Email body..."
+                      value={formData.emailBody3}
+                      onChange={(e) => handleChange("emailBody3", e.target.value)}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Data list for Combobox effect */}
+              <datalist id="events-list">
+                {eventsList.map((evt) => (
+                  <option key={evt} value={evt} />
+                ))}
+              </datalist>
+
+              {/* Dynamic AI Prompt */}
+              <div className="mt-8 p-4 bg-blue-50 border border-blue-200 rounded-lg space-y-3">
+                <div className="flex items-center gap-2 pb-2 border-b border-blue-200">
+                  <Zap className="h-5 w-5 text-blue-600" />
+                  <h3 className="font-semibold text-blue-900">Dynamic AI Prompt</h3>
+                </div>
+                <p className="text-sm text-blue-800">
+                  Copy this prompt to give your AI coder the exact instructions it needs to implement these events:
+                </p>
+                <div className="bg-slate-900 p-4 rounded text-xs font-mono text-blue-300 overflow-x-auto whitespace-pre-wrap">
+                  {`Please implement the following server-side tracking calls in our codebase using the Dripmetric SDK whenever these actions occur:\n`}
+                  {formData.activationStep && `\n- When the user does Step 1: \`await onboard.track({ userId: user.id, stepId: "${formData.activationStep}" })\``}
+                  {formData.step2 && `\n- When the user does Step 2: \`await onboard.track({ userId: user.id, stepId: "${formData.step2}" })\``}
+                  {formData.step3 && `\n- When the user does Step 3: \`await onboard.track({ userId: user.id, stepId: "${formData.step3}" })\``}
+                </div>
+              </div>
+            </CardContent>
           </Card>
 
           {/* EMAIL SENDING */}

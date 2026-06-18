@@ -5,6 +5,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
 import { encryptPassword } from "@/lib/email/smtp";
 import { Resend } from "resend";
+import { dogfoodTrack } from "@/lib/tracking/dogfood";
 
 export async function GET(req: Request) {
   try {
@@ -107,6 +108,9 @@ export async function POST(req: Request) {
     await db.update(tenants)
       .set(updates)
       .where(eq(tenants.email, user.email!));
+
+    // Dogfood track
+    dogfoodTrack(user.id, "configured_automation").catch(console.error);
 
     return NextResponse.json({ success: true });
   } catch (error) {

@@ -132,3 +132,7 @@ export const ENTERPRISE_PLANS = [
 export function getIndividualLimits(plan: string): IndividualLimits {
   return INDIVIDUAL_LIMITS[plan as PlanTier] ?? INDIVIDUAL_LIMITS["free"];
 }
+
+export function getEnterpriseLimits(plan: string): EnterpriseLimits {
+  return ENTERPRISE_LIMITS[plan as EnterprisePlanTier] ?? ENTERPRISE_LIMITS["free"];
+}
