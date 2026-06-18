@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Download, Loader2, Search } from "lucide-react";
+import { Download, Loader2, Search, Info } from "lucide-react";
+import { NudgeModal, NudgeTarget } from "@/components/modals/NudgeModal";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -13,7 +14,7 @@ import { cn } from "@/lib/utils";
 
 type UserStatus = "activated" | "stalled" | "at_risk" | "churned";
 type StatusFilter = "all" | UserStatus;
-type SortKey = "email" | "customerType" | "plan" | "currentStep" | "lastSeenAt" | "status" | "emailsSent";
+type SortKey = "email" | "customerType" | "plan" | "currentStep" | "lastSeenAt" | "status" | "emailsSent" | "health";
 type SortDirection = "asc" | "desc";
 
 type UserProperties = {
@@ -35,6 +36,8 @@ type ApiUser = {
   automationsReceived: string[];
   createdAt: string;
   status: UserStatus;
+  primaryRiskLabel?: string | null;
+  riskScore?: number | null;
 };
 
 type UsersResponse = {
@@ -96,6 +99,28 @@ function statusClasses(status: UserStatus) {
     case "churned":
       return "border-white/10 bg-white/10 text-white/70";
   }
+}
+
+function healthClasses(label?: string | null) {
+  if (!label) return "border-emerald-500/30 bg-emerald-500/10 text-emerald-300";
+  switch (label) {
+    case "GONE_DARK":
+    case "EMAIL_NON_RESPONSIVE":
+    case "NEVER_STARTED":
+      return "border-red-500/30 bg-red-500/10 text-red-300";
+    case "PRE_ACTIVATION_STALL":
+    case "COOLING":
+      return "border-amber-500/30 bg-amber-500/10 text-amber-300";
+    case "POST_ACTIVATION_STALL":
+      return "border-slate-500/30 bg-slate-500/10 text-slate-300";
+    default:
+      return "border-emerald-500/30 bg-emerald-500/10 text-emerald-300";
+  }
+}
+
+function formatHealth(label?: string | null) {
+  if (!label) return "ACTIVATED";
+  return label.replace(/_/g, " ");
 }
 
 function currencySymbol(properties: UserProperties | null) {
@@ -200,6 +225,8 @@ function sortValue(user: ApiUser, key: SortKey) {
       return statusOrder[user.status];
     case "emailsSent":
       return user.automationsReceived.length;
+    case "health":
+      return user.riskScore ?? 0;
   }
 }
 
@@ -249,9 +276,11 @@ export function UsersClient({ apiKey }: { apiKey: string | null }) {
   const [exporting, setExporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [healthFilter, setHealthFilter] = useState<string>("all");
   const [search, setSearch] = useState("");
   const [sortKey, setSortKey] = useState<SortKey | null>(null);
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
+  const [nudgeTarget, setNudgeTarget] = useState<NudgeTarget | null>(null);
 
   useEffect(() => {
     if (!apiKey) {
@@ -303,7 +332,8 @@ export function UsersClient({ apiKey }: { apiKey: string | null }) {
     const nextUsers = users.filter((user) => {
       const matchesStatus = statusFilter === "all" || user.status === statusFilter;
       const matchesSearch = !normalizedSearch || user.email.toLowerCase().includes(normalizedSearch);
-      return matchesStatus && matchesSearch;
+      const matchesHealth = healthFilter === "all" || user.primaryRiskLabel === healthFilter || (!user.primaryRiskLabel && healthFilter === "ACTIVATED");
+      return matchesStatus && matchesSearch && matchesHealth;
     });
 
     return [...nextUsers].sort((a, b) => {
@@ -312,7 +342,7 @@ export function UsersClient({ apiKey }: { apiKey: string | null }) {
       const result = compareValues(sortValue(a, sortKey), sortValue(b, sortKey));
       return sortDirection === "asc" ? result : -result;
     });
-  }, [search, sortDirection, sortKey, statusFilter, users]);
+  }, [search, sortDirection, sortKey, statusFilter, healthFilter, users]);
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
@@ -378,14 +408,30 @@ export function UsersClient({ apiKey }: { apiKey: string | null }) {
                   Showing page {page} of {totalPages} · {total} total users
                 </CardDescription>
               </div>
-              <div className="relative w-full sm:w-72">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  value={search}
-                  onChange={(event) => setSearch(event.target.value)}
-                  placeholder="Search by email"
-                  className="pl-9"
-                />
+              <div className="flex w-full gap-4 sm:w-auto">
+                <div className="relative w-full sm:w-72">
+                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    value={search}
+                    onChange={(event) => setSearch(event.target.value)}
+                    placeholder="Search by email"
+                    className="pl-9"
+                  />
+                </div>
+                <select
+                  value={healthFilter}
+                  onChange={(e) => setHealthFilter(e.target.value)}
+                  className="flex h-10 w-[180px] items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <option value="all">All Health Risks</option>
+                  <option value="ACTIVATED">Healthy (Activated)</option>
+                  <option value="COOLING">Cooling</option>
+                  <option value="NEVER_STARTED">Never Started</option>
+                  <option value="PRE_ACTIVATION_STALL">Pre-Activation Stall</option>
+                  <option value="POST_ACTIVATION_STALL">Post-Activation Stall</option>
+                  <option value="EMAIL_NON_RESPONSIVE">Email Non-Responsive</option>
+                  <option value="GONE_DARK">Gone Dark</option>
+                </select>
               </div>
             </div>
 
@@ -414,6 +460,7 @@ export function UsersClient({ apiKey }: { apiKey: string | null }) {
                     <SortableHead label="Customer type" sortKey="customerType" activeKey={sortKey} direction={sortDirection} onSort={handleSort} />
                     <SortableHead label="Plan" sortKey="plan" activeKey={sortKey} direction={sortDirection} onSort={handleSort} />
                     <SortableHead label="Current step" sortKey="currentStep" activeKey={sortKey} direction={sortDirection} onSort={handleSort} />
+                    <SortableHead label="Health" sortKey="health" activeKey={sortKey} direction={sortDirection} onSort={handleSort} />
                     <SortableHead label="Last active" sortKey="lastSeenAt" activeKey={sortKey} direction={sortDirection} onSort={handleSort} />
                     <SortableHead label="Status" sortKey="status" activeKey={sortKey} direction={sortDirection} onSort={handleSort} />
                     <SortableHead label="Emails sent" sortKey="emailsSent" activeKey={sortKey} direction={sortDirection} onSort={handleSort} className="text-right" />
@@ -449,6 +496,11 @@ export function UsersClient({ apiKey }: { apiKey: string | null }) {
                           </TableCell>
                           <TableCell className="text-sm text-muted-foreground">{formatPlan(user.properties)}</TableCell>
                           <TableCell className="text-sm text-muted-foreground">{currentStep(user)}</TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className={healthClasses(user.primaryRiskLabel)}>
+                              {formatHealth(user.primaryRiskLabel)}
+                            </Badge>
+                          </TableCell>
                           <TableCell className="text-sm text-muted-foreground">{relativeTime(user.lastSeenAt)}</TableCell>
                           <TableCell>
                             <Badge variant="outline" className={statusClasses(user.status)}>
@@ -459,8 +511,13 @@ export function UsersClient({ apiKey }: { apiKey: string | null }) {
                             {user.automationsReceived.length}
                           </TableCell>
                           <TableCell className="text-right">
-                            {/* TODO: Wire this to a per-user nudge endpoint once the API supports targeting a specific user. */}
-                            <Button type="button" variant="outline" size="sm" disabled title="Per-user nudges are not implemented yet">
+                            <Button 
+                              type="button" 
+                              variant="outline" 
+                              size="sm" 
+                              disabled={!user.email} 
+                              onClick={() => setNudgeTarget({ email: user.email, riskLabel: user.primaryRiskLabel, riskScore: user.riskScore })}
+                            >
                               Send nudge
                             </Button>
                           </TableCell>
@@ -485,9 +542,22 @@ export function UsersClient({ apiKey }: { apiKey: string | null }) {
                 </Button>
               </div>
             </div>
+
+            <div className="mt-6 rounded-md border border-amber-500/30 bg-amber-500/10 px-4 py-3 flex items-start gap-3 text-sm text-amber-700 dark:text-amber-400">
+              <Info className="h-4 w-4 mt-0.5 shrink-0" />
+              <p>
+                <strong>Predictor Engine Note:</strong> The current health status is generated by a heuristic rule-based engine. We will be rolling out an advanced ML-based churn predictor soon!
+              </p>
+            </div>
           </CardContent>
         </Card>
       </div>
+
+      <NudgeModal
+        isOpen={!!nudgeTarget}
+        onClose={() => setNudgeTarget(null)}
+        target={nudgeTarget}
+      />
     </div>
   );
 }

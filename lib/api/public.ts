@@ -115,9 +115,27 @@ export async function track(req: Request) {
 
     const currentSteps = (user.completedSteps as string[]) || [];
     const duplicate = currentSteps.includes(eventName);
+    
+    const timeSinceLastSeenMs = timestamp.getTime() - (user.lastSeenAt?.getTime() ?? 0);
+    const needsPresenceUpdate = timeSinceLastSeenMs > 5 * 60 * 1000;
+    
+    const updatePayload: { completedSteps?: string[]; lastSeenAt?: Date } = {};
+    let newSteps = currentSteps;
+
     if (!duplicate) {
-      const newSteps = [...currentSteps, eventName];
-      await db.update(endUsers).set({ completedSteps: newSteps, lastSeenAt: timestamp }).where(eq(endUsers.id, user.id));
+      newSteps = [...currentSteps, eventName];
+      updatePayload.completedSteps = newSteps;
+    }
+
+    if (needsPresenceUpdate) {
+      updatePayload.lastSeenAt = timestamp;
+    }
+
+    if (Object.keys(updatePayload).length > 0) {
+      await db.update(endUsers).set(updatePayload).where(eq(endUsers.id, user.id));
+    }
+
+    if (!duplicate) {
       deliverWebhookEvent(auth.tenant.id, "user.activated", { userId, eventName, properties, timestamp: timestamp.toISOString(), completedSteps: newSteps }).catch((err) => console.error("Webhook delivery error:", err));
     }
 

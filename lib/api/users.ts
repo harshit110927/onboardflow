@@ -20,6 +20,8 @@ export type ApiUser = {
   automationsReceived: string[];
   createdAt: string;
   status: ApiUserStatus;
+  primaryRiskLabel?: string | null;
+  riskScore?: number | null;
 };
 
 export const apiUserStatuses: ApiUserStatus[] = ["stalled", "activated", "at_risk", "churned"];
@@ -60,7 +62,11 @@ export function computeApiUserStatus(user: EndUser, activationStep?: string | nu
   return completedSteps.length > 0 ? "activated" : "stalled";
 }
 
-export function formatApiUser(user: EndUser, activationStep?: string | null): ApiUser {
+export function formatApiUser(
+  user: EndUser, 
+  activationStep?: string | null,
+  snapshot?: { primaryRiskLabel: string; riskScore: number } | null
+): ApiUser {
   return {
     userId: user.externalId,
     email: user.email ?? "",
@@ -71,5 +77,7 @@ export function formatApiUser(user: EndUser, activationStep?: string | null): Ap
     automationsReceived: toStringArray(user.automationsReceived),
     createdAt: user.createdAt ? user.createdAt.toISOString() : "",
     status: computeApiUserStatus(user, activationStep),
+    primaryRiskLabel: snapshot?.primaryRiskLabel ?? null,
+    riskScore: snapshot?.riskScore ?? null,
   };
 }

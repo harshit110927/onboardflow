@@ -1,9 +1,9 @@
 import { db } from "@/db";
-import { endUsers, tenants } from "@/db/schema";
+import { endUsers, tenants, riskSnapshots } from "@/db/schema";
 import { apiError } from "@/lib/api/errors";
 import { apiUserStatuses, formatApiUser, type ApiUserStatus } from "@/lib/api/users";
 import { checkApiRateLimit } from "@/lib/rate-limit/api";
-import { desc, eq } from "drizzle-orm";
+import { desc, eq, inArray } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
 const DEFAULT_PAGE = 1;
@@ -61,13 +61,46 @@ export async function GET(req: Request) {
       orderBy: [desc(endUsers.createdAt)],
     });
 
-    const formattedUsers = allUsers.map((user) => formatApiUser(user, tenant.activationStep));
-    const filteredUsers = status ? formattedUsers.filter((user) => user.status === status) : formattedUsers;
     const offset = (page - 1) * limit;
+    
+    // We need to compute status first to filter properly if a status query exists
+    let filteredUsers = allUsers;
+    if (status) {
+      filteredUsers = allUsers.filter((user) => {
+        // computeApiUserStatus logic is inside formatApiUser, but for now we format temporarily to check status
+        const temp = formatApiUser(user, tenant.activationStep);
+        return temp.status === status;
+      });
+    }
+
+    const slicedUsers = filteredUsers.slice(offset, offset + limit);
+    const slicedIds = slicedUsers.map((u) => u.id);
+
+    // Fetch the latest snapshots for just this page's users
+    const snapshotMap = new Map<string, { primaryRiskLabel: string; riskScore: number }>();
+    if (slicedIds.length > 0) {
+      const snapshots = await db.query.riskSnapshots.findMany({
+        where: inArray(riskSnapshots.endUserId, slicedIds),
+        orderBy: [desc(riskSnapshots.capturedAt)],
+      });
+
+      for (const snap of snapshots) {
+        if (!snapshotMap.has(snap.endUserId)) {
+          snapshotMap.set(snap.endUserId, {
+            primaryRiskLabel: snap.primaryRiskLabel,
+            riskScore: snap.riskScore,
+          });
+        }
+      }
+    }
+
+    const formattedSlicedUsers = slicedUsers.map((user) => 
+      formatApiUser(user, tenant.activationStep, snapshotMap.get(user.id))
+    );
 
     return NextResponse.json({
       success: true,
-      users: filteredUsers.slice(offset, offset + limit),
+      users: formattedSlicedUsers,
       total: filteredUsers.length,
       page,
       limit,
