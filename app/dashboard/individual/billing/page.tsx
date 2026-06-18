@@ -45,6 +45,28 @@ export default async function IndividualBillingPage() {
           {INDIVIDUAL_PLANS.map((plan) => (
             <BillingActions key={plan.id} plan={plan} isCurrent={planInfo.plan === plan.planTier} />
           ))}
+
+          {/* CUSTOM FEATURES & ANALYTICS TIER */}
+          <div className="rounded-xl border border-border bg-card p-6 flex flex-col justify-between">
+            <div>
+              <h2 className="text-xl font-semibold text-foreground">Custom / Enterprise</h2>
+              <div className="mt-2 text-2xl font-semibold text-foreground">Custom</div>
+              <p className="mt-4 text-sm text-muted-foreground">
+                Need advanced analytics, ML-driven churn prediction, or custom SLA integrations? Consult with our team to build exactly what you need.
+              </p>
+              <ul className="mt-6 space-y-3 text-sm text-muted-foreground">
+                <li className="flex items-center gap-2">✓ Advanced predictive ML models</li>
+                <li className="flex items-center gap-2">✓ Custom dashboard integrations</li>
+                <li className="flex items-center gap-2">✓ Dedicated support & SLA</li>
+              </ul>
+            </div>
+            <a 
+              href="mailto:hello@dripmetric.com?subject=Dripmetric%20Custom%20Plan%20Inquiry"
+              className="mt-8 flex w-full items-center justify-center rounded-md bg-secondary px-4 py-2 text-sm font-medium text-secondary-foreground hover:bg-secondary/80 transition-colors"
+            >
+              Contact Sales
+            </a>
+          </div>
         </div>
 
         <Link href="/dashboard/individual/settings" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
