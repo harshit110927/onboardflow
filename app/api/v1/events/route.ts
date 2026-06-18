@@ -37,7 +37,7 @@ export async function GET(req: Request) {
       "published_first_post"
     ];
 
-    const discoveredEvents = result.rows.map((row) => row.step as string);
+    const discoveredEvents = result.map((row: any) => row.step as string);
     const combined = Array.from(new Set([...discoveredEvents, ...defaultTemplates]));
 
     return NextResponse.json({

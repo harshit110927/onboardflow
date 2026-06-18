@@ -75,7 +75,7 @@ export async function identify(req: Request) {
       const currentUsers = Number(countRes[0].count);
       
       if (currentUsers >= limits.maxTrackedUsers) {
-        return apiError("LIMIT_REACHED", `Plan limit reached. Your current plan allows ${limits.maxTrackedUsers} tracked users. Please upgrade to track more users.`, 402);
+        return apiError("PLAN_LIMIT_REACHED", `Plan limit reached. Your current plan allows ${limits.maxTrackedUsers} tracked users. Please upgrade to track more users.`, 402);
       }
 
       const inserted = await db.insert(endUsers).values({
