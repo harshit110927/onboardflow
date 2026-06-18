@@ -3,8 +3,10 @@ import { endUsers, tenants } from "@/db/schema";
 import { apiError } from "@/lib/api/errors";
 import { checkApiRateLimit } from "@/lib/rate-limit/api";
 import { deliverWebhookEvent } from "@/lib/webhooks/deliver";
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { NextResponse } from "next/server";
+import { getTenantPlan } from "@/lib/plans/get-tenant-plan";
+import { getEnterpriseLimits } from "@/lib/plans/limits";
 
 export type JsonObject = Record<string, unknown>;
 
@@ -62,6 +64,20 @@ export async function identify(req: Request) {
     const alreadyExisted = Boolean(user);
 
     if (!user) {
+      const planInfo = await getTenantPlan(auth.tenant.id);
+      const limits = getEnterpriseLimits(planInfo.plan);
+      
+      const countRes = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(endUsers)
+        .where(eq(endUsers.tenantId, auth.tenant.id));
+        
+      const currentUsers = Number(countRes[0].count);
+      
+      if (currentUsers >= limits.maxTrackedUsers) {
+        return apiError("PLAN_LIMIT_REACHED", `Plan limit reached. Your current plan allows ${limits.maxTrackedUsers} tracked users. Please upgrade to track more users.`, 402);
+      }
+
       const inserted = await db.insert(endUsers).values({
         tenantId: auth.tenant.id,
         externalId: userId,
