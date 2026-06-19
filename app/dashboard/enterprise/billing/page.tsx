@@ -6,9 +6,11 @@ import { getTenant } from "@/lib/auth/get-tenant";
 import { getTenantPlan } from "@/lib/plans/get-tenant-plan";
 import { BillingActions } from "../../individual/billing/_components/BillingActions";
 
-const ENTERPRISE_LAUNCH_PRICES: Partial<Record<EnterprisePlanTier, { regularUsd: number; launchUsd: number; badge: string }>> = {
-  basic: { regularUsd: 60, launchUsd: 25, badge: "Launch Month Discount" },
-  advanced: { regularUsd: 120, launchUsd: 50, badge: "Launch Month Discount" },
+const ENTERPRISE_LAUNCH_PRICES: Partial<Record<string, { regularUsd: number; launchUsd: number; badge: string }>> = {
+  ent_basic: { regularUsd: 60, launchUsd: 25, badge: "Launch Month Discount" },
+  ent_advanced: { regularUsd: 120, launchUsd: 50, badge: "Launch Month Discount" },
+  ent_basic_yearly: { regularUsd: 300, launchUsd: 200, badge: "Save 33% (Launch Discount)" },
+  ent_advanced_yearly: { regularUsd: 600, launchUsd: 400, badge: "Save 33% (Launch Discount)" },
 };
 
 export default async function EnterpriseBillingPage() {
@@ -49,7 +51,7 @@ export default async function EnterpriseBillingPage() {
               key={plan.id}
               plan={plan}
               isCurrent={planInfo.plan === plan.planTier}
-              launchPriceDisplay={ENTERPRISE_LAUNCH_PRICES[plan.planTier]}
+              launchPriceDisplay={ENTERPRISE_LAUNCH_PRICES[plan.id]}
             />
           ))}
 

@@ -12,7 +12,7 @@ export default function TermsPage() {
 
         <div>
           <h1 className="text-3xl font-bold text-foreground">Terms of Service</h1>
-          <p className="text-sm text-muted-foreground mt-2">Last updated: March 2025</p>
+          <p className="text-sm text-muted-foreground mt-2">Last updated: June 2026</p>
         </div>
 
         <div className="flex flex-col gap-6 text-sm text-foreground leading-relaxed">
@@ -33,7 +33,7 @@ export default function TermsPage() {
 
           <section className="flex flex-col gap-2">
             <h2 className="text-base font-semibold">4. Payment Terms</h2>
-            <p>Subscription plans are billed monthly. Credit packs are one-time purchases. All payments are processed securely via Stripe. Prices are listed in USD and subject to change with 30 days notice.</p>
+            <p>Subscription plans are billed monthly. Yearly subscriptions are billed annually and provide a discounted rate compared to monthly billing. Credit packs are one-time purchases. All payments are processed securely via Stripe. Prices are listed in USD and subject to change with 30 days notice.</p>
           </section>
 
           <section className="flex flex-col gap-2">
@@ -58,7 +58,7 @@ export default function TermsPage() {
 
           <section className="flex flex-col gap-2">
             <h2 className="text-base font-semibold">9. Contact</h2>
-            <p>For questions about these terms, contact us at support@dripmetric.com.</p>
+            <p>For questions about these terms, contact us at hello@dripmetric.com.</p>
           </section>
         </div>
       </div>

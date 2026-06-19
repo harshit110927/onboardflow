@@ -776,12 +776,7 @@ const landingMarkup = String.raw`<!-- ══════════════
     <div class="hero-inner">
       <!-- LEFT -->
       <div>
-        <a href="https://www.producthunt.com/products/onboardflow-3/reviews/new?utm_source=badge-product_review&amp;utm_medium=badge&amp;utm_source=badge-dripmetric&#0045;3" target="_blank" rel="noopener" class="product-hunt-badge" aria-label="Review Dripmetric on Product Hunt">
-          <img src="https://api.producthunt.com/widgets/embed-image/v1/product_review.svg?product_id=1210405&amp;theme=light" alt="Dripmetric - Easy to setup mail dripping and cold mailing for individuals | Product Hunt" width="250" height="54" />
-        </a>
         <div class="hero-badge">
-          <span class="badge-dot"></span>
-          Free to start · No credit card
         </div>
         <h1>
           Most SaaS products<br/>
@@ -789,8 +784,7 @@ const landingMarkup = String.raw`<!-- ══════════════
           <strong>before activation.</strong>
         </h1>
         <p class="hero-sub">
-          Dripmetric shows you exactly where users drop off and automatically nudges them back —
-          with only 3 lines of code.
+          Integrate fast and save your signups from disappearing.
         </p>
         <div class="hero-ctas">
           <a href="/login" class="btn-primary btn-primary-lg">
@@ -927,8 +921,8 @@ const landingMarkup = String.raw`<!-- ══════════════
   <div class="container">
     <div class="sec-hdr reveal">
       <p class="sec-label">What you get</p>
-      <h2 class="sec-title">Everything the core onboarding<br/><strong>loop needs. Nothing it doesn't.</strong></h2>
-      <p class="sec-sub">Two tiers — SDK-level control for developers, no-code dashboard for businesses who just want it to work.</p>
+      <h2 class="sec-title">Save your revenue by reducing<br/><strong>the risk of customer drop-off.</strong></h2>
+      <p class="sec-sub">Keep your core onboarding loop tight. Two tiers — SDK-level control for developers, no-code dashboard for businesses who just want it to work.</p>
     </div>
     <div class="feat-grid">
       <div class="feat-card reveal d1">
@@ -989,7 +983,7 @@ const landingMarkup = String.raw`<!-- ══════════════
     <div class="sec-hdr centered reveal">
       <p class="sec-label">Integration in minutes</p>
       <h2 class="sec-title">How to automate SaaS onboarding emails<br/><strong style="color:#fff">when users get stuck</strong></h2>
-      <p class="sec-sub">Three steps. Only 3 lines of code. Working drip automation in under 10 minutes.</p>
+      <p class="sec-sub">Three quick steps. Only 3 lines of code. Get working drip automation in under 10 minutes.</p>
     </div>
     <div class="steps-grid">
       <div class="step reveal d1">
@@ -1114,7 +1108,7 @@ const landingMarkup = String.raw`<!-- ══════════════
 
         <div class="price-card featured" style="background:rgba(255,255,255,.08);text-align:left">
           <div class="feat-badge">Most Popular</div>
-          <h3 style="color:#fff;font-size:1.5rem;font-weight:600;margin-bottom:8px">Startup</h3>
+          <h3 style="color:#fff;font-size:1.5rem;font-weight:600;margin-bottom:8px">Basic</h3>
           <p style="color:var(--on-deep-muted);text-decoration:line-through;margin-bottom:0;line-height:1">$60/month</p>
           <p style="font-size:2.5rem;font-weight:700;color:#fff;margin-bottom:8px;line-height:1">$25<span style="font-size:1rem;color:var(--on-deep-sub);font-weight:400">/month</span></p>
           <p class="tag" style="display:inline-flex;margin-bottom:24px;background:var(--primary);color:#fff;border-color:transparent">Launch Month Discount</p>
@@ -1126,10 +1120,36 @@ const landingMarkup = String.raw`<!-- ══════════════
           </ul>
         </div>
 
+        <div class="price-card featured" style="background:rgba(255,255,255,.08);text-align:left">
+          <div class="feat-badge" style="background:var(--emerald)">Save 33%</div>
+          <h3 style="color:#fff;font-size:1.5rem;font-weight:600;margin-bottom:8px">Yearly Basic</h3>
+          <p style="font-size:2.5rem;font-weight:700;color:#fff;margin-bottom:8px;line-height:1">$200<span style="font-size:1rem;color:var(--on-deep-sub);font-weight:400">/year</span></p>
+          <p class="tag" style="display:inline-flex;margin-bottom:24px;background:var(--primary);color:#fff;border-color:transparent">Launch Month Discount</p>
+          <ul class="price-list" style="margin-bottom:0">
+            <li style="color:var(--on-deep-sub)"><svg class="ico" width="16" height="16" style="color:var(--emerald)"><use href="#i-check"/></svg> 500 tracked users</li>
+            <li style="color:var(--on-deep-sub)"><svg class="ico" width="16" height="16" style="color:var(--emerald)"><use href="#i-check"/></svg> 3,000 emails/month</li>
+            <li style="color:var(--on-deep-sub)"><svg class="ico" width="16" height="16" style="color:var(--emerald)"><use href="#i-check"/></svg> 10 drip steps</li>
+            <li style="color:var(--on-deep-sub)"><svg class="ico" width="16" height="16" style="color:var(--emerald)"><use href="#i-check"/></svg> Webhooks enabled</li>
+          </ul>
+        </div>
+
         <div class="price-card" style="background:rgba(255,255,255,.03);border-color:rgba(255,255,255,.12);text-align:left">
-          <h3 style="color:#fff;font-size:1.5rem;font-weight:600;margin-bottom:8px">Growth</h3>
+          <h3 style="color:#fff;font-size:1.5rem;font-weight:600;margin-bottom:8px">Advanced</h3>
           <p style="color:var(--on-deep-muted);text-decoration:line-through;margin-bottom:0;line-height:1">$120/month</p>
           <p style="font-size:2.5rem;font-weight:700;color:#fff;margin-bottom:8px;line-height:1">$50<span style="font-size:1rem;color:var(--on-deep-sub);font-weight:400">/month</span></p>
+          <p class="tag" style="display:inline-flex;margin-bottom:24px;background:var(--primary);color:#fff;border-color:transparent">Launch Month Discount</p>
+          <ul class="price-list" style="margin-bottom:0">
+            <li style="color:var(--on-deep-sub)"><svg class="ico" width="16" height="16" style="color:var(--emerald)"><use href="#i-check"/></svg> 2,500 tracked users</li>
+            <li style="color:var(--on-deep-sub)"><svg class="ico" width="16" height="16" style="color:var(--emerald)"><use href="#i-check"/></svg> 15,000 emails/month</li>
+            <li style="color:var(--on-deep-sub)"><svg class="ico" width="16" height="16" style="color:var(--emerald)"><use href="#i-check"/></svg> Unlimited drip steps</li>
+            <li style="color:var(--on-deep-sub)"><svg class="ico" width="16" height="16" style="color:var(--emerald)"><use href="#i-check"/></svg> Advanced Analytics</li>
+          </ul>
+        </div>
+
+        <div class="price-card" style="background:rgba(255,255,255,.03);border-color:rgba(255,255,255,.12);text-align:left">
+          <div class="feat-badge" style="background:var(--emerald)">Save 33%</div>
+          <h3 style="color:#fff;font-size:1.5rem;font-weight:600;margin-bottom:8px">Yearly Advanced</h3>
+          <p style="font-size:2.5rem;font-weight:700;color:#fff;margin-bottom:8px;line-height:1">$400<span style="font-size:1rem;color:var(--on-deep-sub);font-weight:400">/year</span></p>
           <p class="tag" style="display:inline-flex;margin-bottom:24px;background:var(--primary);color:#fff;border-color:transparent">Launch Month Discount</p>
           <ul class="price-list" style="margin-bottom:0">
             <li style="color:var(--on-deep-sub)"><svg class="ico" width="16" height="16" style="color:var(--emerald)"><use href="#i-check"/></svg> 2,500 tracked users</li>
@@ -1196,7 +1216,6 @@ const landingMarkup = String.raw`<!-- ══════════════
     <div class="foot-top">
       <div>
         <a href="/" class="foot-logo">
-          <div class="foot-logo-ico">OF</div>
           <span class="foot-logo-text">Dripmetric</span>
         </a>
         <p class="foot-desc">Onboarding automation and email campaign management for SaaS developers and small businesses. Built in public.</p>
@@ -1216,7 +1235,7 @@ const landingMarkup = String.raw`<!-- ══════════════
           <li><a href="#about">About</a></li>
           <li><a href="#roadmap">Roadmap</a></li>
           <li><a href="https://www.producthunt.com/products/dripmetric-3" target="_blank" rel="noopener">Product Hunt</a></li>
-          <li><a href="mailto:harshit@dripmetric.com">Contact</a></li>
+          <li><a href="mailto:hello@dripmetric.com">Contact</a></li>
         </ul>
       </div>
       <div class="foot-col">
@@ -1233,7 +1252,7 @@ const landingMarkup = String.raw`<!-- ══════════════
       <div class="foot-bot-links">
         <a href="https://dripmetric.com/privacy">Privacy</a>
         <a href="https://dripmetric.com/terms">Terms</a>
-        <a href="mailto:harshit@dripmetric.com">Contact</a>
+        <a href="mailto:hello@dripmetric.com">Contact</a>
       </div>
     </div>
   </div>
