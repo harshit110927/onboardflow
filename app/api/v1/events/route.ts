@@ -23,9 +23,9 @@ export async function GET(req: Request) {
 
     // Use PostgreSQL unnest to get unique completed steps
     const result = await db.execute(sql`
-      SELECT DISTINCT unnest(completed_steps) as step
+      SELECT DISTINCT jsonb_array_elements_text(completed_steps) as step
       FROM ${endUsers}
-      WHERE tenant_id = ${tenant.id}
+      WHERE tenant_id = ${tenant.id} AND jsonb_typeof(completed_steps) = 'array'
     `);
 
     // Standard SaaS templates for cold start
