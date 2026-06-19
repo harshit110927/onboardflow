@@ -108,11 +108,11 @@ async function sendCampaign(formData: FormData) {
         campaignId: campaign.id,
         contactEmail: contact.email,
         unsubscribeToken: unsubToken,
-        senderEmail: smtp.smtpEmail!,
+        senderEmail: tenant.senderName || (tenant.name ? `${tenant.name} Team` : "Dripmetric Team"),
         trackingPixelUrl,
       });
       await transporter.sendMail({
-        from: smtp.smtpEmail!,
+        from: `"${tenant.senderName || (tenant.name ? `${tenant.name} Team` : "Dripmetric Team")}" <${smtp.smtpEmail!}>`,
         to: contact.email,
         subject: campaign.subject,
         html: htmlBody,
@@ -136,11 +136,11 @@ async function sendCampaign(formData: FormData) {
         campaignId: campaign.id,
         contactEmail: contact.email,
         unsubscribeToken: unsubToken,
-        senderEmail: "hello@dripmetric.com",
+        senderEmail: tenant.senderName || (tenant.name ? `${tenant.name} Team` : "Dripmetric Team"),
         trackingPixelUrl,
       });
       await resend.emails.send({
-        from: "Dripmetric <hello@dripmetric.com>",
+        from: `${tenant.senderName || (tenant.name ? `${tenant.name} Team` : "Dripmetric Team")} <hello@dripmetric.com>`,
         to: contact.email,
         subject: campaign.subject,
         html: htmlBody,
@@ -186,9 +186,10 @@ export default async function CampaignDetailPage({
   const tenant = await getTenant(user.email);
   if (!tenant || tenant.tier !== "individual") redirect("/dashboard");
 
+  const fromLabel = tenant.senderName || (tenant.name ? `${tenant.name} Team` : "Dripmetric Team");
   const sendingFrom = tenant.smtpVerified && tenant.smtpEmail
-    ? tenant.smtpEmail
-    : "hello@dripmetric.com";
+    ? `"${fromLabel}" <${tenant.smtpEmail}>`
+    : `${fromLabel} <hello@dripmetric.com>`;
 
   const { campaignId } = await params;
   const id = Number(campaignId);
