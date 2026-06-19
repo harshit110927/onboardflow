@@ -76,6 +76,8 @@ export async function POST(req: Request) {
       ind_pro: process.env.RAZORPAY_PLAN_IND_PRO,
       ent_basic: process.env.RAZORPAY_PLAN_ENT_BASIC,
       ent_advanced: process.env.RAZORPAY_PLAN_ENT_ADVANCED,
+      ent_basic_yearly: process.env.RAZORPAY_PLAN_ENT_BASIC_YEARLY,
+      ent_advanced_yearly: process.env.RAZORPAY_PLAN_ENT_ADVANCED_YEARLY,
     };
 
     let resolvedPlanId = planIdFromNotes;

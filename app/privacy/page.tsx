@@ -12,13 +12,13 @@ export default function PrivacyPage() {
 
         <div>
           <h1 className="text-3xl font-bold text-foreground">Privacy Policy</h1>
-          <p className="text-sm text-muted-foreground mt-2">Last updated: March 2025</p>
+          <p className="text-sm text-muted-foreground mt-2">Last updated: June 2026</p>
         </div>
 
         <div className="flex flex-col gap-6 text-sm text-foreground leading-relaxed">
           <section className="flex flex-col gap-2">
             <h2 className="text-base font-semibold">1. Data We Collect</h2>
-            <p>We collect your email address when you sign up. For Enterprise accounts, we also store email addresses of end users you track through our API. We collect usage data including email send counts and feature usage to enforce plan limits.</p>
+            <p>We collect your email address when you sign up. For Enterprise accounts, we also store email addresses of end users you track through our API. We process email analytics and onboarding step completions on behalf of our customers. We collect usage data including email send counts and feature usage to enforce plan limits.</p>
           </section>
 
           <section className="flex flex-col gap-2">
@@ -43,7 +43,7 @@ export default function PrivacyPage() {
 
           <section className="flex flex-col gap-2">
             <h2 className="text-base font-semibold">6. Your Rights (GDPR)</h2>
-            <p>If you are in the European Economic Area, you have the right to access, correct, or delete your personal data. You may also request data portability or object to processing. Contact us at support@dripmetric.com to exercise these rights.</p>
+            <p>If you are in the European Economic Area, you have the right to access, correct, or delete your personal data. You may also request data portability or object to processing. Contact us at hello@dripmetric.com to exercise these rights.</p>
           </section>
 
           <section className="flex flex-col gap-2">
@@ -53,7 +53,7 @@ export default function PrivacyPage() {
 
           <section className="flex flex-col gap-2">
             <h2 className="text-base font-semibold">8. Contact</h2>
-            <p>For privacy questions or data deletion requests, contact us at support@dripmetric.com.</p>
+            <p>For privacy questions or data deletion requests, contact us at hello@dripmetric.com.</p>
           </section>
         </div>
       </div>
