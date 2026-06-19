@@ -28,11 +28,19 @@ export function NudgeModal({
   async function handleSend() {
     if (!target) return;
     setSending(true);
-    
-    // Simulate API call for now per instructions
-    await new Promise((r) => setTimeout(r, 800));
-    console.log(`Nudge sent to ${target.email}`, { subject, body, riskLabel: target.riskLabel });
-    
+    const res = await fetch("/api/v1/nudge-manual", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: target.email, subject, body }),
+    });
+
+    if (!res.ok) {
+      const data = await res.json();
+      alert(data.error || "Failed to send nudge.");
+      setSending(false);
+      return;
+    }
+
     setSending(false);
     setSubject("");
     setBody("");
