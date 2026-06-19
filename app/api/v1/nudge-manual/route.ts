@@ -13,6 +13,8 @@ const resend = new Resend(process.env.RESEND_API_KEY);
 type EmailSender = (args: { to: string; subject: string; html: string }) => Promise<void>;
 
 function resolveEmailSender(tenant: {
+  name?: string | null;
+  senderName?: string | null;
   resendApiKey?: string | null;
   resendFromEmail?: string | null;
   smtpVerified?: boolean | null;
@@ -22,6 +24,7 @@ function resolveEmailSender(tenant: {
   smtpHost?: string | null;
   smtpPort?: number | null;
 }): EmailSender {
+  const fromLabel = tenant.senderName || (tenant.name ? `${tenant.name} Team` : "Dripmetric Team");
   if (tenant.emailProvider === "smtp" && tenant.smtpVerified && tenant.smtpHost && tenant.smtpPort && tenant.smtpEmail && tenant.smtpPassword) {
     try {
       const transporter = createSmtpTransporter(
@@ -31,7 +34,7 @@ function resolveEmailSender(tenant: {
         decryptPassword(tenant.smtpPassword)
       );
       return async ({ to, subject, html }) => {
-        await transporter.sendMail({ from: tenant.smtpEmail!, to, subject, html });
+        await transporter.sendMail({ from: `"${fromLabel}" <${tenant.smtpEmail}>`, to, subject, html });
       };
     } catch {}
   }
@@ -41,14 +44,14 @@ function resolveEmailSender(tenant: {
       const tenantResend = new Resend(decryptPassword(tenant.resendApiKey));
       const fromEmail = tenant.resendFromEmail;
       return async ({ to, subject, html }) => {
-        await tenantResend.emails.send({ from: fromEmail, to: [to], subject, html });
+        await tenantResend.emails.send({ from: `${fromLabel} <${fromEmail}>`, to: [to], subject, html });
       };
     } catch {}
   }
 
   return async ({ to, subject, html }) => {
     await resend.emails.send({
-      from: "Dripmetric <hello@dripmetric.com>",
+      from: `${fromLabel} <hello@dripmetric.com>`,
       to: [to],
       subject,
       html,

@@ -59,6 +59,7 @@ export const tenants = pgTable('tenants', {
 
   // email & smtp related fields
   emailProvider: varchar("email_provider", { length: 20 }).default("resend"),
+  senderName: text("sender_name"),
   smtpHost: varchar("smtp_host", { length: 255 }),
   smtpPort: integer("smtp_port"),
   smtpEmail: varchar("smtp_email", { length: 255 }),

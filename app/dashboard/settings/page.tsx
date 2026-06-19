@@ -41,6 +41,7 @@ export default function SettingsPage() {
     smtpPort: 465,
     smtpUser: "",
     smtpPass: "",
+    senderName: "",
     hasExistingConfig: false,
   });
   const [whatsappTemplate, setWhatsappTemplate] = useState("Hi {name}, ");
@@ -71,6 +72,7 @@ export default function SettingsPage() {
             smtpPort: data.smtpPort || 465,
             smtpUser: data.smtpEmail || "",
             smtpPass: data.smtpPassword ? "***" : "",
+            senderName: data.senderName || "",
             hasExistingConfig: !!(data.resendApiKey || data.smtpVerified),
           });
           setWhatsappTemplate(data.whatsappTemplate || "Hi {name}, ");
@@ -134,6 +136,7 @@ export default function SettingsPage() {
         smtpPort: emailConfig.smtpPort,
         smtpEmail: emailConfig.smtpUser,
         smtpPassword: emailConfig.smtpPass || undefined,
+        senderName: emailConfig.senderName,
       }),
     });
     setSavingEmail(false);
@@ -166,12 +169,13 @@ export default function SettingsPage() {
         smtpPort: 465,
         smtpEmail: "",
         smtpPassword: "",
+        senderName: "",
       }),
     });
     setSavingEmail(false);
     if (res.ok) {
       toast.success("Settings cleared.");
-      setEmailConfig({ provider: "resend", resendApiKey: "", resendFromEmail: "", smtpHost: "", smtpPort: 465, smtpUser: "", smtpPass: "", hasExistingConfig: false });
+      setEmailConfig({ provider: "resend", resendApiKey: "", resendFromEmail: "", smtpHost: "", smtpPort: 465, smtpUser: "", smtpPass: "", senderName: "", hasExistingConfig: false });
     } else {
       toast.error("Failed to clear config.");
     }
@@ -478,6 +482,19 @@ export default function SettingsPage() {
               </div>
 
               <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label className="text-sm font-semibold">Global Sender Name</Label>
+                  <Input
+                    type="text"
+                    placeholder="e.g. John from ACME"
+                    value={emailConfig.senderName}
+                    onChange={(e) => setEmailConfig(prev => ({ ...prev, senderName: e.target.value }))}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Defaults to &apos;[Workspace Name] Team&apos; if left blank. This is the name your users will see in their inbox.
+                  </p>
+                </div>
+
                 {emailConfig.provider === "resend" ? (
                   <>
                     <div className="space-y-2">

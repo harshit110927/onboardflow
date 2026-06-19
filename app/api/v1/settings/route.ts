@@ -33,6 +33,7 @@ export async function GET(req: Request) {
       smtpHost: tenant.smtpHost || null,
       smtpPort: tenant.smtpPort || 465,
       smtpEmail: tenant.smtpEmail || null,
+      senderName: tenant.senderName || "",
       whatsappTemplate: tenant.whatsappTemplate ?? "Hi {name}, ",
     });
   } catch (error) {
@@ -65,6 +66,7 @@ export async function POST(req: Request) {
       smtpPort,
       smtpEmail,
       smtpPassword,
+      senderName,
     } = body;
 
     const updates: Record<string, unknown> = {
@@ -79,6 +81,7 @@ export async function POST(req: Request) {
       emailSubject3,
       emailBody3,
       emailProvider,
+      ...(senderName !== undefined && { senderName: String(senderName) }),
       ...(smtpHost && { smtpHost: String(smtpHost) }),
       ...(smtpPort && { smtpPort: Number(smtpPort) }),
       ...(smtpEmail && { smtpEmail: String(smtpEmail) }),
