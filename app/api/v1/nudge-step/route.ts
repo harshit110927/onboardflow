@@ -5,7 +5,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
 import { Resend } from "resend";
 import { subHours } from "date-fns";
-import { decryptPassword, createGmailTransporter } from "@/lib/email/smtp";
+import { decryptPassword, createSmtpTransporter } from "@/lib/email/smtp";
 import { buildEmailHtml } from "@/lib/email/templates";
 import { checkEmailRateLimit, incrementEmailCount } from "@/lib/rate-limit/enterprise";
 
@@ -19,19 +19,15 @@ function resolveEmailSender(tenant: {
   smtpVerified?: boolean | null;
   smtpEmail?: string | null;
   smtpPassword?: string | null;
+  emailProvider?: string | null;
+  smtpHost?: string | null;
+  smtpPort?: number | null;
 }): EmailSender {
-  if (tenant.resendApiKey && tenant.resendFromEmail) {
+  if (tenant.emailProvider === "smtp" && tenant.smtpVerified && tenant.smtpHost && tenant.smtpPort && tenant.smtpEmail && tenant.smtpPassword) {
     try {
-      const tenantResend = new Resend(decryptPassword(tenant.resendApiKey));
-      const fromEmail = tenant.resendFromEmail;
-      return async ({ to, subject, html }) => {
-        await tenantResend.emails.send({ from: fromEmail, to: [to], subject, html });
-      };
-    } catch {}
-  }
-  if (tenant.smtpVerified && tenant.smtpEmail && tenant.smtpPassword) {
-    try {
-      const transporter = createGmailTransporter(
+      const transporter = createSmtpTransporter(
+        tenant.smtpHost,
+        tenant.smtpPort,
         tenant.smtpEmail,
         decryptPassword(tenant.smtpPassword)
       );
@@ -40,6 +36,17 @@ function resolveEmailSender(tenant: {
       };
     } catch {}
   }
+
+  if ((!tenant.emailProvider || tenant.emailProvider === "resend") && tenant.resendApiKey && tenant.resendFromEmail) {
+    try {
+      const tenantResend = new Resend(decryptPassword(tenant.resendApiKey));
+      const fromEmail = tenant.resendFromEmail;
+      return async ({ to, subject, html }) => {
+        await tenantResend.emails.send({ from: fromEmail, to: [to], subject, html });
+      };
+    } catch {}
+  }
+
   return async ({ to, subject, html }) => {
     await resend.emails.send({
       from: "Dripmetric <hello@dripmetric.com>",

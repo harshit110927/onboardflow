@@ -33,10 +33,15 @@ export default function SettingsPage() {
     emailBody3: "",
   });
 
-  const [emailSending, setEmailSending] = useState({
+  const [emailConfig, setEmailConfig] = useState({
+    provider: "resend",
     resendApiKey: "",
     resendFromEmail: "",
-    hasExistingKey: false,
+    smtpHost: "",
+    smtpPort: 465,
+    smtpUser: "",
+    smtpPass: "",
+    hasExistingConfig: false,
   });
   const [whatsappTemplate, setWhatsappTemplate] = useState("Hi {name}, ");
 
@@ -58,10 +63,15 @@ export default function SettingsPage() {
             emailSubject3: data.emailSubject3 || "",
             emailBody3: data.emailBody3 || "",
           });
-          setEmailSending({
+          setEmailConfig({
+            provider: data.emailProvider || "resend",
             resendApiKey: "",
             resendFromEmail: data.resendFromEmail || "",
-            hasExistingKey: !!data.resendApiKey,
+            smtpHost: data.smtpHost || "",
+            smtpPort: data.smtpPort || 465,
+            smtpUser: data.smtpEmail || "",
+            smtpPass: data.smtpPassword ? "***" : "",
+            hasExistingConfig: !!(data.resendApiKey || data.smtpVerified),
           });
           setWhatsappTemplate(data.whatsappTemplate || "Hi {name}, ");
         }
@@ -95,13 +105,20 @@ export default function SettingsPage() {
   };
 
   const handleSaveEmailSending = async () => {
-    if (!emailSending.resendApiKey && !emailSending.hasExistingKey) {
-      toast.error("Please enter a Resend API key.");
-      return;
-    }
-    if (emailSending.resendApiKey && !emailSending.resendFromEmail) {
-      toast.error("Please enter a from email address.");
-      return;
+    if (emailConfig.provider === "resend") {
+      if (!emailConfig.resendApiKey && !emailConfig.hasExistingConfig) {
+        toast.error("Please enter a Resend API key.");
+        return;
+      }
+      if (emailConfig.resendApiKey && !emailConfig.resendFromEmail) {
+        toast.error("Please enter a from email address.");
+        return;
+      }
+    } else {
+      if (!emailConfig.smtpHost || !emailConfig.smtpPort || !emailConfig.smtpUser || (!emailConfig.smtpPass && !emailConfig.hasExistingConfig)) {
+        toast.error("Please fill all SMTP fields.");
+        return;
+      }
     }
 
     setSavingEmail(true);
@@ -110,18 +127,24 @@ export default function SettingsPage() {
       body: JSON.stringify({
         ...formData,
         automationEnabled,
-        resendApiKey: emailSending.resendApiKey || undefined,
-        resendFromEmail: emailSending.resendFromEmail,
+        emailProvider: emailConfig.provider,
+        resendApiKey: emailConfig.resendApiKey || undefined,
+        resendFromEmail: emailConfig.resendFromEmail,
+        smtpHost: emailConfig.smtpHost,
+        smtpPort: emailConfig.smtpPort,
+        smtpEmail: emailConfig.smtpUser,
+        smtpPassword: emailConfig.smtpPass || undefined,
       }),
     });
     setSavingEmail(false);
 
     if (res.ok) {
       toast.success("Email sending settings saved!");
-      setEmailSending(prev => ({
+      setEmailConfig(prev => ({
         ...prev,
-        hasExistingKey: true,
+        hasExistingConfig: true,
         resendApiKey: "",
+        smtpPass: emailConfig.smtpPass ? "***" : prev.smtpPass,
       }));
     } else {
       const data = await res.json();
@@ -129,23 +152,28 @@ export default function SettingsPage() {
     }
   };
 
-  const handleClearResendKey = async () => {
+  const handleClearConfig = async () => {
     setSavingEmail(true);
     const res = await fetch("/api/v1/settings", {
       method: "POST",
       body: JSON.stringify({
         ...formData,
         automationEnabled,
+        emailProvider: "resend",
         resendApiKey: "",
         resendFromEmail: "",
+        smtpHost: "",
+        smtpPort: 465,
+        smtpEmail: "",
+        smtpPassword: "",
       }),
     });
     setSavingEmail(false);
     if (res.ok) {
-      toast.success("Resend key removed.");
-      setEmailSending({ resendApiKey: "", resendFromEmail: "", hasExistingKey: false });
+      toast.success("Settings cleared.");
+      setEmailConfig({ provider: "resend", resendApiKey: "", resendFromEmail: "", smtpHost: "", smtpPort: 465, smtpUser: "", smtpPass: "", hasExistingConfig: false });
     } else {
-      toast.error("Failed to remove key.");
+      toast.error("Failed to clear config.");
     }
   };
 
@@ -416,10 +444,14 @@ export default function SettingsPage() {
             <CardContent className="space-y-6">
 
               {/* Status indicator */}
-              {emailSending.hasExistingKey ? (
+              {emailConfig.hasExistingConfig ? (
                 <div className="flex items-center gap-2 text-sm text-green-700 bg-green-50 border border-green-200 rounded-md px-3 py-2">
                   <Wifi className="h-4 w-4" />
-                  <span>Resend account connected — emails send from <b>{emailSending.resendFromEmail || "your domain"}</b></span>
+                  <span>
+                    {emailConfig.provider === "smtp" 
+                      ? `SMTP account connected — sending from ${emailConfig.smtpUser}`
+                      : `Resend account connected — emails send from ${emailConfig.resendFromEmail || "your domain"}`}
+                  </span>
                 </div>
               ) : (
                 <div className="flex items-center gap-2 text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
@@ -428,41 +460,100 @@ export default function SettingsPage() {
                 </div>
               )}
 
+              <div className="flex items-center gap-2 p-1 bg-secondary/30 rounded-lg">
+                <Button 
+                  variant={emailConfig.provider === "resend" ? "default" : "outline"}
+                  className="flex-1"
+                  onClick={() => setEmailConfig(p => ({ ...p, provider: "resend" }))}
+                >
+                  Resend API
+                </Button>
+                <Button 
+                  variant={emailConfig.provider === "smtp" ? "default" : "outline"}
+                  className="flex-1"
+                  onClick={() => setEmailConfig(p => ({ ...p, provider: "smtp" }))}
+                >
+                  SMTP / Google Workspace
+                </Button>
+              </div>
+
               <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label className="text-sm font-semibold">
-                    {emailSending.hasExistingKey ? "Replace Resend API Key" : "Resend API Key"}
-                  </Label>
-                  <Input
-                    type="password"
-                    placeholder={emailSending.hasExistingKey ? "Enter new key to replace existing" : "re_live_..."}
-                    value={emailSending.resendApiKey}
-                    onChange={(e) => setEmailSending(prev => ({ ...prev, resendApiKey: e.target.value }))}
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Get your key at{" "}
-                    <a href="https://resend.com/api-keys" target="_blank" rel="noreferrer" className="text-primary underline">
-                      resend.com/api-keys
-                    </a>
-                    . Make sure you have verified your domain in Resend first.
-                  </p>
-                </div>
+                {emailConfig.provider === "resend" ? (
+                  <>
+                    <div className="space-y-2">
+                      <Label className="text-sm font-semibold">
+                        {emailConfig.hasExistingConfig ? "Replace Resend API Key" : "Resend API Key"}
+                      </Label>
+                      <Input
+                        type="password"
+                        placeholder={emailConfig.hasExistingConfig ? "Enter new key to replace existing" : "re_live_..."}
+                        value={emailConfig.resendApiKey}
+                        onChange={(e) => setEmailConfig(prev => ({ ...prev, resendApiKey: e.target.value }))}
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Get your key at{" "}
+                        <a href="https://resend.com/api-keys" target="_blank" rel="noreferrer" className="text-primary underline">
+                          resend.com/api-keys
+                        </a>
+                        . Make sure you have verified your domain in Resend first.
+                      </p>
+                    </div>
 
-                <div className="space-y-2">
-                  <Label className="text-sm font-semibold">From Email Address</Label>
-                  <Input
-                    type="email"
-                    placeholder="hello@yourapp.com"
-                    value={emailSending.resendFromEmail}
-                    onChange={(e) => setEmailSending(prev => ({ ...prev, resendFromEmail: e.target.value }))}
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Must match a verified domain in your Resend account.
-                    Example: <code>hello@yourapp.com</code> or <code>noreply@yourapp.com</code>
-                  </p>
-                </div>
+                    <div className="space-y-2">
+                      <Label className="text-sm font-semibold">From Email Address</Label>
+                      <Input
+                        type="email"
+                        placeholder="hello@yourapp.com"
+                        value={emailConfig.resendFromEmail}
+                        onChange={(e) => setEmailConfig(prev => ({ ...prev, resendFromEmail: e.target.value }))}
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Must match a verified domain in your Resend account.
+                        Example: <code>hello@yourapp.com</code> or <code>noreply@yourapp.com</code>
+                      </p>
+                    </div>
+                  </>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label className="text-sm font-semibold">SMTP Host</Label>
+                      <Input
+                        placeholder="smtp.gmail.com"
+                        value={emailConfig.smtpHost}
+                        onChange={(e) => setEmailConfig(prev => ({ ...prev, smtpHost: e.target.value }))}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-sm font-semibold">Port</Label>
+                      <Input
+                        type="number"
+                        placeholder="465"
+                        value={emailConfig.smtpPort || ""}
+                        onChange={(e) => setEmailConfig(prev => ({ ...prev, smtpPort: Number(e.target.value) }))}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-sm font-semibold">Email Address (User)</Label>
+                      <Input
+                        type="email"
+                        placeholder="hello@yourapp.com"
+                        value={emailConfig.smtpUser}
+                        onChange={(e) => setEmailConfig(prev => ({ ...prev, smtpUser: e.target.value }))}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-sm font-semibold">App Password</Label>
+                      <Input
+                        type="password"
+                        placeholder={emailConfig.hasExistingConfig ? "Enter new password to replace" : "App Password"}
+                        value={emailConfig.smtpPass}
+                        onChange={(e) => setEmailConfig(prev => ({ ...prev, smtpPass: e.target.value }))}
+                      />
+                    </div>
+                  </div>
+                )}
 
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 mt-6">
                   <Button
                     onClick={handleSaveEmailSending}
                     disabled={savingEmail}
@@ -474,10 +565,10 @@ export default function SettingsPage() {
                       <><Save className="mr-2 h-4 w-4" /> Save Email Settings</>
                     )}
                   </Button>
-                  {emailSending.hasExistingKey && (
+                  {emailConfig.hasExistingConfig && (
                     <Button
                       variant="outline"
-                      onClick={handleClearResendKey}
+                      onClick={handleClearConfig}
                       disabled={savingEmail}
                       className="text-destructive border-destructive hover:bg-destructive/10"
                     >
@@ -487,17 +578,34 @@ export default function SettingsPage() {
                 </div>
               </div>
 
-              {/* Setup guide */}
-              <div className="bg-secondary/40 rounded-lg border p-4 space-y-2">
-                <p className="text-xs font-semibold text-foreground">Quick setup guide</p>
-                <ol className="text-xs text-muted-foreground space-y-1 list-decimal list-inside">
-                  <li>Create a free account at <a href="https://resend.com" target="_blank" rel="noreferrer" className="text-primary underline">resend.com</a></li>
-                  <li>Go to Domains → Add Domain → enter your domain</li>
-                  <li>Add the DNS records Resend provides (takes ~10 minutes)</li>
-                  <li>Go to API Keys → Create API Key → Full Access</li>
-                  <li>Paste the key above and enter your from address</li>
-                </ol>
-              </div>
+              {emailConfig.provider === "resend" && (
+                <div className="bg-secondary/40 rounded-lg border p-4 space-y-2 mt-6">
+                  {/* Setup guide */}
+                  <p className="text-xs font-semibold text-foreground">Quick setup guide</p>
+                  <ol className="text-xs text-muted-foreground space-y-1 list-decimal list-inside">
+                    <li>Create a free account at <a href="https://resend.com" target="_blank" rel="noreferrer" className="text-primary underline">resend.com</a></li>
+                    <li>Go to Domains → Add Domain → enter your domain</li>
+                    <li>Add the DNS records Resend provides (takes ~10 minutes)</li>
+                    <li>Go to API Keys → Create API Key → Full Access</li>
+                    <li>Paste the key above and enter your from address</li>
+                  </ol>
+                </div>
+              )}
+
+              {emailConfig.provider === "smtp" && (
+                <div className="bg-secondary/40 rounded-lg border p-4 space-y-2 mt-6">
+                  {/* Setup guide */}
+                  <p className="text-xs font-semibold text-foreground">Google Workspace / Gmail setup guide</p>
+                  <ol className="text-xs text-muted-foreground space-y-1 list-decimal list-inside">
+                    <li>Go to your <a href="https://myaccount.google.com/security" target="_blank" rel="noreferrer" className="text-primary underline">Google Account Security</a></li>
+                    <li>Ensure <strong>2-Step Verification</strong> is turned on</li>
+                    <li>Navigate to <a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noreferrer" className="text-primary underline">App Passwords</a></li>
+                    <li>Create an App Password (name it &quot;Dripmetric&quot;)</li>
+                    <li>Copy the 16-character password and paste it in the App Password field above</li>
+                    <li>Use <code>smtp.gmail.com</code> for Host and <code>465</code> for Port</li>
+                  </ol>
+                </div>
+              )}
 
             </CardContent>
           </Card>

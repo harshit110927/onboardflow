@@ -3,7 +3,7 @@ import { tenants } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
-import { encryptPassword } from "@/lib/email/smtp";
+import { encryptPassword, testSmtpConnection } from "@/lib/email/smtp";
 import { Resend } from "resend";
 import { dogfoodTrack } from "@/lib/tracking/dogfood";
 
@@ -29,6 +29,10 @@ export async function GET(req: Request) {
       resendApiKey: tenant.resendApiKey ? "re_live_***" : null,
       resendFromEmail: tenant.resendFromEmail || null,
       smtpPassword: tenant.smtpPassword ? "***" : null,
+      emailProvider: tenant.emailProvider || "resend",
+      smtpHost: tenant.smtpHost || null,
+      smtpPort: tenant.smtpPort || 465,
+      smtpEmail: tenant.smtpEmail || null,
       whatsappTemplate: tenant.whatsappTemplate ?? "Hi {name}, ",
     });
   } catch (error) {
@@ -56,6 +60,11 @@ export async function POST(req: Request) {
       resendApiKey,
       resendFromEmail,
       whatsappTemplate,
+      emailProvider,
+      smtpHost,
+      smtpPort,
+      smtpEmail,
+      smtpPassword,
     } = body;
 
     const updates: Record<string, unknown> = {
@@ -69,6 +78,10 @@ export async function POST(req: Request) {
       step3,
       emailSubject3,
       emailBody3,
+      emailProvider,
+      ...(smtpHost && { smtpHost: String(smtpHost) }),
+      ...(smtpPort && { smtpPort: Number(smtpPort) }),
+      ...(smtpEmail && { smtpEmail: String(smtpEmail) }),
       ...(whatsappTemplate !== undefined && { whatsappTemplate: String(whatsappTemplate) }),
     };
 
@@ -103,6 +116,27 @@ export async function POST(req: Request) {
 
     if (resendFromEmail !== undefined) {
       updates.resendFromEmail = resendFromEmail || null;
+    }
+
+    if (emailProvider === "smtp" && smtpHost && smtpPort && smtpEmail && smtpPassword) {
+      if (smtpPassword !== "***") {
+        try {
+          await testSmtpConnection(smtpHost, Number(smtpPort), smtpEmail, smtpPassword);
+          updates.smtpPassword = encryptPassword(smtpPassword);
+          updates.smtpVerified = true;
+        } catch (err) {
+          console.error("SMTP Validation Error:", err);
+          return NextResponse.json(
+            { error: "Invalid SMTP configuration. Could not connect." },
+            { status: 400 }
+          );
+        }
+      }
+    } else if (emailProvider === "smtp") {
+      // It might be missing fields
+      if (!updates.smtpPassword && smtpPassword !== "***") {
+        // If password is not provided and not existing, fail. But maybe we don't need to enforce here if they just changed something else.
+      }
     }
 
     await db.update(tenants)
