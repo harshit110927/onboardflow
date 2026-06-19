@@ -592,6 +592,21 @@ export default function SettingsPage() {
                 </div>
               )}
 
+              {emailConfig.provider === "smtp" && (
+                <div className="bg-secondary/40 rounded-lg border p-4 space-y-2 mt-6">
+                  {/* Setup guide */}
+                  <p className="text-xs font-semibold text-foreground">Google Workspace / Gmail setup guide</p>
+                  <ol className="text-xs text-muted-foreground space-y-1 list-decimal list-inside">
+                    <li>Go to your <a href="https://myaccount.google.com/security" target="_blank" rel="noreferrer" className="text-primary underline">Google Account Security</a></li>
+                    <li>Ensure <strong>2-Step Verification</strong> is turned on</li>
+                    <li>Navigate to <a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noreferrer" className="text-primary underline">App Passwords</a></li>
+                    <li>Create an App Password (name it &quot;Dripmetric&quot;)</li>
+                    <li>Copy the 16-character password and paste it in the App Password field above</li>
+                    <li>Use <code>smtp.gmail.com</code> for Host and <code>465</code> for Port</li>
+                  </ol>
+                </div>
+              )}
+
             </CardContent>
           </Card>
 
