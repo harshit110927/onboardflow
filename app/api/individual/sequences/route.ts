@@ -5,7 +5,7 @@ import { tenants, individualLists, individualCampaigns, individualContacts, unsu
 import { eq, sql } from "drizzle-orm";
 import { getTenantPlan } from "@/lib/plans/get-tenant-plan";
 import { INDIVIDUAL_LIMITS, type PlanTier } from "@/lib/plans/limits";
-import { decryptPassword, createGmailTransporter } from "@/lib/email/smtp";
+import { decryptPassword, createSmtpTransporter } from "@/lib/email/smtp";
 import { buildEmailHtml, createUnsubscribeToken } from "@/lib/email/templates";
 import { Resend } from "resend";
 import crypto from "crypto";
@@ -26,7 +26,7 @@ export async function POST(req: Request) {
     if (!user?.email) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const tenantRows = await db
-      .select({ id: tenants.id, tier: tenants.tier, smtpEmail: tenants.smtpEmail, smtpPassword: tenants.smtpPassword, smtpVerified: tenants.smtpVerified })
+      .select({ id: tenants.id, tier: tenants.tier, smtpEmail: tenants.smtpEmail, smtpPassword: tenants.smtpPassword, smtpVerified: tenants.smtpVerified, smtpHost: tenants.smtpHost, smtpPort: tenants.smtpPort, emailProvider: tenants.emailProvider })
       .from(tenants)
       .where(eq(tenants.email, user.email))
       .limit(1);
@@ -99,11 +99,11 @@ export async function POST(req: Request) {
       }
 
       const firstStep = steps[0];
-      const useGmail = tenant.smtpVerified && tenant.smtpEmail && tenant.smtpPassword;
+      const useSmtp = tenant.emailProvider === "smtp" && tenant.smtpVerified && tenant.smtpHost && tenant.smtpPort && tenant.smtpEmail && tenant.smtpPassword;
 
-      if (useGmail) {
+      if (useSmtp) {
         const decrypted = decryptPassword(tenant.smtpPassword!);
-        const transporter = createGmailTransporter(tenant.smtpEmail!, decrypted);
+        const transporter = createSmtpTransporter(tenant.smtpHost!, tenant.smtpPort!, tenant.smtpEmail!, decrypted);
         for (const contact of activeContacts) {
           const body = firstStep.body.replace(/\{contact_name\}/g, contact.name);
           await transporter.sendMail({

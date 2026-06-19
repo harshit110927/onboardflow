@@ -3,6 +3,7 @@ import { endUsers, tenants } from "@/db/schema";
 import { eq, and, isNull, lt } from "drizzle-orm"; 
 import { NextResponse } from "next/server";
 import { Resend } from 'resend';
+import { decryptPassword, createSmtpTransporter } from "@/lib/email/smtp";
 
 // Helper to make it crash-proof
 const getResend = () => {
@@ -64,12 +65,49 @@ export async function GET(req: Request) {
     try {
         console.log(`⚠️ User ${user.externalId} stuck on '${requiredStep}'. Sending Nudge...`);
         
-        await resend.emails.send({
-            from: 'Dripmetric <hello@dripmetric.com>',
-            to: user.email, 
-            subject: 'Quick question...',
-            html: NUDGE_EMAIL(user.externalId, requiredStep),
-        });
+        let sent = false;
+        if (tenant.emailProvider === "smtp" && tenant.smtpVerified && tenant.smtpHost && tenant.smtpPort && tenant.smtpEmail && tenant.smtpPassword) {
+            try {
+                const transporter = createSmtpTransporter(
+                    tenant.smtpHost,
+                    tenant.smtpPort,
+                    tenant.smtpEmail,
+                    decryptPassword(tenant.smtpPassword)
+                );
+                await transporter.sendMail({
+                    from: tenant.smtpEmail!,
+                    to: user.email,
+                    subject: 'Quick question...',
+                    html: NUDGE_EMAIL(user.externalId, requiredStep),
+                });
+                sent = true;
+            } catch (err) {
+                console.error("Failed to send nudge via SMTP:", err);
+            }
+        } else if ((!tenant.emailProvider || tenant.emailProvider === "resend") && tenant.resendApiKey && tenant.resendFromEmail) {
+            try {
+                const tenantResend = new Resend(decryptPassword(tenant.resendApiKey));
+                await tenantResend.emails.send({
+                    from: tenant.resendFromEmail,
+                    to: user.email, 
+                    subject: 'Quick question...',
+                    html: NUDGE_EMAIL(user.externalId, requiredStep),
+                });
+                sent = true;
+            } catch (err) {
+                console.error("Failed to send nudge via Resend API:", err);
+            }
+        }
+
+        if (!sent) {
+            // Shared fallback
+            await resend.emails.send({
+                from: 'Dripmetric <hello@dripmetric.com>',
+                to: user.email, 
+                subject: 'Quick question...',
+                html: NUDGE_EMAIL(user.externalId, requiredStep),
+            });
+        }
 
         // 6. Mark as emailed
         await db.update(endUsers)
