@@ -109,6 +109,7 @@ export async function GET(req: Request) {
 
       // Resolve this tenant's email sender once — reused for all their users
       const emailSender = resolveEmailSender(tenant);
+      const fromLabel = tenant.senderName || (tenant.name ? `${tenant.name} Team` : "Dripmetric Team");
 
       let automationSteps: {
         eventTrigger: string;
@@ -206,7 +207,7 @@ export async function GET(req: Request) {
             await emailSender({
               to: user.email,
               subject: emailToSend.subject,
-              html: buildEmailHtml({ body: emailBody }),
+              html: buildEmailHtml({ body: emailBody, senderEmail: fromLabel }),
             });
 
             await incrementEmailCount(tenant.id);
@@ -278,6 +279,8 @@ export async function GET(req: Request) {
         const tenantRows = await db
           .select({
             id: tenants.id,
+            name: tenants.name,
+            senderName: tenants.senderName,
             smtpEmail: tenants.smtpEmail,
             smtpPassword: tenants.smtpPassword,
             smtpVerified: tenants.smtpVerified,
@@ -322,13 +325,14 @@ export async function GET(req: Request) {
               const trackingPixelUrl = baseUrl
                 ? `${baseUrl}/api/track/pixel?campaignId=${step.id}&email=${encodeURIComponent(contact.email)}`
                 : undefined;
-              let html = buildEmailHtml({ body, trackingPixelUrl });
+              const seqFromLabel = seqTenant.senderName || (seqTenant.name ? `${seqTenant.name} Team` : "Dripmetric Team");
+              let html = buildEmailHtml({ body, trackingPixelUrl, senderEmail: seqFromLabel });
               if (baseUrl) {
                 html = wrapLinksWithTracking(html, step.id, contact.email, baseUrl);
               }
 
               await transporter.sendMail({
-                from: seqTenant.smtpEmail!,
+                from: `"${seqFromLabel}" <${seqTenant.smtpEmail!}>`,
                 to: contact.email,
                 subject: step.subject,
                 html,
@@ -348,13 +352,14 @@ export async function GET(req: Request) {
               const trackingPixelUrl = baseUrl
                 ? `${baseUrl}/api/track/pixel?campaignId=${step.id}&email=${encodeURIComponent(contact.email)}`
                 : undefined;
-              let html = buildEmailHtml({ body, trackingPixelUrl });
+              const seqFromLabel = seqTenant.senderName || (seqTenant.name ? `${seqTenant.name} Team` : "Dripmetric Team");
+              let html = buildEmailHtml({ body, trackingPixelUrl, senderEmail: seqFromLabel });
               if (baseUrl) {
                 html = wrapLinksWithTracking(html, step.id, contact.email, baseUrl);
               }
 
               await resend.emails.send({
-                from: "Dripmetric <hello@dripmetric.com>",
+                from: `${seqFromLabel} <hello@dripmetric.com>`,
                 to: contact.email,
                 subject: step.subject,
                 html,
@@ -403,6 +408,7 @@ export async function GET(req: Request) {
           if (!ownerTenant?.email) continue;
 
           const sender = resolveEmailSender(ownerTenant);
+          const ownerFromLabel = ownerTenant.senderName || (ownerTenant.name ? `${ownerTenant.name} Team` : "Dripmetric Team");
           const noteSection = contact.followUpNote
             ? `\n\nYour note: "${contact.followUpNote}"`
             : "";
@@ -410,6 +416,7 @@ export async function GET(req: Request) {
 
           const html = buildEmailHtml({
             body: bodyText,
+            senderEmail: ownerFromLabel,
           });
 
           await sender({
