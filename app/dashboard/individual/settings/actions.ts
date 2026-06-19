@@ -37,7 +37,7 @@ export async function connectGmail(formData: FormData): Promise<ActionResult> {
   if (password.length < 16) return { success: false, error: "App Passwords are 16 characters. Check you copied it correctly." };
 
   try {
-    await testSmtpConnection(email, password);
+    await testSmtpConnection("smtp.gmail.com", 465, email, password);
   } catch {
     return {
       success: false,
@@ -53,7 +53,9 @@ export async function connectGmail(formData: FormData): Promise<ActionResult> {
       smtpEmail: email,
       smtpPassword: encrypted,
       smtpVerified: true,
-      smtpProvider: "gmail",
+      emailProvider: "smtp",
+      smtpHost: "smtp.gmail.com",
+      smtpPort: 465,
     })
     .where(eq(tenants.id, tenant.id));
 
@@ -71,7 +73,9 @@ export async function disconnectGmail(): Promise<ActionResult> {
       smtpEmail: null,
       smtpPassword: null,
       smtpVerified: false,
-      smtpProvider: null,
+      emailProvider: "resend",
+      smtpHost: null,
+      smtpPort: null,
     })
     .where(eq(tenants.id, tenant.id));
 
@@ -91,6 +95,9 @@ export async function sendTestEmail(): Promise<ActionResult> {
       smtpEmail: tenants.smtpEmail,
       smtpPassword: tenants.smtpPassword,
       smtpVerified: tenants.smtpVerified,
+      smtpHost: tenants.smtpHost,
+      smtpPort: tenants.smtpPort,
+      emailProvider: tenants.emailProvider,
     })
     .from(tenants)
     .where(eq(tenants.email, user.email))
@@ -98,13 +105,13 @@ export async function sendTestEmail(): Promise<ActionResult> {
 
   const tenant = rows[0];
   if (!tenant || tenant.tier !== "individual") return { success: false, error: "Unauthorized." };
-  if (!tenant.smtpVerified || !tenant.smtpEmail || !tenant.smtpPassword) {
-    return { success: false, error: "No Gmail connected." };
+  if (!tenant.smtpVerified || !tenant.smtpEmail || !tenant.smtpPassword || !tenant.smtpHost || !tenant.smtpPort) {
+    return { success: false, error: "No SMTP connected." };
   }
 
-  const { decryptPassword, createGmailTransporter } = await import("@/lib/email/smtp");
+  const { decryptPassword, createSmtpTransporter } = await import("@/lib/email/smtp");
   const decrypted = decryptPassword(tenant.smtpPassword);
-  const transporter = createGmailTransporter(tenant.smtpEmail, decrypted);
+  const transporter = createSmtpTransporter(tenant.smtpHost, tenant.smtpPort, tenant.smtpEmail, decrypted);
 
   await transporter.sendMail({
     from: tenant.smtpEmail,

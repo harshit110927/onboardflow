@@ -6,7 +6,7 @@ import { Resend } from "resend";
 import { subHours } from "date-fns";
 import { and, eq, isNotNull, lte } from "drizzle-orm";
 import { checkEmailRateLimit, incrementEmailCount } from "@/lib/rate-limit/enterprise";
-import { decryptPassword, createGmailTransporter } from "@/lib/email/smtp";
+import { decryptPassword, createSmtpTransporter } from "@/lib/email/smtp";
 import { getTenantPlan } from "@/lib/plans/get-tenant-plan";
 import { ENTERPRISE_LIMITS, type EnterprisePlanTier } from "@/lib/plans/limits";
 import { deliverWebhookEvent } from "@/lib/webhooks/deliver";
@@ -33,22 +33,15 @@ function resolveEmailSender(tenant: {
   smtpVerified?: boolean | null;
   smtpEmail?: string | null;
   smtpPassword?: string | null;
+  emailProvider?: string | null;
+  smtpHost?: string | null;
+  smtpPort?: number | null;
 }): EmailSender {
-  if (tenant.resendApiKey && tenant.resendFromEmail) {
+  if (tenant.emailProvider === "smtp" && tenant.smtpVerified && tenant.smtpHost && tenant.smtpPort && tenant.smtpEmail && tenant.smtpPassword) {
     try {
-      const tenantResend = new Resend(decryptPassword(tenant.resendApiKey));
-      const fromEmail = tenant.resendFromEmail;
-      return async ({ to, subject, html }) => {
-        await tenantResend.emails.send({ from: fromEmail, to: [to], subject, html });
-      };
-    } catch (err) {
-      console.error("Failed to initialize tenant Resend client, falling back:", err);
-    }
-  }
-
-  if (tenant.smtpVerified && tenant.smtpEmail && tenant.smtpPassword) {
-    try {
-      const transporter = createGmailTransporter(
+      const transporter = createSmtpTransporter(
+        tenant.smtpHost,
+        tenant.smtpPort,
         tenant.smtpEmail,
         decryptPassword(tenant.smtpPassword)
       );
@@ -57,6 +50,18 @@ function resolveEmailSender(tenant: {
       };
     } catch (err) {
       console.error("Failed to initialize SMTP transporter, falling back:", err);
+    }
+  }
+
+  if ((!tenant.emailProvider || tenant.emailProvider === "resend") && tenant.resendApiKey && tenant.resendFromEmail) {
+    try {
+      const tenantResend = new Resend(decryptPassword(tenant.resendApiKey));
+      const fromEmail = tenant.resendFromEmail;
+      return async ({ to, subject, html }) => {
+        await tenantResend.emails.send({ from: fromEmail, to: [to], subject, html });
+      };
+    } catch (err) {
+      console.error("Failed to initialize tenant Resend client, falling back:", err);
     }
   }
 
@@ -273,6 +278,9 @@ export async function GET(req: Request) {
             smtpEmail: tenants.smtpEmail,
             smtpPassword: tenants.smtpPassword,
             smtpVerified: tenants.smtpVerified,
+            smtpHost: tenants.smtpHost,
+            smtpPort: tenants.smtpPort,
+            emailProvider: tenants.emailProvider,
           })
           .from(tenants)
           .where(eq(tenants.id, list.userId))
@@ -292,12 +300,12 @@ export async function GET(req: Request) {
 
         if (contacts.length === 0) continue;
 
-        const useGmail = seqTenant.smtpVerified && seqTenant.smtpEmail && seqTenant.smtpPassword;
+        const useSmtp = seqTenant.emailProvider === "smtp" && seqTenant.smtpVerified && seqTenant.smtpHost && seqTenant.smtpPort && seqTenant.smtpEmail && seqTenant.smtpPassword;
 
         try {
-          if (useGmail) {
+          if (useSmtp) {
             const decrypted = decryptPassword(seqTenant.smtpPassword!);
-            const transporter = createGmailTransporter(seqTenant.smtpEmail!, decrypted);
+            const transporter = createSmtpTransporter(seqTenant.smtpHost!, seqTenant.smtpPort!, seqTenant.smtpEmail!, decrypted);
             for (const contact of contacts) {
               let body = step.body
                 .replace(/\{name\}/g, contact.name)

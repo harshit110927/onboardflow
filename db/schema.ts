@@ -57,11 +57,13 @@ export const tenants = pgTable('tenants', {
 
   createdAt: timestamp('created_at').defaultNow().notNull(),
 
-  //smtp related fields
+  // email & smtp related fields
+  emailProvider: varchar("email_provider", { length: 20 }).default("resend"),
+  smtpHost: varchar("smtp_host", { length: 255 }),
+  smtpPort: integer("smtp_port"),
   smtpEmail: varchar("smtp_email", { length: 255 }),
   smtpPassword: text("smtp_password"),
   smtpVerified: boolean("smtp_verified").default(false).notNull(),
-  smtpProvider: varchar("smtp_provider", { length: 50 }),
   whatsappTemplate: text("whatsapp_template").default("Hi {name}, "),
 });
 

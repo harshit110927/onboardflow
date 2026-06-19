@@ -7,7 +7,7 @@ import { Resend } from "resend";
 import { db } from "@/db";
 import { individualCampaigns, individualContacts, individualLists, campaignEvents, unsubscribedContacts } from "@/db/schema";
 import { SendCampaignButton } from "./_components/SendCampaignButton";
-import { decryptPassword, createGmailTransporter } from "@/lib/email/smtp";
+import { decryptPassword, createSmtpTransporter } from "@/lib/email/smtp";
 import { createOpenTrackingUrl, injectTracking } from "@/lib/tracking/inject";
 import { getTenantPlan } from "@/lib/plans/get-tenant-plan";
 import { INDIVIDUAL_LIMITS, type PlanTier } from "@/lib/plans/limits";
@@ -85,12 +85,12 @@ async function sendCampaign(formData: FormData) {
 
   // ── Send emails ───────────────────────────────────────────────────
   const smtp = tenant;
-  const useGmail = smtp?.smtpVerified && smtp.smtpEmail && smtp.smtpPassword;
+  const useSmtp = smtp?.emailProvider === "smtp" && smtp?.smtpVerified && smtp?.smtpHost && smtp?.smtpPort && smtp?.smtpEmail && smtp?.smtpPassword;
   const trackingEnabled = limits.trackingEnabled;
 
-  if (useGmail) {
+  if (useSmtp) {
     const decrypted = decryptPassword(smtp.smtpPassword!);
-    const transporter = createGmailTransporter(smtp.smtpEmail!, decrypted);
+    const transporter = createSmtpTransporter(smtp.smtpHost!, smtp.smtpPort!, smtp.smtpEmail!, decrypted);
     for (const contact of activeContacts) {
       const rawBody = campaign.body
         .replace(/\{name\}/g, contact.name)

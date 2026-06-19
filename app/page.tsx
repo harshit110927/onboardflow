@@ -869,16 +869,16 @@ const landingMarkup = String.raw`<!-- ══════════════
         </div>
         <div>
           <h3>For SaaS Developers &amp; Founders</h3>
-          <p>Install the SDK, call two functions, and get onboarding analytics + automated drip emails — without building the infrastructure from scratch.</p>
+          <p>Install the SDK, track your onboarding, and get advanced drop-off analytics + automated drip emails without building infrastructure from scratch.</p>
         </div>
       </div>
       <div class="aud-tile reveal d2">
         <div class="aud-ico">
-          <svg class="ico" width="22" height="22"><use href="#i-store"/></svg>
+          <svg class="ico" width="22" height="22"><use href="#i-sparkles"/></svg>
         </div>
         <div>
-          <h3>For Small Businesses &amp; Freelancers</h3>
-          <p>Manage email lists, build drip sequences, and send campaigns from a no-code dashboard — without the complexity or cost of enterprise tools.</p>
+          <h3>Zero-Friction AI Integration</h3>
+          <p>Simply copy our auto-generated prompts and paste them into your favorite AI coder (Cursor, Copilot, etc.) to get fully integrated in under 10 minutes.</p>
         </div>
       </div>
     </div>
@@ -952,9 +952,9 @@ const landingMarkup = String.raw`<!-- ══════════════
         <p>Connect your own email API key. All emails send from your verified domain — never from a shared Dripmetric address.</p>
       </div>
       <div class="feat-card reveal d5">
-        <div class="feat-ico"><svg class="ico" width="20" height="20"><use href="#i-list"/></svg></div>
-        <h3>Email List Management</h3>
-        <p>Build and manage email lists, add contacts in bulk, create drip sequences, and launch campaigns — all from the browser, no code needed.</p>
+        <div class="feat-ico"><svg class="ico" width="20" height="20"><use href="#i-sparkles"/></svg></div>
+        <h3>Schema-less Event Discovery</h3>
+        <p>You don't need to pre-register your events. Send any step name from your codebase, and our system will automatically discover it for you in your dashboard.</p>
       </div>
       <div class="feat-card reveal d6">
         <div class="feat-ico"><svg class="ico" width="20" height="20"><use href="#i-package"/></svg></div>
@@ -971,10 +971,10 @@ const landingMarkup = String.raw`<!-- ══════════════
         </div>
       </div>
       <div class="feat-card-dark reveal d2">
-        <div class="feat-ico" style="color:var(--emerald)"><svg class="ico" width="20" height="20"><use href="#i-store"/></svg></div>
+        <div class="feat-ico" style="color:var(--emerald)"><svg class="ico" width="20" height="20"><use href="#i-sparkles"/></svg></div>
         <div>
-          <h3>SaaS onboarding dashboard</h3>
-          <p>Manage onboarding automation from the browser after connecting your public API integration. Your team can update steps, emails, and reporting without redeploying.</p>
+          <h3>Dynamic AI Integration Prompts</h3>
+          <p>Our dashboard auto-generates exact, context-aware prompts for your AI coding assistant. Just select the steps you want to track, copy the prompt, and let AI write the integration code.</p>
         </div>
       </div>
     </div>

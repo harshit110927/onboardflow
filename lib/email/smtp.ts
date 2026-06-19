@@ -23,21 +23,21 @@ export function decryptPassword(stored: string): string {
   return Buffer.concat([decipher.update(encrypted), decipher.final()]).toString("utf8");
 }
 
-export async function testSmtpConnection(email: string, password: string): Promise<void> {
+export async function testSmtpConnection(host: string, port: number, email: string, password: string): Promise<void> {
   const transporter = nodemailer.createTransport({
-    host: "smtp.gmail.com",
-    port: 465,
-    secure: true,
+    host: host,
+    port: port,
+    secure: port === 465,
     auth: { user: email, pass: password },
   });
   await transporter.verify();
 }
 
-export function createGmailTransporter(email: string, decryptedPassword: string) {
+export function createSmtpTransporter(host: string, port: number, email: string, decryptedPassword: string) {
   return nodemailer.createTransport({
-    host: "smtp.gmail.com",
-    port: 465,
-    secure: true,
+    host: host,
+    port: port,
+    secure: port === 465,
     auth: { user: email, pass: decryptedPassword },
   });
 }
