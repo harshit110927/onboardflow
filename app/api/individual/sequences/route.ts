@@ -26,7 +26,7 @@ export async function POST(req: Request) {
     if (!user?.email) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const tenantRows = await db
-      .select({ id: tenants.id, tier: tenants.tier, smtpEmail: tenants.smtpEmail, smtpPassword: tenants.smtpPassword, smtpVerified: tenants.smtpVerified, smtpHost: tenants.smtpHost, smtpPort: tenants.smtpPort, emailProvider: tenants.emailProvider })
+      .select({ id: tenants.id, name: tenants.name, senderName: tenants.senderName, tier: tenants.tier, smtpEmail: tenants.smtpEmail, smtpPassword: tenants.smtpPassword, smtpVerified: tenants.smtpVerified, smtpHost: tenants.smtpHost, smtpPort: tenants.smtpPort, emailProvider: tenants.emailProvider })
       .from(tenants)
       .where(eq(tenants.email, user.email))
       .limit(1);
@@ -99,6 +99,7 @@ export async function POST(req: Request) {
       }
 
       const firstStep = steps[0];
+      const fromLabel = tenant.senderName || (tenant.name ? `${tenant.name} Team` : "Dripmetric Team");
       const useSmtp = tenant.emailProvider === "smtp" && tenant.smtpVerified && tenant.smtpHost && tenant.smtpPort && tenant.smtpEmail && tenant.smtpPassword;
 
       if (useSmtp) {
@@ -107,14 +108,14 @@ export async function POST(req: Request) {
         for (const contact of activeContacts) {
           const body = firstStep.body.replace(/\{contact_name\}/g, contact.name);
           await transporter.sendMail({
-            from: tenant.smtpEmail!,
+            from: `"${fromLabel}" <${tenant.smtpEmail!}>`,
             to: contact.email,
             subject: firstStep.subject,
             html: buildEmailHtml({
               body,
               contactEmail: contact.email,
               unsubscribeToken: createUnsubscribeToken(contact.email),
-              senderEmail: tenant.smtpEmail!,
+              senderEmail: fromLabel,
             }),
           });
         }
@@ -122,14 +123,14 @@ export async function POST(req: Request) {
         for (const contact of activeContacts) {
           const body = firstStep.body.replace(/\{contact_name\}/g, contact.name);
           await resend.emails.send({
-            from: "Dripmetric <hello@dripmetric.com>",
+            from: `${fromLabel} <hello@dripmetric.com>`,
             to: contact.email,
             subject: firstStep.subject,
             html: buildEmailHtml({
               body,
               contactEmail: contact.email,
               unsubscribeToken: createUnsubscribeToken(contact.email),
-              senderEmail: "hello@dripmetric.com",
+              senderEmail: fromLabel,
             }),
           });
         }
