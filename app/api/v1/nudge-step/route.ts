@@ -121,6 +121,7 @@ export async function POST(req: Request) {
     });
 
     const emailSender = resolveEmailSender(tenant);
+    const fromLabel = tenant.senderName || (tenant.name ? `${tenant.name} Team` : "Dripmetric Team");
     const companyName = tenant.name || "Team";
 
     let sent = 0;
@@ -183,7 +184,7 @@ export async function POST(req: Request) {
           subject: stepConfig.emailSubject,
           html: buildEmailHtml({
             body: emailBody,
-            senderEmail: companyName,
+            senderEmail: fromLabel,
           }),
         });
 

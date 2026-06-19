@@ -93,7 +93,7 @@ export async function POST(req: Request) {
     }
 
     const emailSender = resolveEmailSender(tenant);
-    const companyName = tenant.name || "Team";
+    const fromLabel = tenant.senderName || (tenant.name ? `${tenant.name} Team` : "Dripmetric Team");
     const userName = email.split("@")[0];
 
     const parsedBody = emailBody
@@ -105,7 +105,7 @@ export async function POST(req: Request) {
       subject,
       html: buildEmailHtml({
         body: parsedBody,
-        senderEmail: companyName,
+        senderEmail: fromLabel,
       }),
     });
 
